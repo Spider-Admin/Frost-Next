@@ -33,6 +33,9 @@ public class TableBackgroundColors {
     private static Color redColor = new java.awt.Color(0xFF,0x99,0x99);
     private static Color lightRedColor = new java.awt.Color(0xFF,0xCC,0xCC);
 
+    private static Color blueColor = new java.awt.Color(0x96,0xC4,0xFF);
+    private static Color lightBlueColor = new java.awt.Color(0xC2,0xDC,0xFF);
+
     public static Color getBackgroundColor(final JTable table, final int row, final boolean showColoredLines) {
         if( showColoredLines ) {
             if ((row & 0x0001) == 0) {
@@ -66,6 +69,18 @@ public class TableBackgroundColors {
             }
         } else {
             return redColor;
+        }
+    }
+    
+    public static Color getBackgroundColorPaused(final JTable table, final int row, final boolean showColoredLines) {
+        if( showColoredLines ) {
+            if ((row & 0x0001) == 0) {
+                return lightBlueColor;
+            } else {
+                return blueColor;
+            }
+        } else {
+            return blueColor;
         }
     }
 }

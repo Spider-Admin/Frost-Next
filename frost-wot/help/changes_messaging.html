@@ -1,0 +1,650 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="Content-Style-Type" content="text/css">
+    <link rel="stylesheet" href="style.css" type="text/css">
+    <title>Changes: Messaging (Frost-Next)</title>
+  </head>
+<body>
+<h1>Changes: Messaging (Frost-Next)</h1>
+<p><a href="index.html">Back to Help Index</a></p>
+<table class="cltable" cellspacing="0" cellpadding="0">
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">1.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>This is what everyone has been waiting for! The legacy versions of Frost all take exponentially longer to open a board the more messages are in it, and it rises sharply the more messages are in a board. For up to 5000 messages, it "only" takes around 5 seconds. For 15000 messages you would instead be waiting for 1-2 minutes. The reason for this is that Java is extremely slowly re-painting the whole GUI over and over while inserting thousands of message rows.</p>
+    <p>Frost-Next instead uses a crazy new idea to work around Java's limitations: First, the Java GUI is set to a fake off-screen GUI that renders nothing (and therefore "renders" any changes <i>instantly</i>). Next, I insert the massive new message list from the loaded board (which of course renders nothing on screen since it's a fake GUI, and is therefore inserted instantly). Finally, I set Java back to its regular GUI rendering and tell it to repaint the visible on-screen part of the GUI all in a single operation.</p>
+    <p>The result? Boards with 5000 or 30000 or 100000 messages now load in less than 1 second, <i>most of which</i> is the non-GUI work (such as loading messages from disk and building the thread hierarchy, etc). The GUI rendering step for 5k messages is now only ~100 milliseconds, and for 15k messages it's around ~300 milliseconds, and so on. This speed trick is also used whenever you change the view settings (such as going between threaded/non-threaded mode). Switching quickly between boards and view-modes without any noticeable delay feels like a whole new world. The only limitation is the speed of your hard disk (how fast it can load the messages), but even that's cached in memory by Frost-Next, so that re-visits to a board are always faster than the initial click.</p>
+    <p>Enjoy the next generation!</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">2.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Since Frost-Next is insanely fast at loading board messages, it made sense to give you new keyboard shortcuts for changing view modes. You can now fly around effortlessly between threading and non-threaded mode, showing only certain types of messages, etc. And the viewmode-switching has been programmed in a very robust way, so that you can literally <i>mash</i> the keys as fast as you can and it will still never choke; it handles your viewmode-switches one by one and lets each take effect before processing the next change. So you can be as careless as you want, rolling your head on the keyboard to switch modes constantly! Knock yourself out! See the general keyboard shortcut overview for more information.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">3.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>The message list now renders rows about 30% faster in general (such as while scrolling), and uses <i>much less memory</i>, thanks to using a fixed-size row height cache which treats every row as the same height and <i>no longer wastes time and memory</i> calculating and caching individual row-heights for potentially tens of thousands of identically-sized message rows.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">4.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>The decade of living with Frost's dreaded midnight messaging bugs is finally over! You can now <i>freely</i> talk at midnight for the first time! Fixed midnight bug #1 of 2:</p>
+    <p>The first and most annoying of the two midnight bugs was caused by the very poor design of Frost's old board refresher. As soon as midnight UTC/GMT occurred, everyone's Frost clients only grabbed the new day, which meant that they didn't see the conversations that took place at midnight. That made it <i>completely impossible</i> to have active conversations near midnight. "Conventional wisdom" on Frost became that you should <i>never post messages</i> any later than "1-2 hours before midnight", otherwise nobody would reply to them since most people wouldn't see your messages.</p>
+    <p>Here is how the bug manifested itself:</p>
+    <ul>
+      <li>23:18 on the 1st of December: Bob's Frost client runs its regularly scheduled (45-minute interval) board refresh, which grabs all new messages posted on "1st of December".</li>
+      <li>23:30 on the 1st of December: Alice posts a message to the board.</li>
+      <li>00:03 on the 2nd of December: Bob's Frost client runs its regularly scheduled (45-minute interval) board refresh again, which now grabs all new messages posted on the "<b>2nd</b> of December". He never sees Alice's message or anything else that was posted mere minutes ago (aka "yesterday on the 1st of December") in-between his two update intervals.</li>
+    </ul>
+    <p>If you were lucky, you would see Alice's message <i>12 hours later</i> when Frost runs its scheduled (12-hour interval) "download <i>all</i> days backwards" scan instead of just a "today" scan, but by then Alice's old message would have been buried under 12 hours of new messages posted by others on the new day and would yet again be missed by most people.</p>
+    <p>Unfortunately this midnight bug/misbehavior meant that for almost a decade, <i>all</i> Frost board conversations have died down in the 2 hours before and after the American East Coast / European primetime hours when <i>most</i> people are active at their computers, and you <i>constantly</i> had to be paranoid about <i>when</i> to post your message. If it was close to UTC midnight, it was <i>much</i> better to wait until afterwards to post your new message.</p>
+    <p>In Frost-Next, this <i>huge</i> problem is <i>finally</i> a thing of the past! <i>All</i> messages are now seen by <i>everyone that's using Next</i>, even if posted at midnight. The message downloader in Next has been rewritten and now grabs the current day's messages <i>plus</i> anything new that was posted near yesterday's midnight. You are now welcome to speak to each other <i>freely</i> at midnight, for the <i>first</i> time ever!</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">5.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>The decade of living with Frost's dreaded midnight messaging bugs is finally over! You can now <i>freely</i> talk at midnight for the first time! Fixed midnight bug #2 of 2:</p>
+    <p>The second and final of the two midnight bugs was <i>extremely</i> serious, since it could lead to <i>permanently losing</i> your sent messages into a "black hole" where nobody would <i>ever</i> see them, and it could actually happen <i>at any time of day</i> (although it was most common at midnight). It was slightly difficult to trigger this bug (as you'll see in its conditions below) since most people avoided speaking at midnight, but the fact that Frost-Next now supports midnight conversations would have made this second, "black hole" midnight bug <i>much</i> more common, so it has been completely squashed as well.</p>
+    <p>Due to a very serious (and very silly) bug in the message uploader, your messages vanished into a "black hole" <i>whenever</i> Frost uploaded messages with a <i>mismatch</i> between the message's "envelope date" and which date's "message slot index" it used. For example, let's say that you started a board-refresh (which is what uploads messages) on the 21st and that there were currently 51 other messages that were posted on the 21st in that board. When Frost begins your board-refresh, it grabs the <i>current</i> day's "message slot index" (the 21st in this case), and when it <i>finishes</i> checking all new messages for "today", it uses <i>that</i> previously-grabbed "message slot index" to decide <i>which slot</i> to put the outgoing message in. It had absolutely <i>zero</i> checks to make sure it was still the same day, and it was therefore <i>extremely</i> important that the "current day" hadn't <i>changed</i> in the period between when the board refresh began, and when the actual message uploading began.</p>
+    <p>In several cases, various <i>delays</i> could lead to the day <i>passing over to the next day</i> (the 22nd, in this example) <i>before</i> the message uploading had a chance to begin, which meant that your message uploads were incorrectly performed with an <i>outdated</i> "slot index" belonging to the <i>previous</i> day. In this example, your message would be uploaded as message #52 (the next available spot in the <i>old</i> slot index), but using the "envelope date" (current date and time) stating the date of the <i>new</i> day. Since your message is now posted as "Message #52 on the 22nd", <i>nobody</i> would <i>ever</i> see that message <i>unless</i> other people posted <i>51</i> other messages on the <i>new</i> day too, so that the new day's index actually reached your incorrectly marked message. The correct behavior would have been to detect that the day had changed and to use the proper "slot index" for the <i>new</i> day (the 22nd, which would have started at message index #0).</p>
+    <p>This serious "black hole" midnight bug happened in three situations:</p>
+    <ul>
+      <li>If you started a board refresh <i>right before midnight</i> and it finished <i>after</i> midnight, in which case all messages were uploaded using what's now "yesterday's slotindex". Since it usually takes 1-15 minutes to refresh today's messages, you were at high risk of the "black hole" if you posted a message very close to midnight.</li>
+      <li>If you had a huge amount of active <i>file downloads</i> running with <i>very high</i> download priorities, they could delay the messaging system. The message downloading only runs with priority 2, so the message fetching for "today's messages" would be severely starved/stalled by the pressure of your regular file download queue in this scenario. It could take <i>hours</i> to download the "today" messages for a board, and a board refresh started <i>long before</i> midnight could easily be delayed so that it didn't finish until after midnight, thus putting your messages in the "black hole" yet again.</li>
+      <li>Or, even more commonly: If you queued up <i>multiple</i> outgoing messages, and one or more of them <i>stalled</i> the queue, such as by running a huge file upload queue with priority 0 (maximum) and your message uploads with priority 2 (Frost's old default), which meant that your ongoing file uploads would stall your "lower sending priority" outgoing message for <i>hours</i> or <i>days</i>. Your first, stalled, outgoing message was actually still correctly marked, since it had already been associated with the old "now" date and the old "now" slotindex at the moment its upload-attempt began, but the <i>subsequent</i> messages in your multi-message queue were in big trouble... because when it was finally <i>their</i> time to upload, the slotindex had become outdated by one or more days (however long it took to upload the previous message in the queue).</li>
+    </ul>
+    <p>Next completely fixes the "black hole" behavior in multiple ways:</p>
+    <ul>
+      <li>First of all, message <i>uploads</i> (but not its file attachments) now default to Priority 0, which makes them faster and <i>ensures</i> that <i>regular</i> file uploads <i>never</i> stall message uploads anymore (messages are tiny 32k blocks most of the time and really <i>don't</i> need to run with anything below max priority). This high message upload priority is incredibly important whenever you've queued <i>more than one</i> outgoing message. If the priority is low, the first message upload would stall the rest of your outgoing message queue.</li>
+      <li>Secondly, the message uploader verifies that the slotindex date matches the envelope-date of the message, and if so it allows the message to be uploaded. If not, it refuses to upload the message (to prevent the bug from ever happening again).</li>
+      <li>Lastly, if the slotindex date did <i>not</i> match the envelope-date, it downloads the <i>latest</i> messages and slotindex for "now" (whatever day that may be), and then performs the upload properly.</li>
+    </ul>
+    <p>That last point ensures that the fix is transparent for users: If you queue lots of messages or start board refreshes near midnight, then Frost-Next will <i>always</i> guarantee that your messages are uploaded with the correct slotindex for the envelope-date they get stamped with, <i>even if</i> it takes <i>several days</i> to finish the upload job.</p>
+    <p>Now that <i>both</i> of the serious midnight bugs are fixed, you're welcome to speak <i>as much as you want</i> at midnight with <i>zero</i> worries <i>ever</i> again. Everyone will see every message, and every message you upload will be retrievable. Let there be a new dawn of midnight discussions! Enjoy!</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">6.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>You can now configure the GUI colors used for various message types, which allows you to fine-tune your own favorite GUI (and Frost-Next comes with beautiful, fine-tuned defaults for each color). This new capability helps color blind people as well. And it enhances security of Frost, by showing clear differences between each type of message. The colors are used in the "Subject" and "From" columns in all message lists (including search results, your list of sent messages, etc).</p>
+    <p>The configurable colors are Normal messages, Private messages, Private message editor (the color shown when you've chosen a recipient for your in-progress message), Messages with attachments, and Unsigned/"Anonymous" messages. The latter is a security feature; prior to this change, anonymous messages showed up in the same black color as normal messages, which meant that somebody could easily spoof the author of a message by inserting a fake XML file with their name as the sender's name (Frost itself refuses to send such messages, but they could be inserted manually in order to appear like <i>any</i> other user).</p>
+    <p>Use the "Preferences &gt; Display &gt; Colors" panel to choose your colors, and remember to press "Ok" to close the preferences and apply your colors.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">7.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Along with the new ability to set custom GUI colors comes a new color scheme! Private messages <i>aren't</i> a harsh red anymore and attachments <i>aren't</i> a harsh blue, and the private message editor <i>isn't</i> a harsh and eye-burning blue. Those days are all in the past. Instead, these fresh, new colors are used by default (and you can change them if you prefer other colors):</p>
+    <ul>
+      <li>Normal messages = Very dark blue, almost looks black. It provides great contrast against all other default message type colors.</li>
+      <li>Private messages = Pink, which stands out very clearly (without being obnoxiously red like in the past).</li>
+      <li>Private message editor = A medium-dark blue color, which is distinct from the pitch black color used when writing normal messages; if this is too dark for you and you can't see that you're in private message mode, then just change the color. However, this default shade should be great for most people and is intended as a relaxing color while writing messages (as opposed to the eye-burning blue used in the past).</li>
+      <li>Messages with attachments = A slightly-dirty sky blue, which stands out clearly against all other messages.</li>
+      <li>Unsigned/"Anonymous" messages = A partially faded, gray color so that they aren't able to impersonate/spoof signed IDs; it also helps clean up boards since almost every spammer and troll uses unsigned messages, so it helps give you an "at-a-glance" overview of what's possibly spam/abuse. If you don't like this security feature, then feel free to set them to the same color as normal encrypted/signed messages, it's up to you.</li>
+    </ul>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">8.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>All message text now renders with proper word wrapping, thanks to a new, custom word-wrap renderer. You'll never see any ugly, annoying horizontal scrollbars again.</p>
+    <p>The problem was that Freenet keys (such as CHK@s) are extremely long and don't contain any spaces. Java sees that as a single "EXTREMELYLONGWORDTHATWECANNOTWRAPSINCETHEREARENOSPACES", and that's why keys could not split across multiple lines. So why did Frost "work" in the past? Because Java 6 and lower <i>used to</i> try to wrap lines at word boundaries, and if that failed it <i>forcibly</i> wrapped them anyway at character boundaries. As of Java 7, the behavior is to <i>never</i> force-wrap long words.</p>
+    <p>The new, custom renderer instructs Java exactly how to wrap lines, and ensures that we always break overly long words if necessary. This solution works regardless of Java version, so that you'll never need to scroll horizontally <i>ever</i> again.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">9.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>New, graphical thread-renderer for the message table now draws brand new, <i>sexy</i>, circular "expand/collapse" icons in threaded view, along with some soft, blue connecting lines which shows the thread hierarchies. These fresh icons are unique to Frost-Next, and will show up in <i>every</i> "Look and Feel". You can also change to alternative, square icons via "Preferences &gt; Display &gt; Message tree expansion icons", if you prefer that (only to be used by crazy people who dislike sexy circles).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">10.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Overhauled "JUNK message" system:</p>
+    <ul>
+      <li>The "Preferences &gt; Junk &gt; Hide JUNK messages" option is gone from the preferences panel. Instead, there is a new toolbar button next to the "show only unread/starred/flagged". It allows you to instantly toggle the hiding/showing of messages you've marked as JUNK.</li>
+      <li>Keyboard shortcuts! If you see messages you don't want to see, just press J on the keyboard to mark them as junk (or click the junk column).</li>
+      <li>If you've disabled junk display, the junk messages will not be seen the next time you reload that board (or change view mode). And if you're curious about what is being hidden, just enable the showing of JUNK and you will be able to see them (preferably by sorting via the Junk column in non-threaded mode).</li>
+      <li>Also remember to use "Preferences &gt; Junk &gt; Mark identity that sent JUNK as BAD (if their current trust state is NEUTRAL)", if that sounds useful to you. You can even combine it with "Preferences &gt; News (2) &gt; Hide messages with trust state: BAD" to automatically hide further posts from those people.</li>
+    </ul>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">11.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Advanced and intelligent new "Undo Manager" for the message composer. You will no longer have to fear spending 15 minutes writing something, and then accidentally selecting everything and hitting some other key and <i>screaming</i> when the whole message is lost. You now simply press Ctrl + Z to undo and Ctrl + Shift + Z (or Ctrl + Y) to redo.</p>
+    <p>The undo manager is intelligent and splits your edits into individual, undoable segments based on multiple factors such as inactivity and the last text cursor position. All you need to know is that Ctrl + Z will give you granular undo-ability of any changes.</p>
+    <p>However, there is one small caveat: If you change the sending identity via the "From" dropdown, we discard all current undo-history. This is unfortunately <i>necessary</i>, because changing the identity creates a "new document" with a new ID-line, signature and other important details, which the user is not allowed to undo. So you just need to keep one thing in mind: Set your proper sending identity at the <i>start</i> or <i>end</i> of the writing process.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">12.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Added "Undo" and "Redo" to the right-click menu in the "New message" composer, for those who don't think about trying the "Undo" keyboard shortcuts.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">13.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>When composing messages, the identity picker now has new color-indicators to show you which identity you've chosen. The dropdown colors each identity with a unique color, and when you've made a selection you will see the color of that identity in a small pellet to the right of the name, as well as in the background of the dropdown menu itself (if your current Java "Look and Feel" theme supports background colors on dropdowns). This helps you quickly glance up at the pellet to make sure you've selected the correct sending identity (color), so that you never send something with the wrong identity by accident anymore.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">14.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>We now ask you to confirm that you want to send unencrypted (unsigned) messages without any proper Frost identities. The confirmation is intended to teach new users about the very real downsides of posting without an ID, but can be suppressed forever by unchecking the "Show this dialog again next time" checkbox at the bottom of the confirmation window.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">15.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Whenever you close an unsent message, the message composer now analyzes whether or not you've written anything and will only ask "Do you want to discard your unsent message?" if you've <i>actually</i> written something. This means there's no more super-annoying confirmation every time you create a message, regret making it, and decide to close it again. For those curious about specifics: It looks for <i>any</i> edits to your signature area, or any non-whitespace edits in the area between your sender-line and your signature.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">16.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>The intelligent "has the user written anything?" check is now also performed when attempting to send a message. This means that your signature no longer counts as your message contents. If you selected an identity with a signature and pressed send, it <i>used to</i> accept and send away that blank message. Now it <i>properly</i> detects that you haven't written anything, and refuses to send the message.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">17.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>You can now close any message window using Ctrl + W (Windows/Linux) or Cmd + W (Mac). This acts exactly like pressing the window's "X" to close the message normally, but is a very fast and convenient shortcut which allows you to fly around the user interface effortlessly (for instance, super quickly checking and closing lots of message search results). You can even use the shortcut to close the "New message" composer window, and it will close your window immediately (or if you've written something, it will ask you to confirm abandoning your unsaved work).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">18.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>You can now tell Frost to "Refresh board" even while it's busy with a long, slow "all days back" scan. It will then start a parallel "today" scan, which grabs today's messages without interrupting the "all days" progress. This lets you quickly refresh the latest messages even though you may be busy with a very long "all days" scan that's downloading hundreds of days backwards.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">19.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>The message uploader now always uploads today's outgoing messages when it finishes downloading "today" regardless of whether the running board-refresh is in today-mode or all days-mode (used to only do it when "today" ran, which delayed outgoing messages).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">20.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Massive improvement to the uploading of messages with file attachments. Instead of forever sitting as "Waiting" without showing any status at all (as if they were stuck), they now show "Attaching: example.jpg", etc. The file attachments are (as always) uploaded one by one, and it will go through all of them before it finally gets to "Uploading" of the message itself.</p>
+    <p>Here's a bonus tip: If you double-click the outgoing message and look at the file attachments at the bottom, the ones with "Key: ?" are not yet fully uploaded. You can also see the sizes of each attachment to draw your own conclusions about how long it will take. If you are going to upload very large files, then you should <i>always</i> prefer the regular upload panel instead, which has much more control and feedback and doesn't hog your message upload queue.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">21.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>If you accidentally hit Delete on your keyboard to delete a message in the message list, you can now press Shift + Delete to undelete it (without needing to use the right-click menu).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">22.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Upgraded the "Search messages" dialog so that it's now powered by an advanced regex engine, instead of old plaintext searches. This makes Frost's message search <i>extremely</i> powerful, <i>and</i> about 5x faster than in the past. See the dedicated "Feature Details: Searching for Messages" page for more information.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">23.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>The search text highlighter now supports regex matches. So when you double-click a search result to view a message, you will see all matches within the opened message.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">24.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>It is now <i>finally</i> possible to jump <i>directly</i> from your search results to the associated message thread. Comments from the legacy author reveal that he had <i>tried</i> to add the feature, but gave up - and I don't blame him, since it was <i>not</i> trivial to add. The GUI timings and synchronization had to be done <i>just right</i> and in a performant way, but I considered it an essential communication feature which <i>had to</i> be added no matter how difficult it was or how many hours it would take.</p>
+    <p>Search has always been one the biggest pains in Frost. You find great results, and then struggle to find the actual thread in the related board to read the whole thread in context. Or worse, you'd spend ages in the "search results" window, clicking on each individual message and trying to read them in a jumbled order.</p>
+    <p>Now, you can simply press the new "Go to message" button at the bottom of the search window, and Frost-Next will switch to the correct board and jump directly to the desired message thread. From there, you can easily read the rest of the thread in context.</p>
+    <p>It even marks the selected message as "read" in the search results table, so that you know which messages you've jumped to.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">25.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>New, completely rewritten "Message Tree Table", which <i>finally</i> maintains your row selections properly at all times. No more suddenly jumping selections, suddenly de-selected messages (and associated loss of reading position), and so on. You can finally relax and enjoy your reading even while the boards are refreshing and new messages are arriving. Thanks to this change, Frost-Next now <i>defaults</i> to "multi-line selection mode" (which used to exacerbate the problem) for the message list, since the row selections are <i>finally stable</i> and reliable.</p>
+    <p>This was a <i>huge</i> undertaking taking close to a week, due to the complex synchronizations and countless message insertion race conditions that had to be avoided. The old code was a total mess which incorrectly calculated all row insertion locations and ranges. But just fixing it to calculate the correct row <i>wasn't</i> enough, since Java is still dumb and might select the wrong rows after the inserts. So Frost-Next uses a new, advanced tool which calculates the exact rows that will need to be selected, and corrects your selection invisibly and on-the-fly as new messages arrive.</p>
+    <p>But... just fixing the row calculation and selection code isn't enough either... Because there is always a brief moment of "flutter" in the selection as the correction is applied, which makes it select the wrong row and then the right row again. It's invisible to the user, but the code certainly sees it! If left as-is, it would mean that your currently visible message would be <i>unloaded</i> (when it selects the wrong row), and then <i>reloaded</i> (when it selects the correct row again). That would mean that you'd constantly keep losing your current reading position (scroll position) within the current message. So to fix that last remaining issue, Frost-Next features a "delayed selection worker" which filters out the flutter so that we don't reload your current message.</p>
+    <p>These deep, exhaustive fixes ensure that you can finally enjoy threaded and non-threaded modes, with and without multi-line selection enabled. You'll <i>never again</i> have to worry about your message selection getting screwed up or your current reading position being lost. It's all safe, stable and reliable at last; the Frost-Next way!</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">26.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>In a move that's sure to make many people happy, the "Subject" field for new messages now defaults to blank (no more "No subject"). If the user tries to send a message with a blank subject, it refuses and says "You must enter a subject!". If you try to manually type "No subject" (case insensitive), it says "You must enter a <i>proper</i> subject for your message!". If you try to reply to a message with a title of "Re: No subject", you'll likewise be prevented from doing so and will be forced to edit the subject to something that actually describes the thread.</p>
+    <p>This ensures that newbies actually <i>have to</i> fill in a subject, and that they won't settle for the old "No subject" default. It also ensures that trolls can't type their beloved "No subject" anymore. Perhaps most importantly of all, it helps <i>legitimate</i> users create new threads more easily, since we no longer have to manually select the words "No subject" to type in a proper subject. Now you just click once and type, since the field is empty by default.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">27.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>The "TRUST STATE" system has been completely revamped since the old system was piss-poor and confusing and scared most people away from using the system whatsoever. For instance, the worst offender was that two of the <i>old</i> states (CHECK + OBSERVE) were <i>synonyms</i>. Another big offender was the fact that anyone you marked GOOD massively cluttered up your buddy-list dropdown when composing new private messages, and yet there was no other type of "good" person state, which meant you were discouraged from marking people good. And of course, all states had confusing names since the legacy Frost author was German and didn't grasp English very well (i.e. the synonym issue and the generally awful user interface language). The new system has been cleaned-up from the ground up, so that all states make sense and encourages people to mark others with the <i>new</i> "GOOD" state, and to only mark <i>real</i> friends with FRIEND (people you want available in your recipient list when composing new private messages).</p>
+    <p>The new trust state system is as follows (with corresponding legacy values in parenthesis):</p>
+    <ul>
+      <li>FRIEND (previously called: GOOD). This state is for people you want to be able to select as recipients for new private messages, i.e. your "buddy list"; that's literally the <i>only</i> reason to use this over GOOD. Note that you can still <i>reply</i> to incoming private messages <i>regardless</i> of the sender's state!</li>
+      <li>GOOD (previously called: OBSERVE). Someone you've seen for a while and seen that they're not a spammer/asshole. You should mark <i>most</i> people with this state after they've been around for a while.</li>
+      <li>NEUTRAL (previously called: CHECK). This is the default state, and means that you haven't got a positive or negative opinion of this person yet.</li>
+      <li>BAD (previously called: BAD). Means that the person is a spammer or just a general asshole.</li>
+    </ul>
+    <p>People who are upgrading from old versions of Frost are recommended to switch all of their FRIEND identities to GOOD instead, and to only mark people as FRIEND if you want them in the buddy-dropdown when creating new private messages. Note that if you're upgrading from a legacy version of Frost, your trust-states will automatically be converted to their corresponding new values above. The same goes if you ever import an old identity-list XML file which used the old states.</p>
+    <p>All source code now uses ALL-CAPS for all of these identity states, so that it's easy to search for the words and find all code related to identities if there's ever a need to add any more states, etc. This means that no other developers ever have to go through the hell of manually reviewing 2200 unrelated lines of code just because the word "check" <i>was</i> absolutely everywhere in the source code comments.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">28.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Along with the new trust state system comes fresh, new, non-ugly colors for the various states! BAD is red with a tiny bit of soft orange. NEUTRAL is a slightly-muted but still shiny orange, which calls attention (meaning you should apply a state to that person as soon as possible). GOOD is a midtone green, with a neutral brightness since it's a very common state. Lastly, FRIEND is a dark/muted sky blue, which stands out beautifully without being too bright.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">29.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>New, quick trust-state keyboard shortcuts in both the message list and the "Manage identities" window. You can now use the number row or numpad's 1-4 keys to mark the selected users with a certain trust state. 1 = Mark FRIEND, 2 = Mark GOOD, 3 = Mark NEUTRAL, 4 = Mark BAD. This order was chosen because it corresponds with the order of the clickable state toolbar buttons, and also because it means that you get quick access to 1-3 which are the three most common states, with some clear numpad separation for 4 (Mark BAD) which is only used rarely.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">30.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Added a "Downloading Day 1/30 (2015-11-16)" indicator to the status bar of Frost; it displays the status for the currently selected board, and is shown whenever the current board is performing an "<i>all days back</i>" update (there's no sense showing it for a "today only" board update). This new indicator lets you see <i>exactly</i> how far along your all-days update is and what day it's currently working on, which means that you no longer have to update your boards "blind". Day 1 is today and day 2 is yesterday, etc. Having an indicator was originally an idea by SnowFlake, but his version was utterly broken and completely useless (didn't show anything more than just "Updating Day 1", and kept flickering back and forth between different numbers since multiple threads were changing the status at the same time). The Frost-Next indicator is rewritten, extended and rock solid. Most importantly, the added ability to see the maximum day <i>and</i> the <i>exact</i> date that it's currently working on is <i>extremely</i> useful, since it gives you a good idea of how long the scan will take until completion.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">31.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Ability to choose the start-day to begin downloading "All days backwards" board-update messages from (in the per-board configuration). The number "1" means today, "2" means yesterday, and so on, up until the max number of days to download. If this isn't configured, the boards always start from 1 (today). This option is useful for starting a large board refresh far back in time and simply skipping all recent dates. You could for example set a board to start from day "300" and download until day "1200", which will save you a lot of time if you know that you've already got all messages from days 1-300.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">32.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Support for stopping and resuming board refreshes, via right-clicking the board and choosing "Stop refreshing board". This was initially an idea from SnowFlake but was a huge, buggy mess. It has been completely rewritten and now correctly stops <i>all</i> board-threads (instead of just one) for the selected board, and it now stops them <i>as soon as possible</i> (it stops after the 2-3 currently fetching messages have been downloaded, instead of after the <i>whole current day</i> has been completed). This rewritten code means that you only have to wait for about 5-30 seconds for the refresh to stop (if the whole day was allowed to finish it would have taken up to 20 minutes).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">33.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>You can now right-click on boards and choose "Resume refresh" to resume an interrupted "All days back" scan (which was stopped via either the new "Stop refreshing board" feature or by closing the Frost client while a board update was in progress). The menu item <i>only</i> shows up if the board's <i>last</i> refresh was an <i>unfinished</i> "All days back" scan. With this new feature, you could start a long scan, decide to stop it, and then regret your decision and instantly resume again exactly where you left off. Resuming was inspired by SnowFlake, but unlike his code this version actually works (his tried to load invalid dates from the <i>future</i> if 1 or more days had passed since the board update). If you need another, even better way of starting your board refreshes further back in time, use the new "Days backwards to start downloading from" setting in the per-board configuration instead.</p>
+    <p>Note that if you stop a board update and then resume it a few days later, Frost-Next will adjust the start/max days to compensate so that it starts at the <i>exact</i> date you left off at; so even though you might have set everything to download 30 days (for example), the new status bar indicator could say something like "Downloading Day 11/40 (2015-11-16)" when you resume instead. Don't worry; it always downloads exactly as many days as you asked for, but it compensates for the time elapsed since you interrupted the board update.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">34.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Added a "Quicksend mode" feature for messages ("Preferences &gt; News (1) &gt; Attempt to send your outgoing Frost messages as soon as possible"). It is enabled by default, since it greatly speeds up communication for everyone on Frost. When enabled, the act of pressing <i>Send</i> on a new message starts a "download today's messages" board refresh for the target board, and then uploads your message in the next available message slot for today. If disabled, you'll have to wait for the regular 45-minute interval board refresh to happen instead. See the dedicated "Feature Details: Quicksend Mode" page for more information.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">35.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>It is now possible to click on keys in messages and choose "Open all image keys in browser". This new feature opens all images (bmp, gif, jpg, jpeg, png) in the browser, and is amazingly useful. It's particularly useful for opening all of a post's preview images for quick evaluation without having to download anything. If there are duplicate image keys in the list (which is common in message threads), it only opens the unique image keys so that you don't get duplicate web tabs. You can also use the "Open all image keys from current message in browser" function instead, to only open the keys after the current message's ID-line, which is useful when you only want to look at the latest previews. Note that since images are very small and download quickly in realtime (browser) mode, there's <i>absolutely no risk</i> opening them in the browser directly like this.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">36.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>All board descriptions now enforce a couple of stylistic rules, to ensure that they look clean and consistent in the board list viewer. These rules are enforced even if you upgrade from an old version of Frost, and any old board descriptions are automatically migrated. The first alphabetical character of the description becomes uppercase (if it isn't already). A period is added at the end of the description unless there's already some acceptable punctuation (".!?" or a smiley). This cleanup code is fully Right-to-left language and Unicode aware.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">37.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>There's one or more neurotic people spamming boards with an attachment referring to the "no subject" board whenever someone posts a legacy Frost message titled "No subject" (which is a nuisance that's no longer possible in Frost-Next). They're never contributing anything to the discussions, and since their messages had attachments they showed up in a blue, bold highlight and annoyed the hell out of normal people. So, just to save us from those idiots, the "no subject" board has been wiped off the face of the earth. It's deleted from all incoming messages that contain it, it's wiped out of your Frost instance if you're upgrading from an old version, and you cannot create or add the board ever again.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">38.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Frost-Next contains a new, high-quality, curated (but fully <i>uncensored</i>) list of <i>all</i> 62 active boards on Frost. After almost 15 years, the network has stabilized and we know exactly which boards are active and which have always remained dead. And thanks to this new list of all active boards, users no longer have to ask "where is stuff?" - the answer is right there in front of them. There are even a couple of new boards introduced by Next (such as "drugs", "ebooks" and "multimedia"), to cover the <i>few</i> remaining conversation topics that didn't already have a forum.</p>
+    <p>The first time that you start Frost-Next, it asks if you want to import the new board list. If not, you can always find the list via the "Import Defaults" button in the Known Boards Manager (the globe icon in the main toolbar). Importing won't erase any of your previous boards (if you are upgrading from legacy Frost), so you don't have to worry about that. But anyone who wants to clear out their old, legacy lists full of junk can simply delete their old board list and import the new defaults.</p>
+    <p>Furthermore, all bundled boards have new, consistent, custom-written descriptions which replaces their old descriptions and explains what each board is used for. This gives first-time users a much better experience.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">39.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>The legacy "<i>frost-announce</i>" board has been removed. It was a read-only board which forcibly kept re-adding itself if you tried to remove it. Legacy Frost has been dead for over half a decade and their board is not wanted by anyone anymore.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">40.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Revised the default, auto-subscribed board list. The biggest change is that all international (French and German) boards have been removed, since almost nobody uses them. Users can still add them manually. Furthermore, "<i>boards</i>" is no longer in the default subscriptions, since it is a hellhole full of trolls flooding your auto-learning "known boards list" with hundreds of dead boards. People announce new boards elsewhere these days, and "boards" has always been a useless place where newbies begged for board lists and instead got a bunch of spam dumped on them. We now pre-subscribe to the "<i>sites</i>" board, so that people can learn about new Freesites as soon as they're released. Lastly, all of the dead boards have been removed, such as "<i>thaw</i>", which is a dead file uploader program that nobody uses anymore.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">41.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>New message table renderer which now draws all rows correctly <i>without</i> graphical glitches (such as partially colored backgrounds, etc). This will be a relief for people using Look and Feels which were previously rendered incorrectly, such as the default Linux (GTK) interface.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">42.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>We now use <i>much</i> stricter "minimum message counts" for removing the "possibly new identity" warning circles next to an identity's name. In the past, a user only needed to post 2 messages to get rid of the red warning indicator, and only 6 messages to get rid of the blue warning indicator, which meant that they could simply spam a few messages to no longer have the "new user" circle. The old defaults were therefore completely useless. The new, stricter defaults will show the red circle for users with 1-10 messages (catches all people who just appear once, post a bit and then vanish), and the blue indicator for users with 11-20 messages (means they are starting to become regulars). To get rid of the "new user" circles completely, the user must have posted 21 or more messages. These stricter defaults will help reduce ID impersonations, where people try to take on a name similar to someone's ID, spam a few messages, and then appear as the same person's nickname without any warning circles.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">43.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>We no longer auto-learn boards into the "Known Boards" list when they're posted by Anonymous, because they're the <i>least</i> likely to create real boards and the <i>most</i> likely to spam you with fake troll-boards. You can change this behavior in "Preferences &gt; News (2) &gt; Don't add boards to known boards list from users with trust states...", if you really want to risk auto-accepting their accepted boards.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">44.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Consolidated the extremely buggy and <i>extremely messy</i> "download today" and "download all days" message downloading code into a single, brand new version which handles <i>both</i> types of message downloading. They now share code to avoid repetition.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">45.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>The "download all days" message downloading thread always skipped downloading "today", which the legacy authors "solved" by also starting a "today" thread every time an "all days" scan began. It was a huge mess. Instead, the "all days back" has been rewritten to be capable of starting at "today" (to avoid the need for two threads), and all other message downloading code was adjusted to support both types of threads.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">46.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Improved the "Mark identity that sent JUNK as BAD" code so that it is more efficient and causes less disk thrashing, by only marking each unique identity BAD <i>once</i> in case of multi-message selections with the same sender.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">47.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>When you click on a key in a message, it used to do a ridiculously poor scan for "is this a freesite link?", which was wrong most of the time. Now there's a new, advanced scanner which properly detects all freesite links and offers site-specific menu options to "Copy freesite link to clipboard" and "Open selected key in browser" (letting you instantly navigate to a Freesite with one click).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">48.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Completely rewrote the "Freenet keys" and "Smiley" message text scanners, which are used when you've enabled the "Show clickable Freenet keys in messages" and/or "Show smileys in messages" toolbar buttons. The message text scanning is now exponentially faster (the longer the message, the faster the new method); on average it's ~5x faster than the old scanners and uses ~300x less memory (the insane, old scanning method allocated hundreds of new string objects). Furthermore, the new scanning method is extremely clean and robust. There is no reason to <i>ever</i> disable smileys or links anymore; Frost is now as fast with or without them enabled, and any differences you might perceive are either pure placebo or just the slight natural variation in disk-loading times of the same message (which varies from click to click).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">49.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>The highlighted Freenet keys in messages no longer underline the whitespace (such as spaces and newlines) after the end of the key-line.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">50.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>For those who have ever watched their terminal and seen messages like "loading board freenet: load=10, build+subretrieve=103", that message has now been improved and clarified. It's the number of milliseconds it takes to load a board from disk and construct its threaded relationships, and it's good for checking performance. The new and improved message contains additional information about every step, including how long it takes for the GUI to render the messages.</p>
+    <p>Example, with explanation:</p>
+    <p>"loading board freenet (threaded): diskFetch=29ms, buildThreads+subRetrieve=92ms".</p>
+    <p>"finished loading board freenet: guiRenderTime=471ms, totalTime=606ms".</p>
+    <ul>
+      <li>diskFetch = How long it took to load the messages from the hard disk. This actually takes a while during the first click, but will be cached in memory so that subsequent re-visits to the same board are much faster.</li>
+      <li>buildThreads+subRetrieve = Time to construct the thread hierarchy if threaded mode is enabled.</li>
+      <li>guiRenderTime = How long it took for Java to render the GUI, from the moment we feed it the data to the time that the GUI is ready (this is what used to be <i>insanely</i> slow before Frost-Next, taking several minutes if you had large boards with lots of messages).</li>
+      <li>totalTime = The total amount of time it took from selecting the board to the GUI being fully loaded and ready.</li>
+    </ul>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">51.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>You can now click on regular file keys and use the "Open selected key in browser" feature to open them directly in the browser. However, be aware that this uses "realtime mode" to request the file, which is less anonymous than normal downloads and should only be used for small files.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">52.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Fresh, new, light-blue background color in the board list whenever you've selected a currently updating board. The color can be changed in "Preferences &gt; Display &gt; Board Tree".</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">53.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Increased the "Number of days before a message expires" from 90 to 365. Note that expiration is disabled by default, so this change doesn't matter for most people. However, this is now a much more sensible default if you want to enable message expiration / archiving. It can be changed in the "Preferences &gt; Expiration" panel.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">54.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>The "Open selected key in browser" feature didn't properly URL-encode the keys, so certain keys couldn't be opened (for instance, ones containing [] brackets in the filename). Everything is now properly encoded, so that <i>any</i> Freenet key can be opened in the browser.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">55.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>The "Open selected key in browser" didn't handle Freesite keys with # (anchor) fragments in the name. We now properly strip the #fragment so that the site can be loaded without getting any silly "No such file in archive #blah" errors.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">56.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Frost's ability to use external editors when composing messages was extremely basic and broken; it has now been replaced with a new system that properly parses the command you give it and supports complex command line arguments. Nobody probably ever uses this feature, but now you have it. Just be aware of one thing: Some editors instantly "quit" when you try to start them; for instance, opening "gedit" <i>while it's already running</i> causes your "gedit" external editor to direct that request to the already running application and then instantly quits, which Frost interprets as you having closed the editor and finished editing the file, so just be aware of that. That is a problem of the editor you use (like gedit on Linux) and not something that Frost can fix.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">57.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Improved auto-selection of your correct "From" identity when replying to private messages, thanks to Sadao. Whenever you reply to your own private message that you've sent to someone else, it now chooses the proper recipient instead of replying to yourself.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">58.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>When you toggle the various view modes, such as "threaded/non-threaded", "show only unread/flagged/starred", and "show junk messages too", we now accurately preserve your current message selection whenever possible. As long as the currently selected message <i>exists</i> in the <i>new</i> view-mode too, it will be selected again. Here's an example of what <i>not</i> to do: Selecting a message (thus marking it <i>read</i>), and going into "Show only unread" mode, in which case we obviously can't re-select it (since the message is <i>read</i> and doesn't exist in the "show only unread messages" view-mode).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">59.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Frost now defaults to the most common Freenet node address, "127.0.0.1:8888", as its URL prefix. It used to be a blank setting. The existence of the setting allows the "Open in browser" feature to work when you click on links in messages. Anyone who has their node at a different address should just change the Frost preference to match their node ("Preferences &gt; Miscellaneous &gt; URL prefix for opening keys in browser").</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">60.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Much faster and cleaner Freenet key-type detection (no more constant duplication of arrays).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">61.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Configuring boards is now easier than ever! When you type values into the "Override" text fields, the appropriate "Set to" radio button is automatically selected. If you clear the value, the "Default" radio button is automatically selected again.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">62.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Message uploading is now <i>twice</i> as fast as both Sadao's version <i>and</i> legacy Frost, thanks to leveraging Freenet's recent network topology improvement which helped data retrievability tremendously. The more reliable network means that we no longer need to insert 6 duplicate copies ("extra inserts") of outgoing messages a la Sadao or legacy (the legacy code inserted 2x3 times, and Sadao inserted 6 times). We now simply insert using Freenet's default number of extra inserts (which is currently 3) for our message uploading, for quicker message uploads <i>and</i> perfect retrievability.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">63.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Outgoing messages now use "early encoding", which means that it generates the message-key first, before attempting to insert any data. This allows Frost to find key collisions 6x faster than normal, which <i>greatly</i> speeds up message insertion whenever multiple people are trying to insert something to the same message index-slot. As a result of this change, we <i>no longer</i> waste up to 10-20 minutes trying to insert data to a message slot that's already been <i>taken</i> by someone else.</p>
+    <p>Note that early encoding is <i>completely</i> safe with regards to <i>messaging</i>, since <i>all</i> Frost messages are uploaded using predictable keys anyway, which means that there's <i>zero</i> safety-difference between using early encoding or not. There are <i>only</i> benefits to using it.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">64.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>The default sending priority for outgoing messages is now 0 (maximum priority), and you should <i>never</i> fiddle with that setting. Messages are small files (usually just a single 32 KiB block), and it is very important that your node is able to upload them quickly so that your outgoing message queue doesn't get stalled by your regular uploads. In the past, having a high-priority file upload (such as a "priority 0" file of several gigabytes) meant that Frost could take <i>several days</i> to finish uploading a single message, since they used to have very low priority. It's <i>important</i> that messages are uploaded quickly, while the "available message slots" knowledge for the current day is still fresh.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">65.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>"Identity Manager": Changing the state of the selected identities no longer de-selects them afterwards. This enhancement was important since we need to maintain the selection so that the new keyboard controls are useful.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">66.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>"Identity Manager": Changing the state of the selected identities no longer forcibly re-sorts the table, thus letting you keep the view of the <i>exact</i> people you were looking at so that you can keep switching their states effortlessly until you've decided what state to give them. This one is super important if you decided to sort by the State column and then wanted to change some people in there, which <i>used to</i> make you lose your current view.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">67.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>The signature editor in the "Own Identities Manager" has been improved. It now uses Frost-Next's new undo manager, which means that you can undo any accidents. And the text cursor is now placed at the start of the window when it opens, so that it put the horizontal scrollbar off-screen all the way to the right in case of long lines.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">68.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed a serious bug in the "Own Identities Manager". It is no longer possible to delete your last remaining identity (it used to warn that you can't delete the last one, but then did it anyway). Lots of code in Frost relies on having at least one identity.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">69.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>The independent message viewer windows (when you double-click on a message) now render the top row of fields properly (Subject, From, Date, etc). There is no longer any ugly, weird, white, rectangular background behind them in certain Java "Look and Feel" themes.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">70.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed "Identity Manager" bug: Closing the window with the X didn't cause the currently viewed board to refresh the modified trust states of users. Now it works properly regardless of whether you use the "Close" button or the window's X.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">71.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed "Identity Manager" bug: Trying to change the state of multiple people while you had sorted by the State column caused the new states to be applied to the wrong people (it interpreted your selection incorrectly).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">72.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Double-clicking messages to open them in a separate viewer no longer causes the clicked message thread to collapsed/expand. Now you can finally double-click messages to view them in a separate window, without having to constantly toggle the threads back open again afterwards.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">73.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>The search results list now colors the Subject column by the message type (it only used to color the From column). This change brings it in line with all other message tables.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">74.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Improved the "open selected keys in browser" feature so that it no longer crashes/overwhelms the browser. In the past, it relentlessly opened <i>everything</i> instantly no matter how many files you had selected, which could crash both the browser <i>and</i> the whole operating system. It now has a brief 0.5 second delay between each tab it opens (so two tabs per second), instead of opening everything at once. This is a very calm rate, and if your browser still complains then I suggest switching to a better browser.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">75.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>The "run an all-days scan every 12 hours" code was broken and convoluted and has now been fixed to run like clockwork. If it's time for an "all days" scan, the board refresh starts an "all days" thread, otherwise it starts a "today only" thread (if one isn't already running).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">76.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed a serious bug in the message uploader. It did no sanitizing of the user's message, which meant that you could inadvertently have illegal ASCII control characters in the text. They resulted in illegal XML encodings, and any Frost client that attempted to download such an "illegal" message were unable to decode it (they would see "[Fatal Error] dlMsg_519985843448305749-3.xml.tmp:25:51: Character reference &amp;#" in the console log). Those messages were never seen by anyone since Frost aborts due to the decoding error. All outgoing messages are now sanitized so that they won't be able to contain hidden, illegal control characters anymore. This doesn't fix the broken messages out there in the world already, but it means you will <i>never again</i> have that problem with any new messages you send/reply to.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">77.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>File attachments are now uploaded with sanitized filenames, just like regular uploads. Illegal characters in the on-disk filenames are replaced with underscores.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">78.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>If you selected a sender-identity for your outgoing message and enabled a recipient (private message mode), it correctly colored the message text with the "private message" color in the message composer. But if you then switched to Anonymous, it didn't reset the message composer's text color back to black, so it still looked like you were writing an encrypted message. That has now been fixed, so that if you switch from a private message to Anonymous (or if you disable the private message recipient), it now properly returns to black text to indicate that it isn't a private message anymore.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">79.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed a bug in the message text scanner: If you only enable smileys (but not hyperlinks), Frost used to render potential smileys as part of key-filenames, so a file like "<i>CHK@../A cool B) file.jpg</i>" would draw the "B)" ("cool") smiley. It has now been fixed so that it never renders smileys inside of keys, even if clickable hyperlinks are disabled. This ensures that people who like non-hyperlink mode will never be distracted by misdetected smileys in key-filenames anymore.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">80.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Solved a common annoyance in Frost's smiley handling. The "Cool" (face with sunglasses) smiley no longer appears via "B)", and now only accepts "B-)". This fixes a long-standing annoyance where people write lists like "A) Nice! B) Very nice!" and end up with a freaking smileyface in the middle. It <i>does</i> however mean that old messages with the "cool smiley" now just say "B)" instead of showing a smiley, but it was <i>way more common</i> that people <i>accidentally</i> used that smiley than intentionally using it. I am highly against changing/adding smileys, but this one was a complete nuisance. All other smileys have logical names which won't be typed by accident, whereas this one was consistently triggered accidentally.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">81.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Removed "SNOWFLAKE_HACK_WRITE_LAST_DAY", which was a bunch of really weird and sloppy debug junk left in by SnowFlake. It caused Frost to write the "last updated day" for each board to a text file, but it never read them again. It was just some junk he tried while coding.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">82.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Removed SnowFlake's totally broken "DOWNLOAD_TODAY_DAYS_BACK", which was meant to download multiple days backwards during the "today" update, but instead just downloaded the same day (today) multiple times. Oh, and it was a totally useless "feature" either way, which interfered with Frost's proper operation.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">83.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed bug in the board updater caused by SnowFlake. It was doing a full re-parse of frost.ini every time a "today"-update thread started, which was insanely wasteful. It now properly reads the necessary settings via the global settings storage instance in Frost, the way it's meant to be done.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">84.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>People using SnowFlake's tweaks for Frost have <i>long</i> complained that it "seemed" to download messages from <i>years</i> ago. They were right. SnowFlake was a <i>total</i> moron and literally <i>every single one</i> of his changes were sloppy, clearly untested, and buggy as hell and caused me endless work where they had to be thrown out (50%) or rewritten (the other 50%). Somehow he managed to be <i>sloppier</i> than the original legacy Frost author. His changes to the message-downloading were no exception, since he broke it completely (just like he broke message-searching and many other features). Instead of downloading days properly in sequence, i.e. "1, 2, 3, 4, 5, 6, 7, 8", etc, his code had an unbelievably moronic mistake which kept <i>adding</i> the "next day's" number <i>to</i> the existing day's number on each loop (instead of just incrementing the day number by 1 to get the next day in order), which meant that it actually gallops <i>exponentially</i> past the days, skipping everything in-between. The more days you asked it to download, the more exaggerated the bug became. Anyone who has used his patch has <i>massive</i> gaps of <i>months</i> and <i>years</i> of missing messages.</p>
+    <p>To illustrate the problem, here are a few examples that show how his bug gets worse the further back we're trying to download: When it was supposed to download messages from "yesterday", it downloaded 3 days ago. When it was supposed to download 7 days ago, it downloaded over a month ago. 14 days ago? It grabbed 4 months ago. A month ago? It grabbed over a year ago. 60 days ago? It grabbed messages from a day 5 years in the past. 100 days ago? It grabbed messages from 15 years ago.</p>
+    <p>A common recommendation to Frost newcomers is to set it to "download 700 days back" and let it run to get lots of old messages. Well, if you did that with SnowFlake's garbage code, you actually downloaded messages from... the year 1342, or in other words 673 years ago. And this is <i>serious</i> because his code <i>skipped every day in-between</i> his insanely miscalculated dates. So if you told it to download the past month (days 1-30), it <i>actually</i> downloaded these days: 1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 66, 78, 91, 105, 120, 136, 153, 171, 190, 210, 231, 253, 276, 300, 325, 351, 378, 406, 435, 465, 496. It skipped <i>everything</i> in-between. So "30 days ago" actually grabbed messages for the day that was "496 days ago" instead, and so on...</p>
+    <p>Fortunately, downloading board messages from the year 1342 is now a thing of the past (no pun intended), since Frost-Next has rewritten the message downloader from the ground up. It's now rock solid and downloads the proper days, and even gives you GUI feedback about which exact date it's currently downloading, what day it's on, and how many days remain in the scan. If you were one of the people unfortunate enough to use SnowFlake's version, you will be happy to hear that you can simply set Frost-Next to download "700 days back" and "Always download all days back", and then refresh all of your boards to grab a <i>proper</i> backlog and fill in your gaps.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">85.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Improved the keyboard shortcut handling while the board list (to the left) has keyboard focus. We now properly activate the keyboard shortcut actions on the currently selected message(s) in the <i>message list</i> to the right, instead of certain keyboard presses being absorbed by the board list.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">86.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Removed the weird and useless "Cancel" menu item in the "New message" composer's right-click menu. It was not hooked up to any code, and any normal human being knows that you simply have to click <i>outside</i> of a menu to "cancel" it, so you don't need a menu item for that.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">87.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Removed the "Open all file keys/attachments in browser" feature, since it was <i>dangerous</i> and <i>stupid</i>. There is <i>no</i> reason to open <i>all</i> of the message's files in the browser (such as opening 40 useless tabs of ".rar" files), which thus starts them in "realtime mode" and makes it very easy for attackers to trace the fact that you're retrieving large, possibly illegal files. You can still manually open <i>individual</i> files in the browser, by clicking on specific keys and choosing "Open selected key in browser", but I don't recommend doing that either.</p>
+    <p>Also see the new "Open all image keys in browser" feature, described elsewhere.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">88.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed a bug in the file attachment table for messages; the "Download all attachments" popup menu item was never shown. Now it shows up properly.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">89.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Frost now defaults to showing messages up to 9999 days old. This solves an annoying problem: By default, Frost will show <i>any</i> message that is unread <i>regardless</i> of age, but will hide <i>read</i> messages that are <i>older</i> than the number of days to display. This confuses the users, since they'll read a message, then switch into a different view-mode (such as threaded/non-threaded), which causes a board reload and therefore <i>hides</i> the message since it's now <i>both</i> older than the max-age <i>and</i> has been read. That means they lose the message they were reading. So by changing the default limit to ~27 years, we never hide any old messages. The user can manually set their maximum display age lower again if they have a super slow computer and want to improve performance a tiny bit (via "Preferences &gt; News (1) &gt; Number of days to display").</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">90.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>The Expiration panel's "Force the database cleanup job to run during the next startup" option now works properly. If you enable that checkbox and restart Frost, it will run the expiration database cleanup job even if it's not normally time for it yet. The option will uncheck itself after the next startup when the cleanup job has executed. However, if you enter the preferences and uncheck it again before restarting Frost, then no cleanup will run at the next startup.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">91.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>The "Outbox" and "Sent" tables used the file list font (should be the message list font), didn't set the proper row height (so big fonts were cut off), and didn't refresh the setting without restarting Frost. All three bugs have now been fixed. And as an added bonus, there is now slightly more space around the list entries so that the outgoing/sent message lists are much easier to read, just like the regular board message list (which also uses padding).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">92.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>The message search window's "Archive" tab now looks correct. The option text labels are no longer cut off with "..." ellipses after half the message, so you can finally see what you are selecting.</p>
+  </div></td>
+</tr>
+</table>
+</body>
+</html>

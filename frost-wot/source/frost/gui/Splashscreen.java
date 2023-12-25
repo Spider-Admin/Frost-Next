@@ -46,7 +46,7 @@ import frost.util.gui.*;
 @SuppressWarnings("serial")
 public class Splashscreen extends JDialog {
 
-    private static String SPLASH_LOGO_FILENAME = "/data/splash.png";
+    private static String SPLASH_LOGO_FILENAME = "/data/frostnext.jpg";
 
     //Splashscreen size depends on this image.
     private final ImageIcon frostLogo = MiscToolkit.loadImageIcon(SPLASH_LOGO_FILENAME);
@@ -80,26 +80,23 @@ public class Splashscreen extends JDialog {
 
         pictureLabel.setIcon(frostLogo);
 
-        progressBar.setStringPainted(true);
+        progressBar.setFont(new Font("SansSerif", Font.PLAIN, 14)); // uniform size in every L&F
+        progressBar.setStringPainted(true); // tells the L&F to draw the status string on the bar
         progressBar.setString("Starting...");
 
         getContentPane().add(mainPanel);
         mainPanel.add(pictureLabel, BorderLayout.CENTER);
         mainPanel.add(progressBar, BorderLayout.SOUTH);
 
-        pack();
+        // always display the splashscreen on top of all other desktop windows, so that it doesn't
+        // get lost anymore. note that this setting is temporarily ignored while dialog boxes are
+        // shown, so we fixed it in all dialogs that are shown during startup as well!
+        setAlwaysOnTop(true);
 
-        final Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        final Dimension splashscreenSize = getSize();
-        if (splashscreenSize.height > screenSize.height) {
-            splashscreenSize.height = screenSize.height;
-        }
-        if (splashscreenSize.width > screenSize.width) {
-            splashscreenSize.width = screenSize.width;
-        }
-        setLocation(
-            (screenSize.width - splashscreenSize.width) / 2,
-            (screenSize.height - splashscreenSize.height) / 2);
+	pack();
+
+        // center this window on the default monitor
+	MiscToolkit.centerWindowSafe( MiscToolkit.getDefaultScreen(), this );
     }
 
     /**

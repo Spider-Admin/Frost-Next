@@ -391,6 +391,9 @@ public class JDragTree extends JTree implements DragGestureListener, DragSourceL
 	}
 	
 	private void initialize() {
+		// disable double-click to expand/collapse
+		JDragTree.this.setToggleClickCount(0);
+
 		// install drag n drop support
 		dragSource = DragSource.getDefaultDragSource();
 		dgRecognizer = dragSource.createDefaultDragGestureRecognizer(this,
@@ -477,7 +480,7 @@ public class JDragTree extends JTree implements DragGestureListener, DragSourceL
 		lbl.paint(g2);
 
 		// Now paint a gradient UNDER the ghosted JLabel text (but not under the icon if any)
-		// Note: this will need tweaking if your icon is not positioned to the left of the text
+		// NOTE: this will need tweaking if your icon is not positioned to the left of the text
 		Icon icon = lbl.getIcon();
 		int nStartOfText = (icon == null) ? 0 : icon.getIconWidth()+lbl.getIconTextGap();
 		g2.setComposite(AlphaComposite.getInstance(AlphaComposite.DST_OVER, 0.5f)); // Make the gradient ghostlike

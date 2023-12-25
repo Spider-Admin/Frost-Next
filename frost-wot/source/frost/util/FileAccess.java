@@ -67,6 +67,8 @@ public class FileAccess {
         fc.setFileHidingEnabled(true);
         fc.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
         fc.setMultiSelectionEnabled(false);
+        // NOTE: this dialog is only used for saving the .xml versions of messages to disk,
+        // so we don't need to install the SmartFileFilters list of default file filters here
 
         final int returnVal = fc.showSaveDialog(parent);
         if (returnVal == JFileChooser.APPROVE_OPTION) {
@@ -90,12 +92,13 @@ public class FileAccess {
     }
 
     public static byte[] readByteArray(final File file) {
-        try {
-            final byte[] data = new byte[(int)file.length()];
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
             final FileInputStream fileIn = new FileInputStream(file);
             final DataInputStream din = new DataInputStream(fileIn);
+        ) {
+            final byte[] data = new byte[(int)file.length()];
             din.readFully(data);
-            fileIn.close();
             return data;
         } catch( final IOException e ) {
             logger.log(Level.SEVERE, "Exception thrown in readByteArray(File file)", e);
@@ -143,29 +146,20 @@ public class FileAccess {
 
         final int bufferSize = 4096;
 
-        GZIPOutputStream out = null;
-        FileInputStream in = null;
-
-        try {
-            in = new FileInputStream(inputFile);
-            out = new GZIPOutputStream(new FileOutputStream(outputFile));
-
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final FileInputStream in = new FileInputStream(inputFile);
+            final FileOutputStream fileOutputStream = new FileOutputStream(outputFile);
+            final GZIPOutputStream out = new GZIPOutputStream(fileOutputStream);
+        ) {
             final byte[] buf = new byte[bufferSize];
             int len;
-            while ((len = in.read(buf)) > 0) {
+            while( (len = in.read(buf)) > 0 ) {
                 out.write(buf, 0, len);
             }
-            in.close();
-            out.close();
             return true;
         } catch(final Throwable t) {
             logger.log(Level.SEVERE, "Exception catched", t);
-            try { if( in != null) {
-                in.close();
-            } } catch(final Throwable tt) { }
-            try { if( out != null) {
-                out.close();
-            } } catch(final Throwable tt) { }
             return false;
         }
     }
@@ -181,29 +175,20 @@ public class FileAccess {
 
         final int bufferSize = 4096;
 
-        GZIPInputStream in = null;
-        OutputStream out = null;
-
-        try {
-            in = new GZIPInputStream(new FileInputStream(inputFile));
-            out = new FileOutputStream(outputFile);
-
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final FileInputStream fileInputStream = new FileInputStream(inputFile);
+            final GZIPInputStream in = new GZIPInputStream(fileInputStream);
+            final FileOutputStream out = new FileOutputStream(outputFile);
+        ) {
             final byte[] buf = new byte[bufferSize];
             int len;
-            while ((len = in.read(buf)) > 0) {
+            while( (len = in.read(buf)) > 0 ) {
                 out.write(buf, 0, len);
             }
-            in.close();
-            out.close();
             return true;
         } catch(final Throwable t) {
             logger.log(Level.SEVERE, "Exception catched", t);
-            try { if( in != null) {
-                in.close();
-            } } catch(final Throwable tt) { }
-            try { if( out != null) {
-                out.close();
-            } } catch(final Throwable tt) { }
             return false;
         }
     }
@@ -219,8 +204,11 @@ public class FileAccess {
                                         " and describe what you were doing.", e);
             return false;
         }
-        try {
-            final ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(file));
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final FileOutputStream fileOutputStream = new FileOutputStream(file);
+            final ZipOutputStream zos = new ZipOutputStream(fileOutputStream);
+        ) {
             zos.setLevel(9); // maximum compression
             final ZipEntry ze = new ZipEntry(entry);
             ze.setSize(content.length);
@@ -228,7 +216,6 @@ public class FileAccess {
             zos.write(content);
             zos.flush(); //do this before closeEntry()
             zos.closeEntry();
-            zos.close();
             return true;
         } catch( final Throwable e ) {
             logger.log(Level.SEVERE, "Exception thrown in writeZipFile(byte[] content, String entry, File file)", e);
@@ -245,11 +232,13 @@ public class FileAccess {
         }
 
         final int bufferSize = 4096;
-        ZipInputStream zis = null;
-        ByteArrayOutputStream out = null;
-        try {
-            zis = new ZipInputStream(new FileInputStream(file));
-            out = new ByteArrayOutputStream();
+
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final FileInputStream fileInputStream = new FileInputStream(file);
+            final ZipInputStream zis = new ZipInputStream(fileInputStream);
+            final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ) {
             zis.getNextEntry();
 
             final byte[] zipData = new byte[bufferSize];
@@ -260,19 +249,12 @@ public class FileAccess {
                 }
                 out.write(zipData, 0, len);
             }
-            zis.close();
-            return out.toByteArray();
-
+            final byte[] result = out.toByteArray();
+            return result;
         } catch( final FileNotFoundException e ) {
             logger.log(Level.SEVERE, "Exception catched", e);
         } catch( final IOException e ) {
-            try { if( zis != null) {
-                zis.close();
-            } } catch(final Throwable t) { }
-            try { if( out != null) {
-                out.close();
-            } } catch(final Throwable t) { }
-            logger.log(Level.SEVERE, "Exception thrown in readZipFile(String path) \n" +
+            logger.log(Level.SEVERE, "Exception thrown in readZipFileBinary(String path) \n" +
                                      "Offending file saved as badfile.zip, send to a dev for analysis", e);
             copyFile(file.getPath(), "badfile.zip");
         }
@@ -291,10 +273,11 @@ public class FileAccess {
      */
     public static List<String> readLines(final File file, final String encoding) {
         List<String> result = null;
-        try {
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
             final FileInputStream fis = new FileInputStream(file);
+        ) {
             result = readLines(fis, encoding);
-            fis.close();
         } catch (final IOException e) {
             logger.log(Level.SEVERE, "Exception thrown in readLines(File file, String encoding)", e);
         }
@@ -307,13 +290,14 @@ public class FileAccess {
     public static ArrayList<String> readLines(final InputStream is, final String encoding) {
         String line;
         final ArrayList<String> data = new ArrayList<String>();
-        try {
-            final InputStreamReader iSReader = new InputStreamReader(is, encoding);
-            final BufferedReader reader = new BufferedReader(iSReader);
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final InputStreamReader inputStreamReader = new InputStreamReader(is, encoding);
+            final BufferedReader reader = new BufferedReader(inputStreamReader);
+        ) {
             while( (line = reader.readLine()) != null ) {
                 data.add(line.trim());
             }
-            reader.close();
         } catch (final IOException e) {
             logger.log(Level.SEVERE, "Exception thrown in readLines(InputStream is, String encoding)", e);
         }
@@ -327,12 +311,14 @@ public class FileAccess {
     public static String readFile(final File file) {
         String line;
         final StringBuilder sb = new StringBuilder();
-        try {
-            final BufferedReader f = new BufferedReader(new FileReader(file));
-            while( (line = f.readLine()) != null ) {
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final FileReader fileReader = new FileReader(file);
+            final BufferedReader reader = new BufferedReader(fileReader);
+        ) {
+            while( (line = reader.readLine()) != null ) {
                 sb.append(line).append("\n");
             }
-            f.close();
         } catch (final IOException e) {
             logger.log(Level.SEVERE, "Exception thrown in readFile(String path)", e);
         }
@@ -349,13 +335,15 @@ public class FileAccess {
     public static String readFile(final File file, final String encoding) {
         String line;
         final StringBuilder sb = new StringBuilder();
-        try {
-            final InputStreamReader iSReader = new InputStreamReader(new FileInputStream(file), encoding);
-            final BufferedReader reader = new BufferedReader(iSReader);
-            while ((line = reader.readLine()) != null) {
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final FileInputStream fileInputStream = new FileInputStream(file);
+            final InputStreamReader inputStreamReader = new InputStreamReader(fileInputStream, encoding);
+            final BufferedReader reader = new BufferedReader(inputStreamReader);
+        ) {
+            while( (line = reader.readLine()) != null ) {
                 sb.append(line).append("\n");
             }
-            reader.close();
         } catch (final IOException e) {
             logger.log(Level.SEVERE, "Exception thrown in readFile(String path, String encoding)", e);
         }
@@ -380,38 +368,41 @@ public class FileAccess {
      * Writes a text file in ISO-8859-1 encoding.
      */
     public static boolean writeFile(final String content, final File file) {
-        OutputStreamWriter out = null;
         try {
             // write the file in single byte codepage (default could be a DBCS codepage)
-            try {
-                out = new OutputStreamWriter(new FileOutputStream(file), "ISO-8859-1");
-            } catch(final UnsupportedEncodingException e) {
-                out = new FileWriter(file);
+            // first try writing in ISO-8859-1 encoding
+            try (
+                // NOTE: Java 7+ try-with-resources (autocloseable)
+                final FileOutputStream fileOutputStream = new FileOutputStream(file);
+                final OutputStreamWriter out = new OutputStreamWriter(fileOutputStream, "ISO-8859-1");
+            ) {
+                out.write(content);
+                return true;
+            } catch( final UnsupportedEncodingException e ) {
+                // ISO-8859-1 wasn't supported (should never happen); try regular writing instead
+                try (
+                    // NOTE: Java 7+ try-with-resources (autocloseable)
+                    final FileWriter out = new FileWriter(file);
+                ) {
+                    out.write(content);
+                    return true;
+                }
             }
-            out.write(content);
-            out.close();
-            return true;
         } catch( final Throwable e ) {
             logger.log(Level.SEVERE, "Exception thrown in writeFile(String content, File file)", e);
-            try { if( out != null) {
-                out.close();
-            } } catch(final Throwable tt) { }
-            return false;
         }
+        return false;
     }
 
     public static boolean writeFile(final byte[] content, final File file) {
-        FileOutputStream out = null;
-        try {
-            out = new FileOutputStream(file);
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final FileOutputStream out = new FileOutputStream(file);
+        ) {
             out.write(content);
-            out.close();
             return true;
         } catch( final Throwable e ) {
             logger.log(Level.SEVERE, "Exception thrown in writeFile(byte[] content, File file)", e);
-            try { if( out != null) {
-                out.close();
-            } } catch(final Throwable tt) { }
             return false;
         }
     }
@@ -420,12 +411,13 @@ public class FileAccess {
      * Writes a text file in specified encoding. Converts line separators to target platform.
      */
     public static boolean writeFile(final String content, final File file, final String encoding) {
-        BufferedReader inputReader = null;
-        OutputStreamWriter outputWriter = null;
-        try {
-            outputWriter = new OutputStreamWriter(new FileOutputStream(file), encoding);
-
-            inputReader = new BufferedReader(new StringReader(content));
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final FileOutputStream fileOutputStream = new FileOutputStream(file);
+            final OutputStreamWriter outputWriter = new OutputStreamWriter(fileOutputStream, encoding);
+            final StringReader stringReader = new StringReader(content);
+            final BufferedReader inputReader = new BufferedReader(stringReader);
+        ) {
             final String lineSeparator = System.getProperty("line.separator");
             String line = inputReader.readLine();
 
@@ -434,17 +426,9 @@ public class FileAccess {
                 line = inputReader.readLine();
             }
 
-            outputWriter.close();
-            inputReader.close();
             return true;
         } catch (final Throwable e) {
             logger.log(Level.SEVERE, "Exception thrown in writeFile(String content, File file, String encoding)", e);
-            try { if( inputReader != null) {
-                inputReader.close();
-            } } catch(final Throwable tt) { }
-            try { if( outputWriter != null) {
-                outputWriter.close();
-            } } catch(final Throwable tt) { }
             return false;
         }
     }
@@ -494,25 +478,19 @@ public class FileAccess {
      *            name of the destination file
      */
     public static boolean copyFile(final String sourceName, final String destName) {
-        FileChannel sourceChannel = null;
-        FileChannel destChannel = null;
-        boolean wasOk = false;
-        try {
-            sourceChannel = new FileInputStream(sourceName).getChannel();
-            destChannel = new FileOutputStream(destName).getChannel();
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final FileInputStream fileInputStream = new FileInputStream(sourceName);
+            final FileOutputStream fileOutputStream = new FileOutputStream(destName);
+            final FileChannel sourceChannel = fileInputStream.getChannel();
+            final FileChannel destChannel = fileOutputStream.getChannel();
+        ) {
             destChannel.transferFrom(sourceChannel, 0, sourceChannel.size());
-            wasOk = true;
+            return true;
         } catch (final Throwable exception) {
             logger.log(Level.SEVERE, "Exception in copyFile", exception);
-        } finally {
-            try { if( sourceChannel != null) {
-                sourceChannel.close();
-            } } catch(final Throwable tt) { }
-            try { if( destChannel != null) {
-                destChannel.close();
-            } } catch(final Throwable tt) { }
+            return false;
         }
-        return wasOk;
     }
 
     /**
@@ -520,11 +498,13 @@ public class FileAccess {
      * Returns true if they are equals, or false.
      */
     public static boolean compareFiles(final File f1, final File f2) {
-        BufferedInputStream s1 = null;
-        BufferedInputStream s2 = null;
-        try {
-            s1 = new BufferedInputStream(new FileInputStream(f1));
-            s2 = new BufferedInputStream(new FileInputStream(f2));
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final FileInputStream fileInputStream1 = new FileInputStream(f1);
+            final FileInputStream fileInputStream2 = new FileInputStream(f2);
+            final BufferedInputStream s1 = new BufferedInputStream(fileInputStream1);
+            final BufferedInputStream s2 = new BufferedInputStream(fileInputStream2);
+        ) {
             int i1, i2;
             boolean equals = false;
             while(true) {
@@ -539,16 +519,8 @@ public class FileAccess {
                     break;
                 }
             }
-            s1.close();
-            s2.close();
             return equals;
         } catch(final Throwable e) {
-            try { if( s1 != null) {
-                s1.close();
-            } } catch(final Throwable tt) { }
-            try { if( s2 != null) {
-                s2.close();
-            } } catch(final Throwable tt) { }
             return false;
         }
     }
@@ -559,16 +531,23 @@ public class FileAccess {
      * @param file This is the destination file
      */
     public static void copyFromResource(final String resource, final File file) throws IOException {
-        if (!file.isFile()) {
+        // refuse to overwrite if file already exists...
+        if( file.isFile() ) { return; }
+
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
             final InputStream input = MainFrame.class.getResourceAsStream(resource);
             final FileOutputStream output = new FileOutputStream(file);
+        ) {
+            if( input == null ) {
+                // if resource wasn't found; abort...
+                throw new IOException("Unable to find resource: \""+resource+"\"");
+            }
             final byte[] data = new byte[4096];
             int bytesRead;
-            while ((bytesRead = input.read(data)) != -1) {
+            while( (bytesRead = input.read(data)) != -1 ) {
                 output.write(data, 0, bytesRead);
             }
-            input.close();
-            output.close();
         }
     }
 
@@ -576,21 +555,19 @@ public class FileAccess {
      * Appends a line to the specified text file in UTF-8 encoding.
      */
     public static boolean appendLineToTextfile(final File file, final String line) {
-        BufferedWriter out = null;
-        boolean wasOk = false;
-        try {
-            out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file, true), "UTF-8"));
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final FileOutputStream fileOutputStream = new FileOutputStream(file, true);
+            final OutputStreamWriter outputStreamWriter = new OutputStreamWriter(fileOutputStream, "UTF-8");
+            final BufferedWriter out = new BufferedWriter(outputStreamWriter);
+        ) {
             out.write(line);
             out.write("\n");
-            wasOk = true;
+            return true;
         } catch (final Throwable e) {
             logger.log(Level.SEVERE, "Exception catched", e);
-        } finally {
-            try { if( out != null) {
-                out.close();
-            } } catch(final Throwable tt) { }
+            return false;
         }
-        return wasOk;
     }
 
     public static String appendSeparator(final String path) {
@@ -605,5 +582,24 @@ public class FileAccess {
     	}
 
     	return path;
+    }
+
+    /**
+     * Gives you the (lowercase) extension of the input file, or null if there isn't any extension.
+     */
+    public static String getFileExtension(final String fileName) {
+        if( fileName != null ) {
+            final int pos = fileName.lastIndexOf('.');
+            if( pos >= 0 ) {
+                final int start = pos + 1; // skip the period
+                if( start < fileName.length() ) { // avoid going out of bounds if the period is last
+                    final String ext = fileName.substring(start).trim().toLowerCase();
+                    if( ext != null && !ext.isEmpty() ) {
+                        return ext;
+                    }
+                }
+            }
+        }
+        return null;
     }
 }

@@ -62,9 +62,9 @@ public class DisplayMessagesPanel extends JPanel {
     private JPanel indicateLowReceivedMessagesPanel = null;
     private final JCheckBox indicateLowReceivedMessagesCheckBox = new JCheckBox();
     private final JLabel LindicateLowReceivedMessagesCountRed = new JLabel();
-    private final JLabel LindicateLowReceivedMessagesCountLightRed = new JLabel();
+    private final JLabel LindicateLowReceivedMessagesCountBlue = new JLabel();
     private final JTextField TFindicateLowReceivedMessagesCountRed = new JTextField(8);
-    private final JTextField TFindicateLowReceivedMessagesCountLightRed = new JTextField(8);
+    private final JTextField TFindicateLowReceivedMessagesCountBlue = new JTextField(8);
 
     private final Listener listener = new Listener();
 
@@ -109,11 +109,11 @@ public class DisplayMessagesPanel extends JPanel {
             constraints.gridx = 0;
             constraints.gridy++;
             constraints.weightx = 0.5;
-            indicateLowReceivedMessagesPanel.add(LindicateLowReceivedMessagesCountLightRed, constraints);
+            indicateLowReceivedMessagesPanel.add(LindicateLowReceivedMessagesCountBlue, constraints);
             constraints.fill = GridBagConstraints.NONE;
             constraints.gridx = 1;
             constraints.weightx = 1;
-            indicateLowReceivedMessagesPanel.add(TFindicateLowReceivedMessagesCountLightRed, constraints);
+            indicateLowReceivedMessagesPanel.add(TFindicateLowReceivedMessagesCountBlue, constraints);
         }
         return indicateLowReceivedMessagesPanel;
     }
@@ -223,7 +223,7 @@ public class DisplayMessagesPanel extends JPanel {
         dontShowOwnMessagesAsMECheckBox.setSelected(settings.getBoolValue(SettingsClass.SHOW_OWN_MESSAGES_AS_ME_DISABLED));
 
         TFindicateLowReceivedMessagesCountRed.setText(settings.getValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_RED));
-        TFindicateLowReceivedMessagesCountLightRed.setText(settings.getValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_LIGHTRED));
+        TFindicateLowReceivedMessagesCountBlue.setText(settings.getValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_BLUE));
 
         indicateLowReceivedMessagesCheckBox.setSelected(settings.getBoolValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES));
         indicateLowReceivedMessagesChanged();
@@ -248,8 +248,8 @@ public class DisplayMessagesPanel extends JPanel {
         dontShowOwnMessagesAsMECheckBox.setText(language.getString("Options.news.3.dontShowOwnMessagesAsMe"));
 
         indicateLowReceivedMessagesCheckBox.setText(language.getString("Options.display.indicateLowReceivedMessages"));
-        LindicateLowReceivedMessagesCountRed.setText(language.getString("Options.display.indicateLowReceivedMessagesCountRed"));
-        LindicateLowReceivedMessagesCountLightRed.setText(language.getString("Options.display.indicateLowReceivedMessagesCountLightRed"));
+        LindicateLowReceivedMessagesCountRed.setText(language.getString("Options.display.indicateLowReceivedMessagesCountRed") + " (10)");
+        LindicateLowReceivedMessagesCountBlue.setText(language.getString("Options.display.indicateLowReceivedMessagesCountBlue") + " (20)");
     }
 
     /**
@@ -269,7 +269,7 @@ public class DisplayMessagesPanel extends JPanel {
         settings.setValue(SettingsClass.SHOW_OWN_MESSAGES_AS_ME_DISABLED, dontShowOwnMessagesAsMECheckBox.isSelected());
 
         settings.setValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_RED, TFindicateLowReceivedMessagesCountRed.getText());
-        settings.setValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_LIGHTRED, TFindicateLowReceivedMessagesCountLightRed.getText());
+        settings.setValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_BLUE, TFindicateLowReceivedMessagesCountBlue.getText());
         settings.setValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES, indicateLowReceivedMessagesCheckBox.isSelected());
     }
 

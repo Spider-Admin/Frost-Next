@@ -36,13 +36,21 @@ class DisplayPanel extends JPanel {
 
     public class Listener implements ActionListener {
         public void actionPerformed(final ActionEvent e) {
-            if (e.getSource() == messageBodyButton) {
+            if( e.getSource() == msgNormalColorButton ) {
+                pickColor(msgNormalColorButton);
+            } else if( e.getSource() == msgPrivColorButton ) {
+                pickColor(msgPrivColorButton);
+            } else if( e.getSource() == msgPrivEditorColorButton ) {
+                pickColor(msgPrivEditorColorButton);
+            } else if( e.getSource() == msgWithAttachmentsColorButton ) {
+                pickColor(msgWithAttachmentsColorButton);
+            } else if( e.getSource() == msgUnsignedColorButton ) {
+                pickColor(msgUnsignedColorButton);
+            } else if( e.getSource() == messageBodyButton ) {
                 messageBodyButtonPressed();
-            }
-            if (e.getSource() == messageListButton) {
+            } else if( e.getSource() == messageListButton ) {
                 messageListButtonPressed();
-            }
-            if (e.getSource() == fileListButton) {
+            } else if( e.getSource() == fileListButton ) {
                 fileListButtonPressed();
             }
         }
@@ -73,9 +81,35 @@ class DisplayPanel extends JPanel {
     private final JLabel selectedMessageBodyFontLabel = new JLabel();
     private final JLabel selectedMessageListFontLabel = new JLabel();
 
+    private final JLabel colorsLabel = new JLabel();
+    private JPanel colorPanel = null;
+    private Color msgNormalColor = null;
+    private final JButton msgNormalColorButton = new JButton();
+    private final JLabel msgNormalColorTextLabel = new JLabel();
+    private final JLabel msgNormalColorLabel = new JLabel();
+    private Color msgPrivColor = null;
+    private final JButton msgPrivColorButton = new JButton();
+    private final JLabel msgPrivColorTextLabel = new JLabel();
+    private final JLabel msgPrivColorLabel = new JLabel();
+    private Color msgPrivEditorColor = null;
+    private final JButton msgPrivEditorColorButton = new JButton();
+    private final JLabel msgPrivEditorColorTextLabel = new JLabel();
+    private final JLabel msgPrivEditorColorLabel = new JLabel();
+    private Color msgWithAttachmentsColor = null;
+    private final JButton msgWithAttachmentsColorButton = new JButton();
+    private final JLabel msgWithAttachmentsColorTextLabel = new JLabel();
+    private final JLabel msgWithAttachmentsColorLabel = new JLabel();
+    private Color msgUnsignedColor = null;
+    private final JButton msgUnsignedColorButton = new JButton();
+    private final JLabel msgUnsignedColorTextLabel = new JLabel();
+    private final JLabel msgUnsignedColorLabel = new JLabel();
+
     private Font selectedBodyFont = null;
     private Font selectedFileListFont = null;
     private Font selectedMessageListFont = null;
+
+    private JTranslatableComboBox treeExpansionIconComboBox = null;
+    private final JLabel treeExpansionIconLabel = new JLabel();
 
     /**
      * @param owner the JDialog that will be used as owner of any dialog that is popped up from this panel
@@ -176,6 +210,119 @@ class DisplayPanel extends JPanel {
         return fontsPanel;
     }
 
+    private JPanel getColorPanel() {
+        if( colorPanel == null ) {
+            colorPanel = new JPanel(new GridBagLayout());
+            colorPanel.setBorder(new EmptyBorder(5, 30, 5, 5));
+            final GridBagConstraints constraints = new GridBagConstraints();
+            constraints.insets = new Insets(0, 5, 5, 5);
+            constraints.weighty = 1;
+            constraints.weightx = 1;
+            constraints.anchor = GridBagConstraints.NORTHWEST;
+            constraints.gridy = 0;
+
+            constraints.fill = GridBagConstraints.HORIZONTAL;
+            constraints.gridx = 0;
+            constraints.weightx = 0.5;
+            colorPanel.add(msgNormalColorTextLabel, constraints);
+            constraints.fill = GridBagConstraints.VERTICAL;
+            constraints.gridx = 1;
+            constraints.weightx = 0.2;
+            colorPanel.add(msgNormalColorLabel, constraints);
+            constraints.fill = GridBagConstraints.NONE;
+            constraints.gridx = 2;
+            constraints.weightx = 0.5;
+            colorPanel.add(msgNormalColorButton, constraints);
+
+            constraints.gridy++;
+
+            constraints.fill = GridBagConstraints.HORIZONTAL;
+            constraints.gridx = 0;
+            constraints.weightx = 0.5;
+            colorPanel.add(msgPrivColorTextLabel, constraints);
+            constraints.fill = GridBagConstraints.VERTICAL;
+            constraints.gridx = 1;
+            constraints.weightx = 0.2;
+            colorPanel.add(msgPrivColorLabel, constraints);
+            constraints.fill = GridBagConstraints.NONE;
+            constraints.gridx = 2;
+            constraints.weightx = 0.5;
+            colorPanel.add(msgPrivColorButton, constraints);
+
+            constraints.gridy++;
+
+            constraints.fill = GridBagConstraints.HORIZONTAL;
+            constraints.gridx = 0;
+            constraints.weightx = 0.5;
+            colorPanel.add(msgPrivEditorColorTextLabel, constraints);
+            constraints.fill = GridBagConstraints.VERTICAL;
+            constraints.gridx = 1;
+            constraints.weightx = 0.2;
+            colorPanel.add(msgPrivEditorColorLabel, constraints);
+            constraints.fill = GridBagConstraints.NONE;
+            constraints.gridx = 2;
+            constraints.weightx = 0.5;
+            colorPanel.add(msgPrivEditorColorButton, constraints);
+
+            constraints.gridy++;
+
+            constraints.fill = GridBagConstraints.HORIZONTAL;
+            constraints.gridx = 0;
+            constraints.weightx = 0.5;
+            colorPanel.add(msgWithAttachmentsColorTextLabel, constraints);
+            constraints.fill = GridBagConstraints.VERTICAL;
+            constraints.gridx = 1;
+            constraints.weightx = 0.2;
+            colorPanel.add(msgWithAttachmentsColorLabel, constraints);
+            constraints.fill = GridBagConstraints.NONE;
+            constraints.gridx = 2;
+            constraints.weightx = 0.5;
+            colorPanel.add(msgWithAttachmentsColorButton, constraints);
+
+            constraints.gridy++;
+
+            constraints.fill = GridBagConstraints.HORIZONTAL;
+            constraints.gridx = 0;
+            constraints.weightx = 0.5;
+            colorPanel.add(msgUnsignedColorTextLabel, constraints);
+            constraints.fill = GridBagConstraints.VERTICAL;
+            constraints.gridx = 1;
+            constraints.weightx = 0.2;
+            colorPanel.add(msgUnsignedColorLabel, constraints);
+            constraints.fill = GridBagConstraints.NONE;
+            constraints.gridx = 2;
+            constraints.weightx = 0.5;
+            colorPanel.add(msgUnsignedColorButton, constraints);
+
+            msgNormalColorLabel.setFont(msgNormalColorLabel.getFont().deriveFont(Font.BOLD));
+            msgPrivColorLabel.setFont(msgPrivColorLabel.getFont().deriveFont(Font.BOLD));
+            msgPrivEditorColorLabel.setFont(msgPrivEditorColorLabel.getFont().deriveFont(Font.BOLD));
+            msgWithAttachmentsColorLabel.setFont(msgWithAttachmentsColorLabel.getFont().deriveFont(Font.BOLD));
+            msgUnsignedColorLabel.setFont(msgUnsignedColorLabel.getFont().deriveFont(Font.BOLD));
+            msgNormalColorLabel.setBackground(Color.WHITE);
+            msgPrivColorLabel.setBackground(Color.WHITE);
+            msgPrivEditorColorLabel.setBackground(Color.WHITE);
+            msgWithAttachmentsColorLabel.setBackground(Color.WHITE);
+            msgUnsignedColorLabel.setBackground(Color.WHITE);
+            msgNormalColorLabel.setOpaque(true);
+            msgPrivColorLabel.setOpaque(true);
+            msgPrivEditorColorLabel.setOpaque(true);
+            msgWithAttachmentsColorLabel.setOpaque(true);
+            msgUnsignedColorLabel.setOpaque(true);
+            msgNormalColorLabel.setBorder(new BevelBorder(BevelBorder.LOWERED));
+            msgPrivColorLabel.setBorder(new BevelBorder(BevelBorder.LOWERED));
+            msgPrivEditorColorLabel.setBorder(new BevelBorder(BevelBorder.LOWERED));
+            msgWithAttachmentsColorLabel.setBorder(new BevelBorder(BevelBorder.LOWERED));
+            msgUnsignedColorLabel.setBorder(new BevelBorder(BevelBorder.LOWERED));
+            msgNormalColorLabel.setHorizontalAlignment(SwingConstants.CENTER);
+            msgPrivColorLabel.setHorizontalAlignment(SwingConstants.CENTER);
+            msgPrivEditorColorLabel.setHorizontalAlignment(SwingConstants.CENTER);
+            msgWithAttachmentsColorLabel.setHorizontalAlignment(SwingConstants.CENTER);
+            msgUnsignedColorLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        }
+        return colorPanel;
+    }
+
     /**
      * Initialize the class.
      */
@@ -186,43 +333,67 @@ class DisplayPanel extends JPanel {
 
         //Adds all of the components
         final GridBagConstraints constraints = new GridBagConstraints();
-        constraints.anchor = GridBagConstraints.NORTHWEST;
-        constraints.fill = GridBagConstraints.BOTH;
-        constraints.weightx = 1;
+
         final Insets inset5511 = new Insets(5, 5, 1, 1);
         final Insets insets2 = new Insets(15,5,1,1);
 
-        constraints.insets = inset5511;
+        constraints.anchor = GridBagConstraints.WEST;
+        constraints.fill = GridBagConstraints.NONE;
         constraints.gridx = 0;
         constraints.gridy = 0;
+        constraints.insets = inset5511;
         add(fontsLabel, constraints);
-
         constraints.gridy++;
         add(getFontsPanel(), constraints);
 
-        constraints.insets = insets2;
+        constraints.anchor = GridBagConstraints.WEST;
+        constraints.fill = GridBagConstraints.NONE;
+        constraints.gridy++;
+        constraints.insets = inset5511;
+        add(colorsLabel, constraints);
+        constraints.gridy++;
+        add(getColorPanel(), constraints);
 
+        constraints.insets = insets2;
+        constraints.gridy++;
+        constraints.gridx = 0;
+        add(treeExpansionIconLabel, constraints);
+        constraints.gridx = 1;
+        final String[] treeExpansionIconComboBoxKeys =
+            { "Options.display.treeExpansionIcon.style0", "Options.display.treeExpansionIcon.style1",
+                "Options.display.treeExpansionIcon.style2", "Options.display.treeExpansionIcon.style3" };
+        treeExpansionIconComboBox = new JTranslatableComboBox(language, treeExpansionIconComboBoxKeys);
+        add(treeExpansionIconComboBox, constraints);
+        constraints.gridx = 0;
+
+        constraints.insets = inset5511;
         constraints.gridy++;
         add(showColoredRowsCheckBox, constraints);
 
         constraints.insets = inset5511;
-
         constraints.gridy++;
         add(saveSortStatesCheckBox, constraints);
 
-        constraints.insets = insets2;
+        constraints.insets = inset5511;
         constraints.gridy++;
         add(confirmMarkAllMsgsReadCheckBox, constraints);
 
+        // glue
         constraints.gridy++;
-        constraints.weighty = 1.0;
         constraints.fill = GridBagConstraints.BOTH;
+        constraints.weightx = 1;
+        constraints.weighty = 1;
         add(new JLabel(""), constraints);
 
         // add listeners
         messageBodyButton.addActionListener(listener);
         messageListButton.addActionListener(listener);
         fileListButton.addActionListener(listener);
+        msgNormalColorButton.addActionListener(listener);
+        msgPrivColorButton.addActionListener(listener);
+        msgPrivEditorColorButton.addActionListener(listener);
+        msgWithAttachmentsColorButton.addActionListener(listener);
+        msgUnsignedColorButton.addActionListener(listener);
     }
 
     /**
@@ -250,6 +421,21 @@ class DisplayPanel extends JPanel {
         saveSortStatesCheckBox.setSelected(settings.getBoolValue(SettingsClass.SAVE_SORT_STATES));
         showColoredRowsCheckBox.setSelected(settings.getBoolValue(SettingsClass.SHOW_COLORED_ROWS));
         confirmMarkAllMsgsReadCheckBox.setSelected(settings.getBoolValue(SettingsClass.CONFIRM_MARK_ALL_MSGS_READ));
+
+        treeExpansionIconComboBox.setSelectedKey(settings.getDefaultValue(SettingsClass.TREE_EXPANSION_ICON)); // set to default
+        treeExpansionIconComboBox.setSelectedKey(settings.getValue(SettingsClass.TREE_EXPANSION_ICON)); // set to user-value if one exists
+
+        // load the color values
+        msgNormalColor = settings.getColorValue(SettingsClass.COLORS_MESSAGE_NORMALMSG);
+        msgPrivColor = settings.getColorValue(SettingsClass.COLORS_MESSAGE_PRIVMSG);
+        msgPrivEditorColor = settings.getColorValue(SettingsClass.COLORS_MESSAGE_PRIVEDITOR);
+        msgWithAttachmentsColor = settings.getColorValue(SettingsClass.COLORS_MESSAGE_WITHATTACHMENTS);
+        msgUnsignedColor = settings.getColorValue(SettingsClass.COLORS_MESSAGE_UNSIGNEDMSG);
+        msgNormalColorLabel.setForeground(msgNormalColor);
+        msgPrivColorLabel.setForeground(msgPrivColor);
+        msgPrivEditorColorLabel.setForeground(msgPrivEditorColor);
+        msgWithAttachmentsColorLabel.setForeground(msgWithAttachmentsColor);
+        msgUnsignedColorLabel.setForeground(msgUnsignedColor);
     }
 
     private void messageBodyButtonPressed() {
@@ -280,6 +466,52 @@ class DisplayPanel extends JPanel {
         saveSettings();
     }
 
+    private void pickColor(final JButton sourceButton) {
+        Color oldColor = null;
+        String dialogTitle = null;
+        if( sourceButton == msgNormalColorButton ) {
+            oldColor = msgNormalColor;
+            dialogTitle = language.getString("Options.display.colorChooserDialog.title.msgNormalColor");
+        } else if( sourceButton == msgPrivColorButton ) {
+            oldColor = msgPrivColor;
+            dialogTitle = language.getString("Options.display.colorChooserDialog.title.msgPrivColor");
+        } else if( sourceButton == msgPrivEditorColorButton ) {
+            oldColor = msgPrivEditorColor;
+            dialogTitle = language.getString("Options.display.colorChooserDialog.title.msgPrivEditorColor");
+        } else if( sourceButton == msgWithAttachmentsColorButton ) {
+            oldColor = msgWithAttachmentsColor;
+            dialogTitle = language.getString("Options.display.colorChooserDialog.title.msgWithAttachmentsColor");
+        } else if( sourceButton == msgUnsignedColorButton ) {
+            oldColor = msgUnsignedColor;
+            dialogTitle = language.getString("Options.display.colorChooserDialog.title.msgUnsignedColor");
+        } else {
+            return; // invalid button
+        }
+
+        final Color newCol = JColorChooser.showDialog(
+                getTopLevelAncestor(),
+                dialogTitle,
+                oldColor);
+        if( newCol != null ) { // null means they aborted
+            if( sourceButton == msgNormalColorButton ) {
+                msgNormalColor = newCol;
+                msgNormalColorLabel.setForeground(msgNormalColor);
+            } else if( sourceButton == msgPrivColorButton ) {
+                msgPrivColor = newCol;
+                msgPrivColorLabel.setForeground(msgPrivColor);
+            } else if( sourceButton == msgPrivEditorColorButton ) {
+                msgPrivEditorColor = newCol;
+                msgPrivEditorColorLabel.setForeground(msgPrivEditorColor);
+            } else if( sourceButton == msgWithAttachmentsColorButton ) {
+                msgWithAttachmentsColor = newCol;
+                msgWithAttachmentsColorLabel.setForeground(msgWithAttachmentsColor);
+            } else if( sourceButton == msgUnsignedColorButton ) {
+                msgUnsignedColor = newCol;
+                msgUnsignedColorLabel.setForeground(msgUnsignedColor);
+            }
+        }
+    }
+
     private void refreshLanguage() {
         final String choose = language.getString("Options.display.choose");
         fontsLabel.setText(language.getString("Options.display.fonts"));
@@ -295,6 +527,25 @@ class DisplayPanel extends JPanel {
         saveSortStatesCheckBox.setText(language.getString("Options.display.saveSortStates"));
         showColoredRowsCheckBox.setText(language.getString("Options.display.showColoredRows"));
         confirmMarkAllMsgsReadCheckBox.setText(language.getString("Options.display.confirmMarkAllMsgsRead"));
+        treeExpansionIconLabel.setText(language.getString("Options.display.treeExpansionIcon"));
+
+        colorsLabel.setText(language.getString("Options.display.colors"));
+        final String color = language.getString("Options.news.3.color");
+        msgNormalColorTextLabel.setText(language.getString("Options.display.msgNormalColor"));
+        msgNormalColorLabel.setText("    " + color + "    ");
+        msgNormalColorButton.setText(choose);
+        msgPrivColorTextLabel.setText(language.getString("Options.display.msgPrivColor"));
+        msgPrivColorLabel.setText("    " + color + "    ");
+        msgPrivColorButton.setText(choose);
+        msgPrivEditorColorTextLabel.setText(language.getString("Options.display.msgPrivEditorColor"));
+        msgPrivEditorColorLabel.setText("    " + color + "    ");
+        msgPrivEditorColorButton.setText(choose);
+        msgWithAttachmentsColorTextLabel.setText(language.getString("Options.display.msgWithAttachmentsColor"));
+        msgWithAttachmentsColorLabel.setText("    " + color + "    ");
+        msgWithAttachmentsColorButton.setText(choose);
+        msgUnsignedColorTextLabel.setText(language.getString("Options.display.msgUnsignedColor"));
+        msgUnsignedColorLabel.setText("    " + color + "    ");
+        msgUnsignedColorButton.setText(choose);
     }
 
     /**
@@ -319,5 +570,11 @@ class DisplayPanel extends JPanel {
         settings.setValue(SettingsClass.SAVE_SORT_STATES, saveSortStatesCheckBox.isSelected());
         settings.setValue(SettingsClass.SHOW_COLORED_ROWS, showColoredRowsCheckBox.isSelected());
         settings.setValue(SettingsClass.CONFIRM_MARK_ALL_MSGS_READ, confirmMarkAllMsgsReadCheckBox.isSelected());
+        settings.setValue(SettingsClass.TREE_EXPANSION_ICON, treeExpansionIconComboBox.getSelectedKey());
+        settings.setObjectValue(SettingsClass.COLORS_MESSAGE_NORMALMSG, msgNormalColor);
+        settings.setObjectValue(SettingsClass.COLORS_MESSAGE_PRIVMSG, msgPrivColor);
+        settings.setObjectValue(SettingsClass.COLORS_MESSAGE_PRIVEDITOR, msgPrivEditorColor);
+        settings.setObjectValue(SettingsClass.COLORS_MESSAGE_WITHATTACHMENTS, msgWithAttachmentsColor);
+        settings.setObjectValue(SettingsClass.COLORS_MESSAGE_UNSIGNEDMSG, msgUnsignedColor);
     }
 }

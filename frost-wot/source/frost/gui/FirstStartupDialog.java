@@ -24,6 +24,7 @@ import java.awt.*;
 import javax.swing.*;
 
 import frost.util.gui.translation.*;
+import frost.util.gui.MiscToolkit;
 
 @SuppressWarnings("serial")
 public class FirstStartupDialog extends JDialog {
@@ -48,19 +49,14 @@ public class FirstStartupDialog extends JDialog {
         setModal(true);
         initialize();
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
+
+        // display this dialog box on top of all other desktop windows so it doesn't get lost
+        setAlwaysOnTop(true);
+
         pack();
-        // center on screen
-        final Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        final Dimension splashscreenSize = getSize();
-        if (splashscreenSize.height > screenSize.height) {
-            splashscreenSize.height = screenSize.height;
-        }
-        if (splashscreenSize.width > screenSize.width) {
-            splashscreenSize.width = screenSize.width;
-        }
-        setLocation(
-            (screenSize.width - splashscreenSize.width) / 2,
-            (screenSize.height - splashscreenSize.height) / 2);
+
+        // center this window on the default monitor
+        MiscToolkit.centerWindowSafe( MiscToolkit.getDefaultScreen(), this );
     }
 
     public boolean startDialog() {
@@ -72,6 +68,7 @@ public class FirstStartupDialog extends JDialog {
         this.setSize(424, 304);
         this.setTitle(language.getString("FirstStartupDialog.title"));
         this.setContentPane(getJContentPane());
+        this.setResizable(false); // make sure the user can't resize the dialog
     }
 
     /**

@@ -18,10 +18,15 @@
 */
 package frost.fileTransfer.upload;
 
+import java.util.ArrayList;
+
 import frost.*;
 import frost.fileTransfer.*;
 import frost.util.*;
 
+// NOTE: This upload ticker starts new uploads every second *if*
+// persistence (global queue) is disabled. But if the global queue is
+// used, then the persistence manager is responsible for uploads instead.
 public class UploadTicker extends Thread {
 
 //    private static final Logger logger = Logger.getLogger(UploadTicker.class.getName());
@@ -33,7 +38,7 @@ public class UploadTicker extends Thread {
 
     private final UploadModel model;
 
-    private int removeNotExistingFilesCounter = 0;
+    private int checkForAllMissingFilesElapsed = 0;
 
     /**
      * The number of allocated threads is used to limit the total of threads
@@ -156,12 +161,19 @@ public class UploadTicker extends Thread {
         super.run();
         while (true) {
             Mixed.wait(1000);
-            // this is executed each second, so this counter counts seconds
-            if (Core.frostSettings.getBoolValue(SettingsClass.UPLOAD_REMOVE_NOT_EXISTING_FILES)) {
-            removeNotExistingFilesCounter++;
-            removeNotExistingFiles();
-            }
+
+            // mark as "failed" any missing/modified files that have not yet begun uploading
+            // NOTE: this counter counts seconds, and we only do the full "all files" check every few minutes
+            // *but* if the upload attempt begins and they're missing, then we mark them as failed instantly instead
+            // this is just a separate check which conveniently checks validity of all remaining waiting files in one go
+            checkForAllMissingFilesElapsed++;
+            checkForAllMissingFiles();
+
+            // start pre-generation of CHKs for any files that are waiting for that
             generateCHKs();
+
+            // this just forcibly starts an upload thread if the persistent global Freenet queue support is disabled
+            // normal (persistent) uploads are started by PersistenceManager.java:startNewUploads() instead.
             if( PersistenceManager.isPersistenceEnabled() == false ) {
                 startUploadThread();
             }
@@ -197,43 +209,74 @@ public class UploadTicker extends Thread {
      * Maybe start a new upload automatically.
      */
     private void startUploadThread() {
-        if (Core.isFreenetOnline() && canAllocateUploadingThread()) {
-            final FrostUploadItem uploadItem = FileTransferManager.inst().getUploadManager().selectNextUploadItem();
-            startUpload(uploadItem);
+        if( ! Core.isFreenetOnline() ||
+            ! canAllocateUploadingThread() ) {
+            return;
         }
+
+        final FrostUploadItem ulItem = FileTransferManager.inst().getUploadManager().selectNextUploadItem();
+        startUpload(ulItem);
     }
 
-    public boolean startUpload(final FrostUploadItem ulItem) {
-        if (!Core.isFreenetOnline() ) {
+    /**
+     * Performs an upload using Frost's own internal, non-persistent queue. This function is
+     * normally not called, since Frost has the persistent queue enabled by default.
+     * The persistent queue uploads are handled by PersistenceManager.java:startUpload() instead.
+     *
+     * NOTE: The synchronized attribute ensures that the user's "start selected uploads now" and
+     * "restart selected uploads" features don't trigger startUpload multiple times for the same
+     * file (autostart thread+the menu item). They'll still trigger, but they'll all execute in
+     * series thanks to the synchronization, which means that the first execution takes care of
+     * setting the state for the file. the additional calls will then see the new state and won't
+     * waste any time trying to upload the same file again.
+     *
+     * @param {FrostUploadItem} ulItem - the model item to begin uploading
+     * @return - false if the upload cannot start (such as if the item is missing,
+     * or isn't a waiting item, etc), true if the upload began
+     */
+    public synchronized boolean startUpload(final FrostUploadItem ulItem) {
+        if( ! Core.isFreenetOnline() ||
+            ! canAllocateUploadingThread() ) {
             return false;
         }
-        if( ulItem == null || ulItem.getState() != FrostUploadItem.STATE_WAITING ) {
+
+        if( ulItem == null || ulItem.isExternal() || ulItem.getState() != FrostUploadItem.STATE_WAITING ) {
+            return false;
+        }
+
+        // now make sure the file still exists and hasn't changed size;
+        // if so, then notify the user, mark the file as failed, and skip this upload
+        final ArrayList<FrostUploadItem> itemsToCheck = new ArrayList<FrostUploadItem>();
+        itemsToCheck.add(ulItem);
+        model.setMissingFilesToFailedAndNotifyUser(itemsToCheck);
+        if( ulItem.getState() != FrostUploadItem.STATE_WAITING ) {
             return false;
         }
 
         // increase allocated threads
         allocateUploadingThread();
 
+        // start the upload
         ulItem.setUploadStartedMillis(System.currentTimeMillis());
-
         ulItem.setState(FrostUploadItem.STATE_PROGRESS);
         boolean doMime;
-        // shared files are always inserted as octet-stream
         if( ulItem.isSharedFile() ) {
+            // shared files are always inserted as octet-stream
             doMime = false;
         } else {
             doMime = true;
         }
+
         final UploadThread newInsert = new UploadThread(this, ulItem, doMime);
         newInsert.start();
         return true;
     }
 
-    private void removeNotExistingFiles() {
-        // Check uploadTable every 5 minutes
-        if (removeNotExistingFilesCounter >= 5*60 ) {
-            model.removeNotExistingFiles();
-            removeNotExistingFilesCounter = 0;
+    private void checkForAllMissingFiles() {
+        // Check uploadTable every 5 minutes for all still-pending files that are missing/changed size
+        if( checkForAllMissingFilesElapsed >= 5*60 ) {
+            model.setMissingFilesToFailedAndNotifyUser(null); // null = check all files in the table
+            checkForAllMissingFilesElapsed = 0;
         }
     }
 

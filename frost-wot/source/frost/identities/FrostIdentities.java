@@ -93,7 +93,16 @@ public class FrostIdentities {
             String nick = null;
             boolean isNickOk;
             do {
-                nick = JOptionPane.showInputDialog(language.getString("Core.loadIdentities.ChooseName"));
+                nick = (String)MiscToolkit.showInputDialog(
+                        null, // parented to the main Frost window (even though it may not be visible yet if this is called during startup)
+                        language.getString("Core.loadIdentities.ChooseName"),
+                        null, // automatic title choice ("Frost")
+                        MiscToolkit.QUESTION_MESSAGE,
+                        null, // no special choice buttons or icons...
+                        null,
+                        null,
+                        true ); // always on top; ensures that whenever this dialog is shown during
+                                // the first startup, the Splashscreen stays on top of the screen.
 
                 if( nick == null ) {
                     break; // user cancelled
@@ -128,10 +137,11 @@ public class FrostIdentities {
                 }
 
                 if( !isNickOk ) {
-                    MiscToolkit.showMessage(
+                    MiscToolkit.showMessageDialog(
+                            null,
                             language.getString("Core.loadIdentities.InvalidNameBody"),
-                            JOptionPane.ERROR_MESSAGE,
-                            language.getString("Core.loadIdentities.InvalidNameTitle"));
+                            language.getString("Core.loadIdentities.InvalidNameTitle"),
+                            MiscToolkit.ERROR_MESSAGE);
                 }
             } while(!isNickOk);
 
@@ -281,10 +291,10 @@ public class FrostIdentities {
         return li;
     }
 
-    public List<Identity> getAllGOODIdentities() {
+    public List<Identity> getAllFRIENDIdentities() {
         final List<Identity> list = new ArrayList<Identity>();
         for( final Identity id : identities.values() ) {
-            if( id.isGOOD() ) {
+            if( id.isFRIEND() ) {
                 list.add(id);
             }
         }
@@ -303,24 +313,24 @@ public class FrostIdentities {
      * Applies trust state of source identity to target identity.
      */
     private void takeoverTrustState(final Identity source, final Identity target) {
-        if( source.isGOOD() ) {
-            target.setGOODWithoutUpdate();
+        if( source.isFRIEND() ) {
+            target.setFRIENDWithoutUpdate();
             target.modify();
-        } else if( source.isOBSERVE() ) {
-            target.setOBSERVEWithoutUpdate();
+        } else if( source.isGOOD() ) {
+            target.setGOODWithoutUpdate();
             target.modify();
         } else if( source.isBAD() ) {
             target.setBADWithoutUpdate();
             target.modify();
-        } else if( source.isCHECK() ) {
-            target.setCHECKWithoutUpdate();
+        } else if( source.isNEUTRAL() ) {
+            target.setNEUTRALWithoutUpdate();
             target.modify();
         }
     }
 
     // TODO: merge the imported identities with the existing identities (WOT), use a mergeIdentities method
     public int importIdentities(final List<Identity> importedIdentities) {
-        // for now we import new identities, and take over the trust state if our identity state is CHECK
+        // for now we import new identities, and take over the trust state if our identity state is NEUTRAL
         if( !IdentitiesStorage.inst().beginExclusiveThreadTransaction() ) {
             return 0;
         }
@@ -338,7 +348,7 @@ public class FrostIdentities {
                     if( addIdentity(newId, false) ) {
                         importedCount++;
                     }
-                } else if( oldId.isCHECK() && !newId.isCHECK() ) {
+                } else if( oldId.isNEUTRAL() && !newId.isNEUTRAL() ) {
                     // take over trust state
                     takeoverTrustState(newId, oldId);
                     importedCount++;

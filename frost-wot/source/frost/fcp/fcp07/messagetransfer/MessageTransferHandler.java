@@ -34,6 +34,7 @@ import frost.fcp.fcp07.FcpMultiRequestConnectionFileTransferTools;
 import frost.fcp.fcp07.NodeMessage;
 import frost.fcp.fcp07.NodeMessageListener;
 import frost.util.Logging;
+import frost.util.Mixed;
 
 public class MessageTransferHandler implements NodeMessageListener {
 
@@ -134,6 +135,11 @@ public class MessageTransferHandler implements NodeMessageListener {
             return;
         }
 
+        // NOTE: this node message handler uses a persistent connection
+        // with an infinite read-timeout, and is NOT involved in the
+        // "default/alldata" timeout juggling necessary for normal
+        // FcpSocket file download transfers (a la FcpMultiRequestConnection
+        // FileTransferTools.java:startDirectPersistentGet()).
         if( nm.isMessageName("AllData") ) {
             onAllData(task, nm); // get successful
         } else if( nm.isMessageName("GetFailed") ) {
@@ -179,11 +185,15 @@ public class MessageTransferHandler implements NodeMessageListener {
         final long dataLength = nm.getLongValue("DataLength");
         long bytesWritten = 0;
 
-        try {
-            final BufferedOutputStream fileOut = new BufferedOutputStream(new FileOutputStream(task.getFile()));
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final FileOutputStream fileOutputStream = new FileOutputStream(task.getFile());
+            final BufferedOutputStream fileOut = new BufferedOutputStream(fileOutputStream);
+        ) {
             final byte[] b = new byte[4096];
             long bytesLeft = dataLength;
             int count;
+            // NOTE: this input stream comes from our parent connection and should not be closed by us!
             final BufferedInputStream fcpIn = fcpTools.getFcpPersistentConnection().getFcpSocketIn();
             while( bytesLeft > 0 ) {
                 count = fcpIn.read(b, 0, ((bytesLeft > b.length)?b.length:(int)bytesLeft));
@@ -195,7 +205,6 @@ public class MessageTransferHandler implements NodeMessageListener {
                 fileOut.write(b, 0, count);
                 bytesWritten += count;
             }
-            fileOut.close();
         } catch (final Throwable e) {
             logger.log(Level.SEVERE, "Catched exception", e);
         }
@@ -218,7 +227,8 @@ public class MessageTransferHandler implements NodeMessageListener {
         final int returnCode = nm.getIntValue("Code");
         final String codeDescription = nm.getStringValue("CodeDescription");
         final boolean isFatal = nm.getBoolValue("Fatal");
-        final String redirectURI = nm.getStringValue("RedirectURI");
+        // NOTE:IMPORTANT: INCOMING FREENET URIS FROM THE NODE ARE ALWAYS URLENCODED, SO WE DECODE THEM!
+        final String redirectURI = Mixed.rawUrlDecode(nm.getStringValue("RedirectURI"));
         final FcpResultGet result = new FcpResultGet(false, returnCode, codeDescription, isFatal, redirectURI);
         task.setFcpResultGet(result);
         setTaskFinished(task);
@@ -226,8 +236,9 @@ public class MessageTransferHandler implements NodeMessageListener {
 
     protected void onPutSuccessful(final MessageTransferTask task, final NodeMessage nm) {
 
-        String chkKey = nm.getStringValue("URI");
-        // check if the returned text contains the computed CHK key
+        // NOTE:IMPORTANT: INCOMING FREENET URIS FROM THE NODE ARE ALWAYS URLENCODED, SO WE DECODE THEM!
+        String chkKey = Mixed.rawUrlDecode(nm.getStringValue("URI"));
+        // check if the returned text contains the computed CHK key, and extract it
         final int pos = chkKey.indexOf("CHK@");
         if( pos > -1 ) {
             chkKey = chkKey.substring(pos).trim();

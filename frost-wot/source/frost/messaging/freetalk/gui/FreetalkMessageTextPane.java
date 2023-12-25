@@ -1,5 +1,5 @@
 /*
-  MessageTextPane.java / Frost
+  FreetalkMessageTextPane.java / Frost
   Copyright (C) 2006  Frost Project <jtcfrost.sourceforge.net>
   Some changes by Stefan Majewski <e9926279@stud3.tuwien.ac.at>
 
@@ -31,7 +31,9 @@ import javax.swing.event.*;
 import javax.swing.text.*;
 
 import frost.*;
+import frost.fcp.FreenetKeys;
 import frost.fileTransfer.*;
+import frost.fileTransfer.KeyParser;
 import frost.fileTransfer.download.*;
 import frost.gui.*;
 import frost.messaging.freetalk.*;
@@ -200,14 +202,13 @@ public class FreetalkMessageTextPane extends JPanel {
         messageBodyScrollPane.getVerticalScrollBar().setValueIsAdjusting(false);
 
         if( searchMessagesConfig != null &&
-            searchMessagesConfig.content != null &&
-            searchMessagesConfig.content.length() > 0 )
+            searchMessagesConfig.contentPattern != null )
         {
-            // highlight words in content that the user searched for
+            // highlight words in content that the user searched for; only triggered if the message is opened from the search pane
             if( textHighlighter == null ) {
-                textHighlighter = new TextHighlighter(highlightColor, true);
+                textHighlighter = new TextHighlighter(highlightColor, true); // true = case-insensitive highlighting
             }
-            textHighlighter.highlight(messageTextArea, searchMessagesConfig.content, false);
+            textHighlighter.highlight(messageTextArea, searchMessagesConfig.contentPattern, false); // use the regex pattern for highlighting
         }
     }
 
@@ -287,7 +288,7 @@ public class FreetalkMessageTextPane extends JPanel {
                 }
                 final MouseHyperlinkEvent e = (MouseHyperlinkEvent) evt;
                 if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
-                    // user clicked on 'clickedKey', List 'allKeys' contains all keys
+                    // user clicked on 'clickedKey', List 'allKeys' contains all keys from entire message (and quoted history)
                     final List<String> allKeys = ((MessageDecoder)messageTextArea.getDecoder()).getHyperlinkedKeys();
                     final String clickedKey = e.getDescription();
                     // show menu to download this/all keys and copy this/all to clipboard
@@ -432,12 +433,14 @@ public class FreetalkMessageTextPane extends JPanel {
         }
 
         public void actionPerformed(final ActionEvent e) {
-            if (e.getSource() == saveAttachmentsItem || e.getSource() == saveAttachmentItem) {
-                downloadAttachments();
+            if (e.getSource() == saveAttachmentItem) {
+                downloadAttachments(false);
+            } else if (e.getSource() == saveAttachmentsItem) {
+                downloadAttachments(true);
             } else if (e.getSource() == copyKeysAndNamesItem) {
-                CopyToClipboard.copyKeysAndFilenames( getItems().toArray() );
+                CopyToClipboard.copyKeysAndFilenames( getAttachmentItems(false).toArray(), true ); // true = cleanup keys
             } else if (e.getSource() == copyExtendedInfoItem) {
-                CopyToClipboard.copyExtendedInfo( getItems().toArray() );
+                CopyToClipboard.copyExtendedInfo( getAttachmentItems(false).toArray(), true ); // true = cleanup keys
             }
         }
 
@@ -469,12 +472,8 @@ public class FreetalkMessageTextPane extends JPanel {
 
             add(copyToClipboardMenu);
             addSeparator();
-
-            if (filesTable.getSelectedRow() == -1) {
-                add(saveAttachmentsItem);
-            } else {
-                add(saveAttachmentItem);
-            }
+            add(saveAttachmentItem);
+            add(saveAttachmentsItem);
 
             super.show(invoker, x, y);
         }
@@ -482,45 +481,57 @@ public class FreetalkMessageTextPane extends JPanel {
         /**
          * Adds either the selected or all files from the attachmentTable to downloads table.
          */
-        private void downloadAttachments() {
-            final Iterator<FreetalkFileAttachment> it = getItems().iterator();
-            while (it.hasNext()) {
+        private void downloadAttachments(final boolean allAttachments) {
+            final Iterator<FreetalkFileAttachment> it = getAttachmentItems(allAttachments).iterator();
+
+            // we'll be building a list of download items based on the original key-names,
+            // so that we ignore the possibly-prefixed/renamed/wrong attachment filename + size.
+            ArrayList<FrostDownloadItem> frostDownloadItemList = new ArrayList<FrostDownloadItem>();
+            final KeyParser.ParseResult result = new KeyParser.ParseResult();
+
+            while( it.hasNext() ) {
                 final FreetalkFileAttachment fa = it.next();
-                String filename = fa.getFileName();
-                // maybe convert html codes (e.g. %2c -> , )
-                if( filename.indexOf("%") > 0 ) {
-                    try {
-                        filename = java.net.URLDecoder.decode(filename, "UTF-8");
-                    } catch (final java.io.UnsupportedEncodingException ex) {
-                        logger.log(Level.SEVERE, "Decode of HTML code failed", ex);
+
+                final String key = fa.getKey();
+                if( key != null ) {
+                    // attempt to parse and validate the current key and extract its real filename
+                    // NOTE: we don't want Freesite keys so the 2nd argument is false
+                    KeyParser.parseKeyFromLine(key, false, result);
+
+                    // if this key was valid, then create a new download object for it
+                    if( result.key != null ) {
+                        frostDownloadItemList.add(new FrostDownloadItem(result.fileName, result.key));
                     }
                 }
-                final FrostDownloadItem dlItem = new FrostDownloadItem(
-                        filename,
-                        fa.getKey(),
-                        fa.getFileSize());
-                getDownloadModel().addDownloadItem(dlItem);
             }
+
+            // start "add new downloads" dialog
+            // NOTE: 1st arg = the list of keys to queue, true = ask before redownloading keys,
+            // null, null = do not override prefix or download dir, false = no "paste more" button,
+            // null = we do not associate with freetalk messages
+            FileTransferManager.inst().getDownloadManager().getPanel().openAddNewDownloadsDialog(frostDownloadItemList, true, null, null, false, null);
         }
 
         /**
          * Returns a list of all items to process, either selected ones or all.
          */
-        private List<FreetalkFileAttachment> getItems() {
-            List<FreetalkFileAttachment> items = null;
-            final int[] selectedRows = filesTable.getSelectedRows();
-            if (selectedRows.length == 0) {
-                // If no rows are selected, add all attachments to download table
-                items = selectedMessage.getFileAttachments();
+        private List<FreetalkFileAttachment> getAttachmentItems(final boolean allAttachments) {
+            if( allAttachments ) {
+                // return all attachments
+                return selectedMessage.getFileAttachments();
             } else {
                 final List<FreetalkFileAttachment> attachments = selectedMessage.getFileAttachments();
-                items = new LinkedList<FreetalkFileAttachment>();
-                for( final int element : selectedRows ) {
-                    final FreetalkFileAttachment fo = attachments.get(element);
-                    items.add(fo);
+                List<FreetalkFileAttachment> items = new LinkedList<FreetalkFileAttachment>();
+
+                final int[] selectedRows = filesTable.getSelectedRows();
+                if( selectedRows.length > 0 ) {
+                    for( final int rowPos : selectedRows ) {
+                        items.add(attachments.get(rowPos));
+                    }
                 }
+
+                return items;
             }
-            return items;
         }
     }
 
@@ -597,28 +608,31 @@ public class FreetalkMessageTextPane extends JPanel {
         public void show(final Component invoker, final int x, final int y) {
             removeAll();
 
-            // if clickedLink conatins no '/', its only a key without file, allow to copy this to clipboard only
-            // if clickedLink ends with a '/' its a freesite link, allow to copy this to clipboard only
-            // else the clickedLink is a filelink, allow to copy/download this link or ALL filelinks
+            // if clickedKey contains no '/', it's only a key without file, so only allow copying this key to the clipboard.
+            // if clickedKey matches the advanced freesite URL scanner, we can copy to clipboard.
+            // else the clickedKey is a filelink, so simply allow to copy/download this link or ALL filelinks
+            // TODO: the regular Frost message pane allows to open keys directly in the browser, perhaps port it here... but uh nobody uses Freetalk...
 
-            if( clickedKey.indexOf("/") < 0 ||
-                !Character.isLetterOrDigit(clickedKey.charAt(clickedKey.length()-1)) )
-            {
+            if( clickedKey.indexOf("/") < 0 ) {
                 // key only
                 add(copyKeyOnlyToClipboard);
-            } else if( clickedKey.endsWith("/") ) {
-                // freesite link
-                add(copyFreesiteLinkToClipboard);
             } else {
-                // file key
-                add(copyFileLinkToClipboard);
-                if( allKeys.size() > 1 ) {
-                    add(copyAllFileLinksToClipboard);
-                }
-                addSeparator();
-                add(downloadFile);
-                if( allKeys.size() > 1 ) {
-                    add(downloadAllFiles);
+                // NOTE: this returns false for malformed Freesite keys (such as just a key with
+                // no slashes at all).
+                if( FreenetKeys.isFreesiteKey(clickedKey) ) {
+                    // freesite link
+                    add(copyFreesiteLinkToClipboard);
+                } else {
+                    // file key
+                    add(copyFileLinkToClipboard);
+                    if( allKeys.size() > 1 ) {
+                        add(copyAllFileLinksToClipboard);
+                    }
+                    addSeparator();
+                    add(downloadFile);
+                    if( allKeys.size() > 1 ) {
+                        add(downloadAllFiles);
+                    }
                 }
             }
 
@@ -632,31 +646,36 @@ public class FreetalkMessageTextPane extends JPanel {
          * Adds either the selected or all files from the attachmentTable to downloads table.
          */
         private void downloadItems(final boolean getAll) {
-
-            final List<String> items = getItems(getAll);
+            final List<String> items = getMessageKeyItems(getAll);
             if( items == null ) {
                 return;
             }
 
-            for( final String item : items ) {
-                String key;
-                // 0.7: use key/filename
-                key = item;
-                String name = item.substring(item.lastIndexOf("/")+1);
-                // maybe convert html codes (e.g. %2c -> , )
-                if( name.indexOf("%") > 0 ) {
-                    try {
-                        name = java.net.URLDecoder.decode(name, "UTF-8");
-                    } catch (final java.io.UnsupportedEncodingException ex) {
-                        logger.log(Level.SEVERE, "Decode of HTML code failed", ex);
+            // we'll be building a list of download items based on the original key-names
+            ArrayList<FrostDownloadItem> frostDownloadItemList = new ArrayList<FrostDownloadItem>();
+            final KeyParser.ParseResult result = new KeyParser.ParseResult();
+
+            for( final String key : items ) {
+                if( key != null ) {
+                    // attempt to parse and validate the current key and extract its real filename
+                    // NOTE: we don't want Freesite keys so the 2nd argument is false
+                    KeyParser.parseKeyFromLine(key, false, result);
+
+                    // if this key was valid, then create a new download object for it
+                    if( result.key != null ) {
+                        frostDownloadItemList.add(new FrostDownloadItem(result.fileName, result.key));
                     }
                 }
-                final FrostDownloadItem dlItem = new FrostDownloadItem(name, key);
-                getDownloadModel().addDownloadItem(dlItem);
             }
+
+            // start "add new downloads" dialog
+            // NOTE: 1st arg = the list of keys to queue, true = ask before redownloading keys,
+            // null, null = do not override prefix or download dir, false = no "paste more" button,
+            // null = we do not associate with freetalk messages
+            FileTransferManager.inst().getDownloadManager().getPanel().openAddNewDownloadsDialog(frostDownloadItemList, true, null, null, false, null);
         }
 
-        private List<String> getItems(final boolean getAll) {
+        private List<String> getMessageKeyItems(final boolean getAll) {
             List<String> items;
             if( getAll ) {
                 items = allKeys;
@@ -671,26 +690,36 @@ public class FreetalkMessageTextPane extends JPanel {
 
         /**
          * This method copies the CHK keys and file names of the selected or all items to the clipboard.
+         * It decodes and validates every key, to get rid of "%20" encoding and other junk.
          */
         private void copyToClipboard(final boolean getAll) {
 
-            final List<String> items = getItems(getAll);
-            if( items == null ) {
+            final List<String> items = getMessageKeyItems(getAll);
+
+            if( items == null || items.isEmpty() ) {
                 return;
             }
 
-            String text;
-            if( items.size() > 1 ) {
-                final StringBuilder textToCopy = new StringBuilder();
-            	for( final String key : items ) {
-            		textToCopy.append(key).append("\n");
-            	}
-            	text = textToCopy.toString();
-            } else {
-            	// don't include a trailing \n if we only have one item
-            	text = items.get(0);
+            // build a string of all valid file or freesite keys from the input list
+            final StringBuilder textToCopy = new StringBuilder();
+            final KeyParser.ParseResult result = new KeyParser.ParseResult();
+            for( final String key : items ) {
+                // the input keys are raw, so first we must parse a clean, validated key
+                // NOTE: we DO want Freesite keys, so the 2nd argument is true
+                KeyParser.parseKeyFromLine(key, true, result);
+                if( result.key == null ) { continue; } // skip invalid key
+
+                // add the clean version of the validated key to the string builder
+                textToCopy.append(result.key).append("\n");
             }
-            CopyToClipboard.copyText(text);
+
+            // remove the additional \n at the end if the input array had valid items
+            if( textToCopy.length() > 0 ) {
+                textToCopy.deleteCharAt(textToCopy.length() - 1);
+            }
+
+            // now just put it in the clipboard
+            CopyToClipboard.copyText(textToCopy.toString());
         }
     }
 

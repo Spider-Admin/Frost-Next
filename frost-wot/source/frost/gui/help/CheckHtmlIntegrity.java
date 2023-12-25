@@ -24,8 +24,8 @@ import java.util.logging.*;
 import java.util.zip.*;
 
 /**
- * Checks all HTML files in help.zip for 'http://', 'ftp://' links.
- * If those strings are found the help.zip is not used.
+ * Checks all HTML files in a zip file for 'http://', 'https://', 'ftp://' and 'nntp://' links.
+ * If those strings are found then the zip file is rejected as unsafe.
  * 
  * @author bback
  */
@@ -33,63 +33,70 @@ public class CheckHtmlIntegrity {
 
     private static final Logger logger = Logger.getLogger(CheckHtmlIntegrity.class.getName());
 
-    private boolean isHtmlSecure = false;
-    
-    public boolean isHtmlSecure() {
-        return isHtmlSecure;
-    }
-
+    /**
+     * Tells you whether a zip file contains any unsafe .htm/.html files with external web
+     * links or resources, which could leak your IP. You can call this function multiple times
+     * on different zip files, to get the answers about all of them.
+     * @param {String} fileName - the path to the file you want to check
+     * @return - true if safe, false otherwise (or if file doesn't exist/is 0 bytes/couldn't be parsed)
+     */
     public boolean scanZipFile(String fileName) {
 
         File file = new File(fileName);
         
         if( !file.isFile() || file.length() == 0 ) {
-            logger.log(Level.SEVERE, "Zip file does not exist: "+file.getPath());
-            return isHtmlSecure;
+            logger.log(Level.SEVERE, "Zip file is invalid or doesn't exist: \""+fileName+"\".");
+            return false; // not secure
         }
 
         final byte[] zipData = new byte[4096];
 
-        try {
+        try (
+            // NOTE: Java 7+ autocloseable takes care of automatically close()'ing these
+            // in reverse order after we're done, to free up all memory resources.
             ZipFile zipFile = new ZipFile(file);
+        ) {
             final Enumeration<? extends ZipEntry> zipFileEntryEnumeration = zipFile.entries();
             while( zipFileEntryEnumeration.hasMoreElements() ) {
                 final ZipEntry zipFileEntry = zipFileEntryEnumeration.nextElement();
                 
-                final String zipFileEntryName = zipFileEntry.getName();
+                // SECURITY NOTE: We must lowercase the filename, so that even ".HTM" and ".HTML" are validated
+                final String zipFileEntryName = zipFileEntry.getName().toLowerCase();
                 if( zipFileEntryName.endsWith(".html") || zipFileEntryName.endsWith(".htm") ) {
                     
-                    InputStream zipFileEntryInputStream = zipFile.getInputStream(zipFileEntry);
-                    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream((int)zipFileEntry.getSize());
-                    while( true ) {
-                        int len = zipFileEntryInputStream.read(zipData);
-                        if( len < 0 ) {
-                            break;
+                    try (
+                        // NOTE: Java 7+ try-with-resources (autocloseable)
+                        InputStream zipFileEntryInputStream = zipFile.getInputStream(zipFileEntry);
+                        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream((int)zipFileEntry.getSize());
+                    ) {
+                        while( true ) {
+                            int len = zipFileEntryInputStream.read(zipData);
+                            if( len < 0 ) {
+                                break;
+                            }
+                            byteArrayOutputStream.write(zipData, 0, len);
                         }
-                        byteArrayOutputStream.write(zipData, 0, len);
-                    }
-                    zipFileEntryInputStream.close();
-                    
-                    String htmlStr = new String(byteArrayOutputStream.toByteArray(), "UTF-8").toLowerCase();
-                    if( htmlStr.indexOf("http://") > -1 ||
-                        htmlStr.indexOf("ftp://") > -1 ||
-                        htmlStr.indexOf("nntp://") > -1 )
-                    {
-                        logger.log(Level.SEVERE, "Unsecure HTML file in help.zip found: "+zipFileEntryName);
-                        return isHtmlSecure;
+
+                        // SECURITY NOTE: Once again we must lowercase the string so they can't get around the validation
+                        String htmlStr = new String(byteArrayOutputStream.toByteArray(), "UTF-8").toLowerCase();
+                        if( htmlStr.indexOf("http://") > -1 ||
+                                htmlStr.indexOf("https://") > -1 ||
+                                htmlStr.indexOf("ftp://") > -1 ||
+                                htmlStr.indexOf("nntp://") > -1 )
+                        {
+                            logger.log(Level.SEVERE, "Found an unsafe HTML file in \""+fileName+"\": "+zipFileEntryName);
+                            return false; // not secure
+                        }
                     }
                 }
             }
-            // all files scanned, no unsecure found
-            logger.log(Level.WARNING, "NO unsecure HTML file in help.zip found, all is ok.");
-            isHtmlSecure = true;
+        } catch( final Exception e ) {
+            logger.log(Level.SEVERE, "Exception while reading \""+fileName+"\". File is invalid.", e);
+            return false; // not secure
+        }
 
-        } catch( FileNotFoundException e ) {
-            logger.log(Level.SEVERE, "Exception while reading help.zip. File is invalid.", e);
-        }
-        catch( IOException e ) {
-            logger.log(Level.SEVERE, "Exception while reading help.zip. File is invalid.", e);
-        }
-        return isHtmlSecure;
+        // all files scanned, no unsafe web links found
+        logger.log(Level.WARNING, "No unsafe HTML files found in \""+fileName+"\", everything is ok.");
+        return true; // secure
     }
 }

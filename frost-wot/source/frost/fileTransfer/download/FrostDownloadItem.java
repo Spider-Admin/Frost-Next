@@ -18,7 +18,10 @@
 package frost.fileTransfer.download;
 
 import frost.*;
-import frost.fileTransfer.*;
+import frost.fileTransfer.BlocksPerMinuteCounter;
+import frost.fileTransfer.FreenetPriority;
+import frost.fileTransfer.FrostFileListFileObject;
+import frost.fileTransfer.LastActivityTracker;
 import frost.storage.perst.filelist.*;
 import frost.util.*;
 import frost.util.model.*;
@@ -30,10 +33,10 @@ public class FrostDownloadItem extends ModelItem<FrostDownloadItem> implements C
 
     // the constants representing download states
     public transient final static int STATE_WAITING    = 1; // wait for start
-    public transient final static int STATE_TRYING     = 2; // download running
+    public transient final static int STATE_TRYING     = 2; // download fcp message sent; this state is only used in non-persistent mode
     public transient final static int STATE_DONE       = 3;
     public transient final static int STATE_FAILED     = 4;
-    public transient final static int STATE_PROGRESS   = 5; // download runs
+    public transient final static int STATE_PROGRESS   = 5; // download request was accepted by Freenet and is running
     public transient final static int STATE_DECODING   = 6; // decoding runs
 
 	private String fileName = null;
@@ -44,7 +47,7 @@ public class FrostDownloadItem extends ModelItem<FrostDownloadItem> implements C
 	private String associatedMessageId = null;
 	private String associatedBoardName = null;
 
-    private Boolean enabled = Core.frostSettings.getBoolValue(SettingsClass.DOWNLOAD_ENABLED_DEFAULT); // SF_EDIT
+    private Boolean enabled = Core.frostSettings.getBoolValue(SettingsClass.DOWNLOAD_ENABLED_DEFAULT);
     private int state = STATE_WAITING;
     private long downloadAddedTime = 0;
     private long downloadStartedTime = 0;
@@ -57,43 +60,50 @@ public class FrostDownloadItem extends ModelItem<FrostDownloadItem> implements C
     private boolean isTracked = false;
     private boolean isCompletionProgRun = false;
 
-    private int runtimeSecondsWithoutProgress = 0;
-    private int oldDoneBlocks = 0;
-
     // if this downloadfile is a shared file then this object is set
     private transient FrostFileListFileObject fileListFileObject = null;
 
     private FreenetPriority priority = FreenetPriority.getPriority(Core.frostSettings.getIntValue(SettingsClass.FCP2_DEFAULT_PRIO_FILE_DOWNLOAD));
 
-    // non persistent fields
-	private transient int doneBlocks = 0;
-	private transient int requiredBlocks = 0;
-	private transient int totalBlocks = 0;
+    // non-persistent fields (not stored in database)
+    private transient int doneBlocks = 0;
+    private transient int requiredBlocks = 0;
+    private transient int totalBlocks = 0;
     private transient Boolean isFinalized = null;
     private transient String errorCodeDescription = null;
 
-    private transient boolean isDirect = false;
+    // if DDA (Direct Disk Access) is used instead, then DIRECT (aka "AllData" socket message) is FALSE.
+    // so just initialize the default download "DIRECT" state to whatever the user has chosen;
+    // if they've enabled "use DDA" in the preferences, then we default to direct = false, otherwise
+    // use direct = true. this isDirect variable is purely cosmetic and is always corrected when transfer begins.
+    private transient boolean isDirect = ! Core.frostSettings.getBoolValue(SettingsClass.FCP2_USE_DDA); // we invert the value
     private transient boolean isExternal = false;
 
     private transient boolean internalRemoveExpected = false;
+    private transient boolean internalRemoveExpectedThreadStarted = false;
     private transient boolean stateShouldBeProgress = false;
+
+    // speed and activity measurement; non-persistent (not saved in the database)
+    private LastActivityTracker activityTracker = null; // the activity time is stored in db as a long, but not this object
+    private BlocksPerMinuteCounter bpmCounter = null;
 
     /**
      * Add a file from download text box.
      */
-	public FrostDownloadItem(String fileName, final String key) {
+    public FrostDownloadItem(String newFileName, final String key) {
 
-        fileName = FileTransferManager.inst().getDownloadManager().ensureUniqueFilename(fileName);
+        if( newFileName != null ) {
+            newFileName = Mixed.makeFilename(newFileName);
+        }
+        this.fileName = newFileName;
+        this.key = key;
 
-        this.fileName = Mixed.makeFilename(fileName);
-		this.key = key;
-
-        gqIdentifier = buildGqIdentifier(fileName);
+        gqIdentifier = buildGqIdentifier(this.fileName);
 
         downloadAddedTime = System.currentTimeMillis();
 
-		state = STATE_WAITING;
-	}
+        state = STATE_WAITING;
+    }
 
     /**
      * Add a file attachment.
@@ -106,9 +116,7 @@ public class FrostDownloadItem extends ModelItem<FrostDownloadItem> implements C
     /**
      * Add a shared file from filelist (user searched file and choosed one of the names).
      */
-    public FrostDownloadItem(final FrostFileListFileObject newSfo, String newName) {
-
-        newName = FileTransferManager.inst().getDownloadManager().ensureUniqueFilename(newName);
+    public FrostDownloadItem(final FrostFileListFileObject newSfo, String newFileName) {
 
         FrostFileListFileObject sfo = null;
 
@@ -121,11 +129,14 @@ public class FrostDownloadItem extends ModelItem<FrostDownloadItem> implements C
             sfo = newSfo;
         }
 
-        fileName = newName;
-        fileSize = sfo.getSize();
-        key = sfo.getKey();
+        if( newFileName != null ) {
+            newFileName = Mixed.makeFilename(newFileName);
+        }
+        this.fileName = newFileName;
+        this.fileSize = sfo.getSize();
+        this.key = sfo.getKey();
 
-        gqIdentifier = buildGqIdentifier(fileName);
+        gqIdentifier = buildGqIdentifier(this.fileName);
 
         setFileListFileObject(sfo);
 
@@ -135,18 +146,19 @@ public class FrostDownloadItem extends ModelItem<FrostDownloadItem> implements C
     }
 
     /**
-     * Add a saved file from database.
+     * Constructor used when loading files from the database at startup.
      */
-	public FrostDownloadItem(
+    public FrostDownloadItem(
             final String newFilename,
             final String newFilenamePrefix,
             final String newDownloadDir,
             final long newSize,
             final String newKey,
-            final Boolean newEnabledownload,
+            final boolean newIsEnabled,
             final int newState,
             final long newDownloadAddedTime,
             final long newDownloadStartedTime,
+            final long newDownloadLastActivityTime,
             final long newDownloadFinishedTime,
             final int newRetries,
             final long newLastDownloadStopTime,
@@ -154,8 +166,6 @@ public class FrostDownloadItem extends ModelItem<FrostDownloadItem> implements C
             final boolean newIsLoggedToFile,
             final boolean newIsTracked,
             final boolean newIsCompletionProgRun,
-            final int newRuntimeSecondsWithoutProgress,
-            final int newOldDoneBlocks,
             final String newAssociatedBoardName,
             final String newAssociatedMessageId,
             final FreenetPriority newPriority
@@ -163,13 +173,27 @@ public class FrostDownloadItem extends ModelItem<FrostDownloadItem> implements C
     ) {
         fileName = newFilename;
         prefix = newFilenamePrefix;
-        downloadDir = FileAccess.appendSeparator(newDownloadDir);
+        // Always set the download dir via the setter, so that we convert absolute paths to relative
+        // if required (such as when loading old legacy objects from the old legacy Frost database),
+        // as well as verifying that the folder exists (will attempt to create if missing, and will
+        // fall back to default dir if creation fails). this is just supplementary, since Frost-Next
+        // always creates the dir if missing during the final file-writing stage too.
+        // We *cannot* avoid creating the folders for finished items, since Frost will *also* want to
+        // *save* those finished files to disk at startup if they're missing, so people who have lingering
+        // Finished items will have to live with the folders re-appearing and the files being saved again,
+        // since that's a security feature which allows finished files to be saved to disk again at
+        // the next startup if the user accidentally deletes them or if Frost somehow crashed.
+        // Simple solution for users: They should clear finished downloads when they're done. That also
+        // frees up the global Freenet queue and their node's temporary storage, so it's important anyway.
+        setDownloadDir(newDownloadDir);
         fileSize = newSize;
         key = newKey;
-        enabled = newEnabledownload;
+        enabled = Boolean.valueOf(newIsEnabled);
         state = newState;
         downloadAddedTime = newDownloadAddedTime;
         downloadStartedTime = newDownloadStartedTime;
+        // when restoring objects from the database, we need to force-set the last activity timestamp
+        forceActivityTime(newDownloadLastActivityTime);
         downloadFinishedTime = newDownloadFinishedTime;
         retries = newRetries;
         lastDownloadStopTime = newLastDownloadStopTime;
@@ -177,36 +201,77 @@ public class FrostDownloadItem extends ModelItem<FrostDownloadItem> implements C
         isLoggedToFile= newIsLoggedToFile;
         isTracked= newIsTracked;
         isCompletionProgRun= newIsCompletionProgRun;
-        runtimeSecondsWithoutProgress = newRuntimeSecondsWithoutProgress;
-        oldDoneBlocks = newOldDoneBlocks;
         associatedBoardName = newAssociatedBoardName;
         associatedMessageId = newAssociatedMessageId;
         if( newPriority == null ) {
-    		priority = FreenetPriority.getPriority(Core.frostSettings.getIntValue(SettingsClass.FCP2_DEFAULT_PRIO_FILE_DOWNLOAD));
-    	} else {
-    		priority = newPriority;
-    	}
-        
+            priority = FreenetPriority.getPriority(Core.frostSettings.getIntValue(SettingsClass.FCP2_DEFAULT_PRIO_FILE_DOWNLOAD));
+        } else {
+            priority = newPriority;
+        }
 
         if( this.state == FrostDownloadItem.STATE_PROGRESS ) {
             // download was running at end of last shutdown
             stateShouldBeProgress = true;
         }
 
-        if (this.state != FrostDownloadItem.STATE_DONE && this.state != FrostDownloadItem.STATE_FAILED) {
+        // reset unfinished downloads to "waiting" just in case Freenet no longer has it
+        if( this.state != FrostDownloadItem.STATE_DONE && this.state != FrostDownloadItem.STATE_FAILED ) {
             this.state = FrostDownloadItem.STATE_WAITING;
         }
-	}
+    }
+
+    // creates a speed counter object tuned for downloads
+    private BlocksPerMinuteCounter getBPMCounter() {
+        if( bpmCounter == null ) {
+            bpmCounter = new BlocksPerMinuteCounter(
+                    BlocksPerMinuteCounter.DOWNLOAD_MAX_MEASUREMENT_AGE,
+                    BlocksPerMinuteCounter.DOWNLOAD_SMOOTHING_FACTOR);
+        }
+        return bpmCounter;
+    }
+
+    // creates an activity tracker parented to this object
+    private LastActivityTracker getActivityTracker() {
+        if( activityTracker == null ) {
+            activityTracker = new LastActivityTracker(FrostDownloadItem.this);
+        }
+        return activityTracker;
+    }
+
+    // this function is only called *once*, whenever loading items from database
+    private void forceActivityTime(final long newLastActivityMillis) {
+        getActivityTracker().setLastActivityMillis(newLastActivityMillis);
+    }
+
+    // retrieves the latest activity timestamp from the tracker
+    // see LastActivityTracker.java:getLastActivityMillis() for return value documentation
+    public long getLastActivityMillis() {
+        return getActivityTracker().getLastActivityMillis();
+    }
+
+    // helper which retrieves whole seconds from the activity tracker (used by filesharing feature)
+    public long getRuntimeSecondsWithoutProgress() {
+        final long timeDiff = getActivityTracker().getRuntimeMillisWithoutProgress();
+        if( timeDiff < 1 ) {
+            return 0;
+        }
+        final long timeDiffSec = Math.round( ((double)timeDiff / 1000) );
+        return timeDiffSec;
+    }
 
     public boolean isSharedFile() {
         return getFileListFileObject() != null;
     }
 
     /**
-     * Used only to set a new name if an item with same name is already in download table.
+     * Mainly used when the user triggers the "rename file" menu feature before adding the download.
      */
-    public void setFileName(final String s) {
-        fileName = s;
+    public void setFileName(String newFileName) {
+        if( newFileName != null ) {
+            // replace illegal characters with underscores
+            newFileName = Mixed.makeFilename(newFileName);
+        }
+        this.fileName = newFileName;
     }
 	public String getFileName() {
 		if (prefix == null || prefix.length() == 0) {
@@ -242,10 +307,36 @@ public class FrostDownloadItem extends ModelItem<FrostDownloadItem> implements C
 	public int getState() {
 		return state;
 	}
-	public void setState(final int newState) {
-		state = newState;
+    public void setState(final int newState) {
+        final int oldState = state;
+        state = newState;
+
+        // determine if a transfer has now begun
+        if( oldState != newState && newState == FrostDownloadItem.STATE_PROGRESS ) {
+            // unset the "last activity" timestamp when the download begins, but *only* if this
+            // wasn't an expected state change. when we load a previously-in-progress item from
+            // the database, then the state is "WAITING" but the "PROGRESS" state is *expected*, so
+            // that's how we know that we've loaded a download from the database. we definitely
+            // don't want to reset the activity time during database loading, since that would
+            // mean constantly losing the last activity at every startup. ;) all other progress
+            // changes (such as starting new downloads during the session, or restarting old ones)
+            // are always unexpected. so this *only* resets the state during *actual* (re)starts.
+            if( !stateShouldBeProgress ) {
+                // NOTE: we don't need to unset this at other state changes, since the tracker's getter function
+                // always returns 0 ("no measurement value") when a download is in any non-progress state
+                getActivityTracker().unsetLastActivity();
+            }
+            stateShouldBeProgress = true; // we expect this item to be in "progress" state from now on
+
+            // do all other maintenance resetting regardless of whether this was loaded from database
+            downloadFinishedTime = 0; // reset the "download finished at" time when the transfer begins
+            getBPMCounter().resetBlocksPerMinute(0); // reset blocks-per-minute counter to zero when the transfer begins
+        } else {
+            stateShouldBeProgress = false; // we expect this item to be in a non-progress state
+        }
+
         fireChange();
-	}
+    }
 
 	public long getLastDownloadStopTime() {
 		return lastDownloadStopTime;
@@ -281,9 +372,15 @@ public class FrostDownloadItem extends ModelItem<FrostDownloadItem> implements C
 	public int getDoneBlocks() {
 		return doneBlocks;
 	}
-	public void setDoneBlocks(final int newDoneBlocks) {
-	    doneBlocks = newDoneBlocks;
-	}
+
+    public void setDoneBlocks(final int newDoneBlocks) {
+        // possibly update the "last activity" timestamp
+        getActivityTracker().updateLastActivity(doneBlocks, newDoneBlocks);
+
+        // now just set the new progress
+        doneBlocks = newDoneBlocks;
+        getBPMCounter().updateBlocksPerMinute(newDoneBlocks); // update the blocks-per-minute counter
+    }
 
 	public int getRequiredBlocks() {
 		return requiredBlocks;
@@ -343,23 +440,57 @@ public class FrostDownloadItem extends ModelItem<FrostDownloadItem> implements C
     }
 
     public String getDownloadDir() {
-        if (downloadDir == null) {
-            return FileAccess.appendSeparator(Core.frostSettings.getValue(SettingsClass.DIR_DOWNLOAD));
-		}
+        if (downloadDir == null || downloadDir.isEmpty()) {
+            return getDefaultDownloadDir();
+        }
         return downloadDir;
     }
 
-    public boolean setDownloadDir(final String dir) {
-    	String dirName = FileAccess.appendSeparator(dir);
-    	if( FileAccess.createDir(new java.io.File(dirName)) ) {
-    		downloadDir = dirName;
-    		return true;
-    	}
-    	return false;
+    // NOTE: always contains a trailing slash, so that the caller doesn't have to add one
+    public static String getDefaultDownloadDir() {
+        String defaultDlDir = Core.frostSettings.getValue(SettingsClass.DIR_DOWNLOAD);
+        if( defaultDlDir != null && !defaultDlDir.isEmpty() ) {
+            defaultDlDir = Core.pathRelativizer.relativize(defaultDlDir);
+            if( defaultDlDir != null ) {
+                defaultDlDir = FileAccess.appendSeparator(defaultDlDir);
+            }
+        }
+        if( defaultDlDir == null || defaultDlDir.isEmpty() ) {
+            // if there's something wrong with the syntax of the path the user has set as download
+            // directory, or if it's missing, then we'll just return the built-in untouched default
+            // instead ("downloads/"), without running it through the relativizer (it's already relative).
+            defaultDlDir = FileAccess.appendSeparator(Core.frostSettings.getDefaultValue(SettingsClass.DIR_DOWNLOAD));
+        }
+
+        return defaultDlDir;
     }
 
-    public void setFilenamePrefix(final String newPrefix) {
-    	prefix = newPrefix;
+    // NOTE: always adds a trailing slash, so that the caller doesn't have to add one
+    public boolean setDownloadDir(final String downloadDirDirty) {
+        if( downloadDirDirty == null ){ return false; }
+
+        // clean up and validate the input, and turn absolute paths that point to subfolders
+        // of the Frost directory, into relative paths instead (this migrates users from older
+        // versions of Frost which stored absolute paths, as well as ensures that any future
+        // paths are always relative where needed)
+        String downloadDirClean = Core.pathRelativizer.relativize(downloadDirDirty);
+        if( downloadDirClean == null ) { return false; } // skip invalid paths
+        downloadDirClean = FileAccess.appendSeparator(downloadDirClean); // append trailing slash
+
+        // now attempt to create the folder if it doesn't exist, and reject if we couldn't create it
+        if( FileAccess.createDir(new java.io.File(downloadDirClean)) ) {
+            this.downloadDir = downloadDirClean;
+            return true;
+        }
+        return false;
+    }
+
+    public void setFilenamePrefix(String newPrefix) {
+        if( newPrefix != null ) {
+            // replace illegal characters with underscores
+            newPrefix = Mixed.makeFilename(newPrefix);
+        }
+        prefix = newPrefix;
     }
 
 	public final String getFilenamePrefix() {
@@ -417,24 +548,14 @@ public class FrostDownloadItem extends ModelItem<FrostDownloadItem> implements C
 
     /**
      * Called by a FrostFileListFileObject if a value interesting for FrostDownloadItem was set.
+     * Also called by various Frost features that update the dlItem and then tell the GUI to update.
      */
     public void fireValueChanged() {
         // maybe take over the key, or set new key
         // NOTE: once a key is set, the ticker will allow to start this item!
-
         if( this.fileListFileObject != null ) {
             if( this.fileListFileObject.getKey() != null && this.fileListFileObject.getKey().length() > 0 ) {
                 setKey( this.fileListFileObject.getKey(), false );
-            }
-        }
-
-        // if progress increased, reset runtimeSecondsWithoutProgress
-        if( isSharedFile() && getState() == STATE_PROGRESS ) {
-            // check if progress changed, maybe reset
-            if( oldDoneBlocks != getDoneBlocks() ) {
-                // progress changed
-                oldDoneBlocks = getDoneBlocks();
-                resetRuntimeSecondsWithoutProgress();
             }
         }
 
@@ -472,6 +593,8 @@ public class FrostDownloadItem extends ModelItem<FrostDownloadItem> implements C
         isExternal = e;
     }
 
+    // if an item is "direct" it means the data will be returned directly via an AllData message,
+    // as opposed to written to the disk by the node. so if DDA (direct disk access) is on, then direct is FALSE!
     public boolean isDirect() {
         return isDirect;
     }
@@ -490,7 +613,7 @@ public class FrostDownloadItem extends ModelItem<FrostDownloadItem> implements C
     }
 
     /**
-     * @return  true if the remove of this request was expected and item should not be removed from the table
+     * @return  true if the remove of this request was expected and item should not be removed from the table (or marked as "Disappeared from global queue")
      */
     public boolean isInternalRemoveExpected() {
         return internalRemoveExpected;
@@ -502,9 +625,16 @@ public class FrostDownloadItem extends ModelItem<FrostDownloadItem> implements C
      */
     public void setInternalRemoveExpected(final boolean internalRemoveExpected) {
         this.internalRemoveExpected = internalRemoveExpected;
-        if( isSharedFile() && internalRemoveExpected ) {
-            resetRuntimeSecondsWithoutProgress();
-        }
+    }
+
+    /**
+     * This is used by the thread that clears the "expected" flag, to avoid starting multiple threads.
+     */
+    public boolean isInternalRemoveExpectedThreadStarted() {
+        return internalRemoveExpectedThreadStarted;
+    }
+    public void setInternalRemoveExpectedThreadStarted(final boolean val) {
+        this.internalRemoveExpectedThreadStarted = val;
     }
 
     @Override
@@ -528,36 +658,6 @@ public class FrostDownloadItem extends ModelItem<FrostDownloadItem> implements C
         this.isTracked = isTracked;
     }
 
-    /**
-     * @return  the runtime of this download item in seconds
-     */
-    public synchronized int getRuntimeSecondsWithoutProgress() {
-        return runtimeSecondsWithoutProgress;
-    }
-
-    /**
-     * Sets runtimeSeconds to 0.
-     */
-    public synchronized void resetRuntimeSecondsWithoutProgress() {
-        runtimeSecondsWithoutProgress = 0;
-        // FIXME: called when download made progress, maybe remember last progress time
-    }
-
-    /**
-     * Adds the specified amount of seconds to the value
-     */
-    public synchronized void addToRuntimeSecondsWithoutProgress(final int s) {
-        runtimeSecondsWithoutProgress += s;
-    }
-
-    public int getOldDoneBlocks() {
-        return oldDoneBlocks;
-    }
-
-    public boolean isStateShouldBeProgress() {
-        return stateShouldBeProgress;
-    }
-
     public String getAssociatedMessageId() {
 		return associatedMessageId;
 	}
@@ -575,8 +675,13 @@ public class FrostDownloadItem extends ModelItem<FrostDownloadItem> implements C
 	}
 
     public void associateWithFrostMessageObject(FrostMessageObject associatedFrostMessageObject) {
-    	associatedBoardName = associatedFrostMessageObject.getBoard().getName();
-    	associatedMessageId = associatedFrostMessageObject.getMessageId();
+        if( associatedFrostMessageObject == null ) {
+            associatedBoardName = null;
+            associatedMessageId = null;
+        } else {
+            associatedBoardName = associatedFrostMessageObject.getBoard().getName();
+            associatedMessageId = associatedFrostMessageObject.getMessageId();
+        }
     }
 
     public boolean isCompletionProgRun() {
@@ -585,5 +690,35 @@ public class FrostDownloadItem extends ModelItem<FrostDownloadItem> implements C
 
     public void setCompletionProgRun(final boolean isCompletionProgRun) {
         this.isCompletionProgRun = isCompletionProgRun;
+    }
+
+    // see BlocksPerMinuteCounter.java:getAverageBlocksPerMinute() for return value documentation
+    public double getAverageBlocksPerMinute() {
+        return getBPMCounter().getAverageBlocksPerMinute();
+    }
+
+    // see BlocksPerMinuteCounter.java:getAverageBytesPerMinute() for return value documentation
+    public long getAverageBytesPerMinute() {
+        return getBPMCounter().getAverageBytesPerMinute();
+    }
+
+    // see BlocksPerMinuteCounter.java:getAverageBytesPerSecond() for return value documentation
+    public long getAverageBytesPerSecond() {
+        return getBPMCounter().getAverageBytesPerSecond();
+    }
+
+    // see BlocksPerMinuteCounter.java:getMillisSinceLastMeasurement() for return value documentation
+    public long getMillisSinceLastMeasurement() {
+        return getBPMCounter().getMillisSinceLastMeasurement();
+    }
+
+    // see BlocksPerMinuteCounter.java:getLastMeasurementBlocks() for return value documentation
+    public int getLastMeasurementBlocks() {
+        return getBPMCounter().getLastMeasurementBlocks();
+    }
+
+    // see BlocksPerMinuteCounter.java:getEstimatedMillisRemaining() for return value documentation
+    public long getEstimatedMillisRemaining(final int aCurrentDoneBlocks, final int aTotalBlocks, final int aTransferType) {
+        return getBPMCounter().getEstimatedMillisRemaining(aCurrentDoneBlocks, aTotalBlocks, aTransferType);
     }
 }

@@ -19,10 +19,13 @@
 package frost.gui;
 
 import java.awt.*;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 
 import javax.swing.*;
 
 import frost.*;
+import frost.util.gui.CompoundUndoManager;
 import frost.util.gui.textpane.*;
 import frost.util.gui.translation.*;
 
@@ -37,6 +40,8 @@ public class ManageLocalIdentitiesSignatureDialog extends JDialog {
     private JButton Bcancel = null;
 
     private AntialiasedTextArea signatureTextArea;
+
+    private CompoundUndoManager undoManager = null;
     
     private String returnValue = null;
     
@@ -155,7 +160,20 @@ public class ManageLocalIdentitiesSignatureDialog extends JDialog {
         if( originalSig == null ) {
             originalSig = "";
         }
-        getSignatureTextArea().setText(originalSig);
+        // set the user's current signature in the text area
+        final AntialiasedTextArea textArea = getSignatureTextArea();
+        textArea.setText(originalSig);
+        textArea.setCaretPosition(0); // jump back to top
+
+        // attach the undo/redo handler (we have to do this last so that none of our internal editing above gets recorded)
+        undoManager = new CompoundUndoManager(textArea);
+        textArea.getActionMap().put("Undo", undoManager.getUndoAction());
+        textArea.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_MASK, true), "Undo"); // ctrl + z
+        textArea.getActionMap().put("Redo", undoManager.getRedoAction());
+        textArea.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_MASK | InputEvent.SHIFT_MASK, true), "Redo"); // ctrl + shift + z
+        textArea.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_Y, InputEvent.CTRL_MASK, true), "Redo"); // ctrl + y
+
+        // prepare the return value and show the dialog
         returnValue = null;
         setVisible(true);
         return returnValue; // null means cancelled

@@ -27,8 +27,12 @@ import java.util.logging.*;
 import javax.swing.*;
 
 import frost.*;
+import frost.ext.Execute;
+import frost.ext.ExecResult;
 import frost.util.*;
+import frost.util.ArgumentTokenizer;
 import frost.util.gui.translation.*;
+import frost.util.gui.MiscToolkit;
 
 /**
  * Class provides alternate editor functionality.
@@ -78,79 +82,106 @@ public class AltEdit extends Thread {
             return;
         }
 
-        final String editor = Core.frostSettings.getValue(SettingsClass.ALTERNATE_EDITOR_COMMAND);
-
-        if( editor == null || editor.length() == 0 ) {
-            JOptionPane.showMessageDialog(parentFrame,
+        // grab the editor command and make sure it contains a non-empty value
+        final String editorCmd = Core.frostSettings.getValue(SettingsClass.ALTERNATE_EDITOR_COMMAND);
+        if( editorCmd == null || editorCmd.length() == 0 ) {
+            MiscToolkit.showMessageDialog(parentFrame,
                     language.getString("AltEdit.errorDialog.noAlternateEditorConfigured"),
                     language.getString("AltEdit.errorDialogs.title"),
-                    JOptionPane.ERROR_MESSAGE);
+                    MiscToolkit.ERROR_MESSAGE);
             callbackMessageFrame(null, null);
             return;
         }
 
-        if( editor.indexOf("%f") == -1 ) {
-            JOptionPane.showMessageDialog(parentFrame,
+        // now parse the editor command into individual arguments
+        final List<String> argList = ArgumentTokenizer.tokenize(editorCmd, false);
+        final String[] args = argList.toArray(new String[argList.size()]);
+
+        // find the array index which contains the '%f' placeholder
+        // NOTE: the user is allowed to have it within the string, like 'gedit "foo %f"',
+        // in which case we'll see arg2 ("foo %f") and replace that with ("foo <filename>")
+        // NOTE: we start at 1, since they can't use the placeholder as the first argument (0).
+        int placeholderIdx = -1;
+        for( int i=1; i<args.length; ++i ) {
+            if( args[i].indexOf("%f") > -1 ) {
+                placeholderIdx = i;
+                break;
+            }
+        }
+
+        // if there wasn't any placeholder, then warn the user and abort
+        if( placeholderIdx < 0 ) {
+            MiscToolkit.showMessageDialog(parentFrame,
                     language.getString("AltEdit.errorDialog.missingPlaceholder"),
                     language.getString("AltEdit.errorDialogs.title"),
-                    JOptionPane.ERROR_MESSAGE);
+                    MiscToolkit.ERROR_MESSAGE);
             callbackMessageFrame(null, null);
             return;
         }
 
-        // part before and after %f
-        final String editor_pre_file = editor.substring(0, editor.indexOf("%f"));
-        final String editor_post_file = editor.substring(editor.indexOf("%f") + 2, editor.length());
-
+        // create the temporary file and tell Java to delete it when the JVM exits
         final File editFile = FileAccess.createTempFile("frostmsg", ".txt");
         editFile.deleteOnExit();
 
+        // build the temporary message that we'll give to the external editor
         StringBuilder sb = new StringBuilder();
         sb.append(language.getString("AltEdit.textFileMessage.1")).append(linesep);
         sb.append(language.getString("AltEdit.textFileMessage.2")).append(linesep);
         sb.append(language.getString("AltEdit.textFileMessage.3")).append(linesep).append(linesep);
         sb.append(SUBJECT_MARKER).append(linesep);
-        sb.append(oldSubject).append(linesep).append(linesep);
+        sb.append(
+                // NOTE: We default to "No subject" if they're using external editors, to make it
+                // clear where to put the subject. But "No subject" will never be accepted by the
+                // final post-message frame, so they'll be forced to change it before sending. ;)
+                ( oldSubject == null || oldSubject.isEmpty() ? "No subject" : oldSubject )
+        ).append(linesep).append(linesep);
         sb.append(oldText).append(linesep); // contains new from-header-line
         sb.append(TEXT_MARKER).append(linesep);
 
+        // attempt to write the temporary message to our temp file
         if( FileAccess.writeFile(sb.toString(), editFile, "UTF-8") == false ) {
-            JOptionPane.showMessageDialog(parentFrame,
+            MiscToolkit.showMessageDialog(parentFrame,
                     language.getString("AltEdit.errorDialog.couldNotCreateMessageFile")+": "+editFile.getPath(),
                     language.getString("AltEdit.errorDialogs.title"),
-                    JOptionPane.ERROR_MESSAGE);
+                    MiscToolkit.ERROR_MESSAGE);
             callbackMessageFrame(null, null);
             return;
         }
-        sb = null;
+        sb = null; // mark the temp msg for garbage collection
 
-        final String editorCmdLine = editor_pre_file + editFile.getPath() + editor_post_file;
-        try {
-          run_wait(editorCmdLine);
-        } catch(final Throwable t) {
-            JOptionPane.showMessageDialog(parentFrame,
-                    language.getString("AltEdit.errorDialog.couldNotStartEditorUsingCommand")+": "+editorCmdLine+"\n"+t.toString(),
-                    language.getString("AltEdit.errorDialogs.title"),
-                    JOptionPane.ERROR_MESSAGE);
+        // update the calculated command arguments to point to the temporary file
+        args[placeholderIdx] = args[placeholderIdx].replaceFirst("%f", editFile.getPath());
+
+        // execute the external editor and wait for it to finish (exit) before proceeding
+        final ExecResult res = Execute.run_wait(args, "UTF-8", false);
+        if( res.error != null ) {
+            // NOTE: these exceptions only indicate general problems like "failed to launch";
+            // we *do not* look at the returnCode, since even Unix apps can have non-zero exit
+            // codes for certain (still-valid) states. so we only care about failure to launch.
             editFile.delete();
+            MiscToolkit.showMessageDialog(parentFrame,
+                    language.getString("AltEdit.errorDialog.couldNotStartEditorUsingCommand")+": ["+editorCmd+"]\n"+res.error.getMessage(),
+                    language.getString("AltEdit.errorDialogs.title"),
+                    MiscToolkit.ERROR_MESSAGE);
             callbackMessageFrame(null, null);
             return;
         }
 
+        // read all the lines from the temporary file that they've edited
         final List<String> lines = FileAccess.readLines(editFile, "UTF-8");
-        // adding the exec stdout/stderr output
-        //lines.addAll(exec_output);
 
-        if( lines.size() < 4 ) { // subject marker,subject,from line, text marker
-            JOptionPane.showMessageDialog(parentFrame,
+        // do some quick validation to make sure they've got the minimum number of lines
+        if( lines.size() < 4 ) { // subject marker, subject, from line, text marker
+            editFile.delete();
+            MiscToolkit.showMessageDialog(parentFrame,
                     language.getString("AltEdit.errorDialog.invalidReturnedMessageFile"),
                     language.getString("AltEdit.errorDialogs.title"),
-                    JOptionPane.ERROR_MESSAGE);
-            editFile.delete();
+                    MiscToolkit.ERROR_MESSAGE);
             callbackMessageFrame(null, null);
             return;
         }
 
+        // now just parse and validate the entire returned message file
         String newSubject = null;
         final StringBuilder newTextSb = new StringBuilder();
 
@@ -166,21 +197,21 @@ public class AltEdit extends Thread {
             if( line.equals(SUBJECT_MARKER) ) {
                 // next line is the new subject
                 if( it.hasNext() == false ) {
-                    JOptionPane.showMessageDialog(parentFrame,
+                    editFile.delete();
+                    MiscToolkit.showMessageDialog(parentFrame,
                             language.getString("AltEdit.errorDialog.invalidReturnedMessageFile"),
                             language.getString("AltEdit.errorDialogs.title"),
-                            JOptionPane.ERROR_MESSAGE);
-                    editFile.delete();
+                            MiscToolkit.ERROR_MESSAGE);
                     callbackMessageFrame(null, null);
                     return;
                 }
                 line = it.next();
                 if( line.equals(TEXT_MARKER) ) {
-                    JOptionPane.showMessageDialog(parentFrame,
+                    editFile.delete();
+                    MiscToolkit.showMessageDialog(parentFrame,
                             language.getString("AltEdit.errorDialog.invalidReturnedMessageFile"),
                             language.getString("AltEdit.errorDialogs.title"),
-                            JOptionPane.ERROR_MESSAGE);
-                    editFile.delete();
+                            MiscToolkit.ERROR_MESSAGE);
                     callbackMessageFrame(null, null);
                     return;
                 }
@@ -194,49 +225,19 @@ public class AltEdit extends Thread {
             }
         }
 
+        // we must have at least found the subject line marker
         if( newSubject == null ) {
-            JOptionPane.showMessageDialog(parentFrame,
+            editFile.delete();
+            MiscToolkit.showMessageDialog(parentFrame,
                     language.getString("AltEdit.errorDialog.invalidReturnedMessageFile"),
                     language.getString("AltEdit.errorDialogs.title"),
-                    JOptionPane.ERROR_MESSAGE);
-            editFile.delete();
+                    MiscToolkit.ERROR_MESSAGE);
             callbackMessageFrame(null, null);
             return;
         }
 
-        // finished, we have a newSubject and a newText now
+        // finished, we have a newSubject and a newText now, so just display
+        // a message frame with the constructed message for further editing/sending
         callbackMessageFrame(newSubject, newTextSb.toString());
-    }
-
-    /**
-     * start an external program, and return their output
-     * @param order the command to execute
-     * @return the output generated by the program. Standard ouput and Error output are captured.
-     */
-    public static List<String> run_wait(final String order) throws Throwable {
-        logger.info("-------------------------------------------------------------------\n" +
-                    "Execute: " + order + "\n" +
-                    "-------------------------------------------------------------------");
-
-        final ArrayList<String> result = new ArrayList<String>();
-
-        final Process p = Runtime.getRuntime().exec(order);  // java 1.4 String Order
-        //ProcessBuilder pb = new ProcessBuilder(order);   // java 1.5 List<String> order
-        //Process p = pb.start();
-
-        final InputStream stdOut = p.getInputStream();
-        final InputStream stdErr = p.getErrorStream();
-
-        List<String> tmpList;
-        tmpList = FileAccess.readLines(stdOut, "UTF-8");
-        if( tmpList != null ) {
-            result.addAll(tmpList);
-        }
-        tmpList = FileAccess.readLines(stdErr, "UTF-8");
-        if( tmpList != null ) {
-            result.addAll(tmpList);
-        }
-        p.waitFor(); // wait really!
-        return result;
     }
 }

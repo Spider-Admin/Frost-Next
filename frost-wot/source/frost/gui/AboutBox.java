@@ -32,25 +32,25 @@ import frost.util.gui.*;
 @SuppressWarnings("serial")
 public class AboutBox extends JDialogWithDetails {
 
-    private final static String product = "Frost";
+    private final static String product = "Frost-Next";
 
     // because a growing amount of users use CVS version:
     private String version = null;
 
-    private final static String copyright = "Copyright 2011 Frost Project";
-    private final static String comments2 = "http://jtcfrost.sourceforge.net/";
+    private final static String copyright = "Copyright 2015 Frost-Next Project";
+    private final static String comments2 = "Maintained by The Kitty";
 
     private final JPanel imagePanel = new JPanel();
     private final JPanel messagesPanel = new JPanel();
 
     private final JLabel imageLabel = new JLabel();
     private final JLabel productLabel = new JLabel();
-    private final JLabel versionLabel = new JLabel();
+//    private final JLabel versionLabel = new JLabel();
     private final JLabel copyrightLabel = new JLabel();
     private final JLabel licenseLabel = new JLabel();
     private final JLabel websiteLabel = new JLabel();
 
-    private static final ImageIcon frostImage = MiscToolkit.loadImageIcon("/data/jtc.jpg");
+    private static final ImageIcon frostImage = MiscToolkit.loadImageIcon("/data/frost.png");
 
     public AboutBox(final Frame parent) {
         super(parent);
@@ -71,16 +71,16 @@ public class AboutBox extends JDialogWithDetails {
         
 
         // Messages panel
-        final GridLayout gridLayout = new GridLayout(5, 1);
+        final GridLayout gridLayout = new GridLayout(4, 1);
         messagesPanel.setLayout(gridLayout);
         messagesPanel.setBorder(new EmptyBorder(10, 50, 10, 10));
         productLabel.setText(product);
-        versionLabel.setText(getVersion());
+//        versionLabel.setText(getVersion());
         copyrightLabel.setText(copyright);
         licenseLabel.setText(language.getString("AboutBox.label.openSourceProject"));
         websiteLabel.setText(comments2);
         messagesPanel.add(productLabel);
-        messagesPanel.add(versionLabel);
+//        messagesPanel.add(versionLabel);
         messagesPanel.add(copyrightLabel);
         messagesPanel.add(licenseLabel);
         messagesPanel.add(websiteLabel);
@@ -95,11 +95,16 @@ public class AboutBox extends JDialogWithDetails {
 
     private void fillDetailsArea() {
         final StringBuilder details = new StringBuilder();
-        details.append(language.getString("AboutBox.text.development") + "\n\n");
-        details.append(language.getString("AboutBox.text.active") + "\n");
-        details.append("   Jan Gerritsen \n   (artur@K7dLGJvoXF_QQeUhZq9bNp0lFx4)\n\n");
-        details.append("   Karsten Graul \n   (bback@xgVRApPk+Yngy+jmtOeGzIbN_A0)\n\n");
-        details.append(language.getString("AboutBox.text.left") + "\n");
+        details.append("Frost-Next is the brainchild of The Kitty.\n(The Kitty@++U6QppAbIb1UBjFBRtcIBZg6NU).\n\n");
+        details.append("Official Project Site:\n");
+        details.append("USK@~kiTTy3Rc2kOhIRnJl1P13JXtZeJSqln76h7DC3AgGw,Ocr6A3ZSED6iBZJZrCd9jTtW5JuxkRP7S4NXL9XWBgg,AQACAAE/The_Kitty/-10/\n\n");
+        details.append("---\n\n");
+        //details.append(language.getString("AboutBox.text.development") + "\n\n");
+        //details.append(language.getString("AboutBox.text.active") + "\n");
+        //details.append(language.getString("AboutBox.text.left") + "\n");
+        details.append("Previous Frost \"legacy\" developers:\n");
+        details.append("   Jan Gerritsen (quit)\n");
+        details.append("   Karsten Graul (quit)\n");
         details.append("   S. Amoako (quit)\n");
         details.append("   Roman Glebov (quit)\n");
         details.append("   Jan-Thomas Czornack (quit)\n");
@@ -109,10 +114,11 @@ public class AboutBox extends JDialogWithDetails {
         details.append("   Edward Louis Severson IV (quit)\n");
         details.append("   José Manuel Arnesto (quit)\n");
         details.append("   Ingo Franzki (old systray icon code)\n");
-        details.append("   Frédéric Scheer (splashscreen logo)\n");
+        details.append("   Frédéric Scheer (old splashscreen logo)\n");
         setDetailsText(details.toString());
     }
 
+    /* COMMENTED OUT: There is no specification-version for Frost-Next.
     private String getVersion() {
         if (version == null) {
             version =
@@ -122,4 +128,5 @@ public class AboutBox extends JDialogWithDetails {
         }
         return version;
     }
+    */
 }

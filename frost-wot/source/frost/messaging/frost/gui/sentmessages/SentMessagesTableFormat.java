@@ -27,6 +27,7 @@ import javax.swing.table.*;
 
 import frost.*;
 import frost.fileTransfer.common.*;
+import frost.util.Mixed;
 import frost.util.gui.translation.*;
 import frost.util.model.*;
 
@@ -45,8 +46,15 @@ public class SentMessagesTableFormat extends SortedTableFormat<SentMessagesTable
     
     private boolean showColoredLines;
 
+    private Color fMsgNormalColor;
+    private Color fMsgPrivColor;
+    private Color fMsgWithAttachmentsColor;
+    private Color fMsgUnsignedColor;
+
     public SentMessagesTableFormat() {
         super(COLUMN_COUNT);
+
+        updateMessageColors();
 
         language = Language.getInstance();
         language.addLanguageListener(this);
@@ -60,6 +68,15 @@ public class SentMessagesTableFormat extends SortedTableFormat<SentMessagesTable
         
         showColoredLines = Core.frostSettings.getBoolValue(SettingsClass.SHOW_COLORED_ROWS);
         Core.frostSettings.addPropertyChangeListener(this);
+        MainFrame.getInstance().getMessageColorManager().addPropertyChangeListener(this);
+    }
+
+    private void updateMessageColors()
+    {
+        fMsgNormalColor = MainFrame.getInstance().getMessageColorManager().getNormalColor();
+        fMsgPrivColor = MainFrame.getInstance().getMessageColorManager().getPrivColor();
+        fMsgWithAttachmentsColor = MainFrame.getInstance().getMessageColorManager().getWithAttachmentsColor();
+        fMsgUnsignedColor = MainFrame.getInstance().getMessageColorManager().getUnsignedColor();
     }
 
     public void languageChanged(LanguageEvent event) {
@@ -115,12 +132,14 @@ public class SentMessagesTableFormat extends SortedTableFormat<SentMessagesTable
         TableColumnModel columnModel = modelTable.getTable().getColumnModel();
         
         ShowContentTooltipRenderer tooltipRenderer = new ShowContentTooltipRenderer();
+        ShowColoredLinesRenderer showColoredLinesRenderer = new ShowColoredLinesRenderer();
+        MessageTypeColorRenderer messageTypeColorRenderer = new MessageTypeColorRenderer();
 
         columnModel.getColumn(0).setCellRenderer(tooltipRenderer);
-        columnModel.getColumn(1).setCellRenderer(new SubjectRenderer());
-        columnModel.getColumn(2).setCellRenderer(tooltipRenderer);
+        columnModel.getColumn(1).setCellRenderer(messageTypeColorRenderer); // subject
+        columnModel.getColumn(2).setCellRenderer(messageTypeColorRenderer); // from
         columnModel.getColumn(3).setCellRenderer(tooltipRenderer);
-        columnModel.getColumn(4).setCellRenderer(new ShowColoredLinesRenderer());
+        columnModel.getColumn(4).setCellRenderer(showColoredLinesRenderer);
         
         // Sets the relative widths of the columns
         if( !loadTableLayout(columnModel) ) {
@@ -136,7 +155,7 @@ public class SentMessagesTableFormat extends SortedTableFormat<SentMessagesTable
         {
             int sortedColumn = Core.frostSettings.getIntValue(CFGKEY_SORTSTATE_SORTEDCOLUMN);
             boolean isSortedAsc = Core.frostSettings.getBoolValue(CFGKEY_SORTSTATE_SORTEDASCENDING);
-            if( sortedColumn > -1 ) {
+            if( sortedColumn > -1 && sortedColumn < modelTable.getTable().getColumnModel().getColumnCount() ) {
                 modelTable.setSortedColumn(sortedColumn, isSortedAsc);
             }
         } else {
@@ -216,31 +235,51 @@ public class SentMessagesTableFormat extends SortedTableFormat<SentMessagesTable
 
     private class ToComparator implements Comparator<SentMessagesTableItem> {
         public int compare(SentMessagesTableItem left, SentMessagesTableItem right) {
-        	return left.getTo().compareTo(right.getTo());
+            String leftTo = left.getTo();
+            String rightTo = right.getTo();
+            // set empty recipients (aka global board messages) to null recipients so they'll
+            // be sorted below messages with recipients in ascending mode.
+            if( leftTo != null && leftTo.equals("") ) { leftTo = null; }
+            if( rightTo != null && rightTo.equals("") ) { rightTo = null; }
+            return Mixed.compareStringWithNullSupport(leftTo, rightTo, /*ignoreCase=*/true);
         }
     }
 
     private class FromComparator implements Comparator<SentMessagesTableItem> {
         public int compare(SentMessagesTableItem left, SentMessagesTableItem right) {
-        	return left.getFrom().compareTo(right.getFrom());
+        	return left.getFrom().compareToIgnoreCase(right.getFrom());
         }
     }
     
     private class SubjectComparator implements Comparator<SentMessagesTableItem> {
         public int compare(SentMessagesTableItem left, SentMessagesTableItem right) {
-        	return left.getSubject().compareTo(right.getSubject());
+            // when comparing subjects, we ignore the "Re: " prefix
+            String leftSubject = left.getSubject();
+            String rightSubject = right.getSubject();
+            if( leftSubject.indexOf("Re: ") == 0 ) {
+                leftSubject = leftSubject.substring(4);
+            }
+            if( rightSubject.indexOf("Re: ") == 0 ) {
+                rightSubject = rightSubject.substring(4);
+            }
+            // first compare by subject, but if they're equal, compare by date instead
+            int result = leftSubject.compareToIgnoreCase(rightSubject);
+            if( result == 0 ) {
+                result = left.getDateAndTimeString().compareTo(right.getDateAndTimeString());
+            }
+            return result;
         }
     }
 
     private class BoardComparator implements Comparator<SentMessagesTableItem> {
     	public int compare(SentMessagesTableItem left, SentMessagesTableItem right) {
-        	return left.getBoardName().compareTo(right.getBoardName());
+        	return left.getBoardName().compareToIgnoreCase(right.getBoardName());
         }
     }
 
     @SuppressWarnings("serial")
-	private class SubjectRenderer extends ShowContentTooltipRenderer {
-        public SubjectRenderer() {
+	private class MessageTypeColorRenderer extends ShowContentTooltipRenderer {
+        public MessageTypeColorRenderer() {
             super();
         }
         @Override
@@ -255,12 +294,22 @@ public class SentMessagesTableFormat extends SortedTableFormat<SentMessagesTable
             super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
 
             if( !isSelected ) {
-                setForeground(Color.BLACK);
                 SentMessagesTableItem item = (SentMessagesTableItem) modelTable.getItemAt(row);
-                if( item != null ) {
-                    if( item.getFrostMessageObject().containsAttachments() ) {
-                        setForeground(Color.BLUE);
-                    }
+                // color priority: private message > has attachments > unsigned/anonymous
+                if( item == null ) { // paranoia: no message object at this row?
+                    setForeground(fMsgNormalColor);
+                } else if( !item.getTo().isEmpty() ) {
+                    setForeground(fMsgPrivColor);
+                } else if( item.getFrostMessageObject().containsAttachments() ) {
+                    setForeground(fMsgWithAttachmentsColor);
+                } else if( item.getFrom() == null || item.getFrom().indexOf('@') < 0 ) { // no "@" symbol in name
+                    // NOTE: normally we'd use isSignatureStatusVERIFIED(), but this table's objects
+                    // don't set that property when they construct the FrostMessageObject, so we simply
+                    // check for an "@" in the name, which is forbidden unless they're sending from
+                    // a signed identity.
+                    setForeground(fMsgUnsignedColor);
+                } else {
+                    setForeground(fMsgNormalColor);
                 }
             }
             return this;
@@ -324,6 +373,16 @@ public class SentMessagesTableFormat extends SortedTableFormat<SentMessagesTable
         if (evt.getPropertyName().equals(SettingsClass.SHOW_COLORED_ROWS)) {
             showColoredLines = Core.frostSettings.getBoolValue(SettingsClass.SHOW_COLORED_ROWS);
             modelTable.fireTableDataChanged();
+        } else if( evt.getPropertyName().equals("MessageColorsChanged") ) {
+            updateMessageColors();
+            SwingUtilities.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    // executed on swing since we can't guarantee that the event came from EDT
+                    // NOTE: this clears the user's selection but maintains the scroll position
+                    modelTable.fireTableDataChanged(); // update all visible rows
+                }
+            });
         }
     }
 }

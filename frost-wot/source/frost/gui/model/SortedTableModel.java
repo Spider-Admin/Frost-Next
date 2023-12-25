@@ -25,13 +25,25 @@ import javax.swing.table.*;
 
 import frost.gui.*;
 
+/**
+ * This implementation is thread-safe. All methods that manipulate the data
+ * are synchronized on the "LOCK" object, which ensures that only a single
+ * thread can read/write to the model at a time. Basically, anything that reads
+ * or manipulates the model and isn't marked "private" uses synchronization.
+ * We also use the "volatile" keyword which allows concurrent access to
+ * primitives without requiring us to do any regular locking.
+ * You don't need to know any of these details to use the class. They're just
+ * mentioned here for future reference.
+ */
 @SuppressWarnings("serial")
 public class SortedTableModel<T extends TableMember<T>> extends DefaultTableModel
 {
+    private static final Object LOCK = new Object();
+
     private static final Logger logger = Logger.getLogger(SortedTableModel.class.getName());
 
-    private boolean bWasResized = false;
-    private ArrayList<T> rows = null;
+    private volatile boolean bWasResized = false;
+    private final ArrayList<T> rows; // model-data
     private SortedTable<T> parentTable = null;
 
     // we always need to hold the actual sorting comparator to allow sorted insertion
@@ -56,14 +68,19 @@ public class SortedTableModel<T extends TableMember<T>> extends DefaultTableMode
     @Override
     public int getRowCount()
     {
-        if( rows == null )
-            return 0;
-        return rows.size();
+        // NOTE: the super() constructor will call this before we've
+        // assigned "rows" or even the LOCK, so we must check null!
+        if( rows == null ) { return 0; }
+        synchronized(LOCK) {
+            return rows.size();
+        }
     }
 
     public void sortModelColumn(int col, boolean ascending)
     {
-        sortColumn(col,ascending);
+        synchronized(LOCK) {
+            sortColumn(col,ascending);
+        }
     }
     private void sortColumn(int col, boolean ascending)
     {
@@ -86,21 +103,30 @@ public class SortedTableModel<T extends TableMember<T>> extends DefaultTableMode
             this.ascending = ascending;
         }
 
-        // uses implementation in ITableMember or default impl. in abstracttreemodel
-        public int compare(T oOne, T oTwo)
+        // uses implementation in ITableMember.BaseTableMember or default impl. in abstracttreemodel
+        public int compare(T tableMember1, T tableMember2)
         {
+            // this is the FIRST stage of the sort where we compare the table rows (members);
+            // but we then call their internal TableMember.compareTo method to compare them to each other
+            // that method is in either source/frost/gui/model/TableMember.java, or in the table's overriding subclass.
             try {
-                if( ascending )
-                {
-                    return oOne.compareTo(oTwo, index);
+                // null row objects are sorted higher (later/further down) than non-nulls
+                int result;
+                if( tableMember1 == tableMember2 ) { result = 0; } // compare object reference (memory address)
+                else if( tableMember1 == null ) { result = 1; }
+                else if( tableMember2 == null ) { result = -1; }
+                else { // two non-null objects; compare using their own column comparator
+                    result = tableMember1.compareTo(tableMember2, index);
                 }
-                else
-                {
-                    return oTwo.compareTo(oOne, index);
+
+                // if they want a reverse/descending sort, we'll invert the result
+                if( !ascending ) {
+                    result = -result;
                 }
-            }
-            catch(Exception e) { }
-            return 1;
+
+                return result;
+            } catch( final Exception ex ) {} // should never happen, so swallow it
+            return -1; // fallback: "member 1 is more important than member 2"; used if the compareTo threw exception
         }
     }
 
@@ -112,31 +138,33 @@ public class SortedTableModel<T extends TableMember<T>> extends DefaultTableMode
      */
     public void addRow(T member)
     {
-        // compute pos to insert and insert node sorted into table
-        int insertPos = Collections.binarySearch(rows, member, colComparator);
-        if( insertPos < 0 )
-        {
-            // compute insertion pos
-            insertPos = (insertPos+1)*-1;
+        synchronized(LOCK) {
+            // compute pos to insert and insert node sorted into table
+            int insertPos = Collections.binarySearch(rows, member, colComparator);
+            if( insertPos < 0 )
+            {
+                // compute insertion pos
+                insertPos = (insertPos+1)*-1;
+            }
+            else
+            {
+                // if such an item is already contained in search column,
+                // determine last element and insert after
+                insertPos = Collections.lastIndexOfSubList(rows, Collections.singletonList(rows.get(insertPos)));
+                insertPos++; // insert AFTER last
+            }
+            insertRowAt(member, insertPos);
         }
-        else
-        {
-            // if such an item is already contained in search column,
-            // determine last element and insert after
-            insertPos = Collections.lastIndexOfSubList(rows, Collections.singletonList(rows.get(insertPos)));
-            insertPos++; // insert AFTER last
-
-        }
-        insertRowAt(member, insertPos);
     }
 
     public void insertRowAt(T member, int index)
     {
-       if (index <= rows.size())
-       {
-          rows.add(index, member);
-          fireTableRowsInserted(index,index);
-       }
+        synchronized(LOCK) {
+            if (index <= rows.size()) {
+                rows.add(index, member);
+                fireTableRowsInserted(index,index);
+            }
+        }
     }
 
     /**
@@ -146,11 +174,14 @@ public class SortedTableModel<T extends TableMember<T>> extends DefaultTableMode
      */
     public void deleteRow(T obj)
     {
-        if (obj != null)
-        {
-            int i = rows.indexOf(obj);
-            rows.remove(obj);
-            if (i!=-1) fireTableRowsDeleted(i,i);
+        synchronized(LOCK) {
+            if (obj != null) {
+                int i = rows.indexOf(obj);
+                if( i >= 0 ) { // -1 means doesn't exist in model; >= 0 means exists in model
+                    rows.remove(obj);
+                    fireTableRowsDeleted(i,i);
+                }
+            }
         }
     }
     
@@ -160,12 +191,14 @@ public class SortedTableModel<T extends TableMember<T>> extends DefaultTableMode
      * @param row row number
      */
     public void deleteRow(int row) {
-    	if( row < 0 || row >= rows.size()) {
-    		return;
-    	}
-    	
-    	rows.remove(row);
-    	fireTableRowsDeleted(row,row);
+        synchronized(LOCK) {
+            if( row < 0 || row >= rows.size()) {
+                return;
+            }
+
+            rows.remove(row);
+            fireTableRowsDeleted(row,row);
+        }
     }
     
     /**
@@ -175,15 +208,28 @@ public class SortedTableModel<T extends TableMember<T>> extends DefaultTableMode
      */
     public void updateRow(T obj)
     {
-        if (obj!=null)
-        {
-            int i = rows.indexOf(obj);
-            if (i!=-1)
-            {
-                fireTableRowsUpdated(i,i);
-                resortTable();
+        synchronized(LOCK) {
+            if (obj!=null) {
+                int i = rows.indexOf(obj);
+                if( i >= 0 ) { // -1 means doesn't exist in model; >= 0 means exists in model
+                    fireTableRowsUpdated(i,i);
+                    resortTable();
+                }
             }
+        }
+    }
 
+    /**
+     * Returns the index in this model of the first occurrence of the specified
+     * item, or -1 if this model does not contain this element.
+     *
+     * @param obj - item to search for.
+     * @return - the index in this model of the first occurrence of the specified
+     * item, or -1 if this model does not contain this element.
+     */
+    public int indexOf(final T obj) {
+        synchronized(LOCK) {
+            return rows.indexOf(obj);
         }
     }
 
@@ -204,11 +250,12 @@ public class SortedTableModel<T extends TableMember<T>> extends DefaultTableMode
      */
     public T getRow(int row)
     {
-        if (row<getRowCount())
-        {
-            return rows.get(row);
+        synchronized(LOCK) {
+            if (row<getRowCount()) {
+                return rows.get(row);
+            }
+            return null;
         }
-        return null;
     }
 
     /**
@@ -221,11 +268,13 @@ public class SortedTableModel<T extends TableMember<T>> extends DefaultTableMode
     @Override
     public void removeRow(int row)
     {
-        if (row<getRowCount())
-        {
-            T obj = rows.get(row);
-            if (obj instanceof TableMember)
-                deleteRow((T)obj);
+        synchronized(LOCK) {
+            if (row<getRowCount()) {
+                T obj = rows.get(row);
+                if (obj instanceof TableMember) {
+                    deleteRow((T)obj);
+                }
+            }
         }
     }
 
@@ -239,13 +288,16 @@ public class SortedTableModel<T extends TableMember<T>> extends DefaultTableMode
     @Override
     public Comparable<?> getValueAt(int row, int column)
     {
-        if (row>=getRowCount() || row<0) return null;
+        synchronized(LOCK) {
+            if (row>=getRowCount() || row<0) { return null; }
 
-        T obj = (T)rows.get(row);
-        if (obj == null)
-            return null;
-        else
-            return obj.getValueAt(column);
+            T obj = (T)rows.get(row);
+            if (obj == null) {
+                return null;
+            } else {
+                return obj.getValueAt(column);
+            }
+        }
     }
 
     /**
@@ -253,11 +305,12 @@ public class SortedTableModel<T extends TableMember<T>> extends DefaultTableMode
      */
     public void clearDataModel()
     {
-        int size = rows.size();
-        if (size>0)
-        {
-            rows = new ArrayList<T>();
-            fireTableRowsDeleted(0,size);
+        synchronized(LOCK) {
+            int size = rows.size();
+            if (size>0) {
+                rows.clear();
+                fireTableRowsDeleted(0,size);
+            }
         }
     }
 
@@ -266,7 +319,9 @@ public class SortedTableModel<T extends TableMember<T>> extends DefaultTableMode
      */
     public void tableEntriesChanged()
     {
-        fireTableRowsUpdated(0,getRowCount());
+        synchronized(LOCK) {
+            fireTableDataChanged();
+        }
     }
 
     /**
@@ -277,7 +332,12 @@ public class SortedTableModel<T extends TableMember<T>> extends DefaultTableMode
      */
     public void tableEntriesChanged(int from, int to)
     {
-        fireTableRowsUpdated(from,to);
+        synchronized(LOCK) {
+            final int rowCount = getRowCount();
+            if( from >= rowCount ) { from = rowCount - 1; }
+            if( to >= rowCount ) { to = rowCount - 1; }
+            fireTableRowsUpdated(from,to);
+        }
     }
 
     /**
@@ -291,7 +351,10 @@ public class SortedTableModel<T extends TableMember<T>> extends DefaultTableMode
     @Override
     public void setValueAt(Object aValue, int row, int column)
     {
-        logger.severe("setValueAt() - ERROR: NOT IMPLEMENTED");
+        synchronized(LOCK) {
+            System.out.println("setValueAt() - ERROR: NOT IMPLEMENTED"); // warn the programmer
+            logger.severe("setValueAt() - ERROR: NOT IMPLEMENTED");
+        }
     }
 
     /**
@@ -301,7 +364,7 @@ public class SortedTableModel<T extends TableMember<T>> extends DefaultTableMode
      */
      public boolean wasResized()
      {
-        return bWasResized;
+         return bWasResized;
      }
 
     /**

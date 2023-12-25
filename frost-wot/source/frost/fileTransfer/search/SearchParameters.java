@@ -46,9 +46,9 @@ public class SearchParameters {
     private String tabText = null;
 
     private boolean hideFilesWithoutChkKey = false;
-    private boolean hideBadUserFiles = false;
-    private boolean hideCheckUserFiles = false;
-    private boolean hideObserveUserFiles = false;
+    private boolean hideBADUserFiles = false;
+    private boolean hideNEUTRALUserFiles = false;
+    private boolean hideGOODUserFiles = false;
 
     // simple search
     private List<String> simpleSearchStrings = null;
@@ -144,30 +144,30 @@ public class SearchParameters {
     }
 
     public void setSimpleSearchString(final String simpleSearchStr) {
-        final List<String>[] res = TextSearchFun.splitStrings(simpleSearchStr, true);
-        simpleSearchStrings = res[0];
-        simpleSearchNotStrings = res[1];
+        final List<List<String>> res = TextSearchFun.splitStrings(simpleSearchStr, true);
+        simpleSearchStrings = res.get(0);
+        simpleSearchNotStrings = res.get(1);
     }
 
     public void setCommentString(final String commentStr) {
-        final List<String>[] res = TextSearchFun.splitStrings(commentStr, true);
-        comment = res[0];
-        notComment = res[1];
+        final List<List<String>> res = TextSearchFun.splitStrings(commentStr, true);
+        comment = res.get(0);
+        notComment = res.get(1);
     }
     public void setKeywordString(final String keywordStr) {
-        final List<String>[] res = TextSearchFun.splitStrings(keywordStr, true);
-        keyword = res[0];
-        notKeyword = res[1];
+        final List<List<String>> res = TextSearchFun.splitStrings(keywordStr, true);
+        keyword = res.get(0);
+        notKeyword = res.get(1);
     }
     public void setNameString(final String nameStr) {
-        final List<String>[] res = TextSearchFun.splitStrings(nameStr, true);
-        name = res[0];
-        notName = res[1];
+        final List<List<String>> res = TextSearchFun.splitStrings(nameStr, true);
+        name = res.get(0);
+        notName = res.get(1);
     }
     public void setOwnerString(final String ownerStr) {
-        final List<String>[] res = TextSearchFun.splitStrings(ownerStr, true);
-        owner = res[0];
-        notOwner = res[1];
+        final List<List<String>> res = TextSearchFun.splitStrings(ownerStr, true);
+        owner = res.get(0);
+        notOwner = res.get(1);
     }
 
     public List<String> getComment() {
@@ -245,24 +245,24 @@ public class SearchParameters {
         this.hideFilesWithoutChkKey = hideFilesWithoutChkKey;
     }
 
-    public boolean isHideBadUserFiles() {
-        return hideBadUserFiles;
+    public boolean isHideBADUserFiles() {
+        return hideBADUserFiles;
     }
-    public void setHideBadUserFiles(final boolean hideBadUserFiles) {
-        this.hideBadUserFiles = hideBadUserFiles;
-    }
-
-    public boolean isHideCheckUserFiles() {
-        return hideCheckUserFiles;
-    }
-    public void setHideCheckUserFiles(final boolean hideCheckUserFiles) {
-        this.hideCheckUserFiles = hideCheckUserFiles;
+    public void setHideBADUserFiles(final boolean hideBADUserFiles) {
+        this.hideBADUserFiles = hideBADUserFiles;
     }
 
-    public boolean isHideObserveUserFiles() {
-        return hideObserveUserFiles;
+    public boolean isHideNEUTRALUserFiles() {
+        return hideNEUTRALUserFiles;
     }
-    public void setHideObserveUserFiles(final boolean hideObserveUserFiles) {
-        this.hideObserveUserFiles = hideObserveUserFiles;
+    public void setHideNEUTRALUserFiles(final boolean hideNEUTRALUserFiles) {
+        this.hideNEUTRALUserFiles = hideNEUTRALUserFiles;
+    }
+
+    public boolean isHideGOODUserFiles() {
+        return hideGOODUserFiles;
+    }
+    public void setHideGOODUserFiles(final boolean hideGOODUserFiles) {
+        this.hideGOODUserFiles = hideGOODUserFiles;
     }
 }

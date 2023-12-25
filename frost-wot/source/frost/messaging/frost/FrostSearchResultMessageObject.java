@@ -19,6 +19,7 @@
 package frost.messaging.frost;
 
 import frost.gui.model.*;
+import frost.util.Mixed;
 
 public class FrostSearchResultMessageObject implements TableMember<FrostSearchResultMessageObject> {
 
@@ -37,7 +38,7 @@ public class FrostSearchResultMessageObject implements TableMember<FrostSearchRe
      */
     public int compareTo(final FrostSearchResultMessageObject another, int tableColumnIndex) {
 
-        // booleans
+        // booleans: flagged and starred
         if (tableColumnIndex == 0 || tableColumnIndex == 1) {
             Boolean b1 = (Boolean) getValueAt(tableColumnIndex);
             Boolean b2 = (Boolean) another.getValueAt(tableColumnIndex);
@@ -48,16 +49,21 @@ public class FrostSearchResultMessageObject implements TableMember<FrostSearchRe
                 return -1;
             }
             return 1;
-        } 
+        }
+
+        // integers: "index"
+        if( tableColumnIndex == 2 ) {
+            return Mixed.compareInt(messageObject.getIndex(), another.getMessageObject().getIndex());
+        }
         
         String c1 = (String) getValueAt(tableColumnIndex);
         String c2 = (String) another.getValueAt(tableColumnIndex);
-        if (tableColumnIndex == 7) {
+        if (tableColumnIndex == 7) { // date
             return c1.compareTo(c2);
         } else {
             // If we are sorting by anything but date...
             if (tableColumnIndex == 5) {
-                //If we are sorting by subject...
+                //If we are sorting by subject... then ignore the "Re: " prefix
                 if (c1.indexOf("Re: ") == 0) {
                     c1 = c1.substring(4);
                 }
@@ -67,8 +73,8 @@ public class FrostSearchResultMessageObject implements TableMember<FrostSearchRe
             }
             int result = c1.compareToIgnoreCase(c2);
             if (result == 0) { // Items are the same. Date and time decides
-                String d1 = (String) getValueAt(6);
-                String d2 = (String) another.getValueAt(6);
+                String d1 = (String) getValueAt(7);
+                String d2 = (String) another.getValueAt(7);
                 return d1.compareTo(d2);
             } else {
                 return result;

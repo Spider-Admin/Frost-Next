@@ -42,7 +42,6 @@ public abstract class FcpHandler {
     	// Currently hardcoded to version 0.7 (The only existing version)
         instance = new FcpHandler07();
         instance.initialize(node);
-        FreenetKeys.initializeFor07();
     }
 
     public abstract void initialize(String node) throws Exception;
@@ -154,7 +153,7 @@ public abstract class FcpHandler {
             boolean doMime,
             FrostUploadItem ulItem);
 
-    public abstract String generateCHK(File file) throws Throwable;
+    public abstract String generateCHK(final FrostUploadItem ulItem) throws Throwable;
 
     public abstract BoardKeyPair generateBoardKeyPair() throws IOException, ConnectException;
 }

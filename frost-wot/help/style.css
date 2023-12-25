@@ -1,54 +1,94 @@
-.textbox {
-    font-family: Verdana, Arial, Helvetica, sans-serif;
-    font-style: normal;
-    border: 1px #99CCFF solid;
-    padding-top: 10px;
-    padding-right: 10px;
-    padding-bottom: 10px;
-    padding-left: 10px ;
-    clip:   rect(   );
-    margin-top: 10px;
-    color: black;
+body {
+	font-family: Arial,Verdana,Helvetica,sans-serif;
+	padding: 0px;
+	margin: 8px;
 }
-.textonly {
-    font-family: Verdana, Arial, Helvetica, sans-serif;
-    font-style: normal;
-}
-.menua {
-    font-family: Verdana, Arial, Helvetica, sans-serif;
-    color: black;
-    text-decoration: none;
-    font-weight: bold;
-}
+
 a {
-    font-family: Verdana, Arial, Helvetica, sans-serif;
-    font-style: normal;
-    text-decoration: none;
-    color: blue;
+	color: #5695C6;
+	text-decoration: none;
+	font-weight: bold;
 }
-a:hover {
-    text-decoration: underline;
-    color: red;
+
+table.cltable {
+	width: 100%;
 }
-table.optionstable {
-    border-collapse: collapse;
-    border-width:    1px;
-    border-color:    #ccc;
-    border-style:    solid;
+
+td.cltype {
+	width: 140px;
 }
-table.optionstable td,th {
-    border-width:  1px;
-    border-color:  #ccc;
-    border-style:  solid;
-    padding-left:  4px;
-    padding-right: 4px;
-    padding-top:   4px;
-    padding-bottom:4px;
+
+td.cltype,
+td.cldesc {
+	padding: 0px;
 }
-table.optionstable th {
-    background: #efefef;
+
+div.cltype_new,
+div.cltype_enhanced,
+div.cltype_fixed,
+div.cltype_developer {
+	font-family: "Courier New",Courier,"Lucida Sans Typewriter","Lucida Typewriter",monospace;
+	font-size: 11px;
+	font-weight: bold;
+	padding: 4px 8px 4px 8px;
 }
-table.optionstable td.gray {
-    background:  #efefef;
-    font-weight: bold;
+
+div.cltype_new {
+	background-color: #FEE9C4;
+	border-left: 3px solid #FD860A;
+}
+div.cltype_enhanced {
+	background-color: #E2C2FF;
+	border-left: 3px solid #6C00D9;
+}
+div.cltype_fixed {
+	background-color: #ECFFDA;
+	border-left: 3px solid #4C991A;
+}
+div.cltype_developer {
+	background-color: #E1E1E1;
+	border-left: 3px solid #878787;
+}
+
+div.clindex {
+	font-family: "Courier New",Courier,"Lucida Sans Typewriter","Lucida Typewriter",monospace;
+	font-size: 11px;
+	font-weight: bold;
+	text-align: right;
+	color: #CCCCCC;
+	margin: 4px 4px 4px 4px;
+}
+
+div.cldesc_new,
+div.cldesc_enhanced,
+div.cldesc_fixed,
+div.cldesc_developer {
+	padding: 0px 12px 0px 12px;
+}
+
+div.cldesc_new {
+	border-top: 2px solid #FEE9C4;
+}
+div.cldesc_enhanced {
+	border-top: 2px solid #E2C2FF;
+}
+div.cldesc_fixed {
+	border-top: 2px solid #ECFFDA;
+}
+div.cldesc_developer {
+	border-top: 2px solid #E1E1E1;
+}
+
+p {
+	margin: 12px 0px 12px 0px;
+}
+
+ul {
+	list-style-type: circle;
+}
+
+pre {
+	font-family: monospace;
+	font-size: 11px;
+	color: #444444;
 }

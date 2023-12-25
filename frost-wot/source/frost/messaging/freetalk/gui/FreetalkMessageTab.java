@@ -95,7 +95,7 @@ public class FreetalkMessageTab implements LanguageListener {
 
             int dividerLoc = Core.frostSettings.getIntValue("FreetalkTab.treeAndTabbedPaneSplitpaneDividerLocation");
             if( dividerLoc < 10 ) {
-                dividerLoc = 160;
+                dividerLoc = 210;
             }
             treeAndTabbedPaneSplitpane.setDividerLocation(dividerLoc);
 
@@ -296,7 +296,7 @@ public class FreetalkMessageTab implements LanguageListener {
         }
         String newname = null;
         do {
-            newname = JOptionPane.showInputDialog(
+            newname = MiscToolkit.showInputDialog(
                     mainFrame,
                     language.getString("MainFrame.dialog.renameFolder")+":\n",
                     selected.getName());

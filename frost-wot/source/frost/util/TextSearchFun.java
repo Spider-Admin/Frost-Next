@@ -16,6 +16,13 @@
   along with this program; if not, write to the Free Software
   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
+/**
+ * THIS FILE HAS BEEN DEPRECATED. THE MESSAGE SEARCH HAS BEEN REWRITTEN
+ * WITH A NEW REGEX ENGINE. THIS OLD "TEXTSEARCHFUN" PLAINTEXT SEARCH
+ * IS ONLY USED FOR THE ANCIENT "SEARCH FILES" (FROST FILESHARING) TAB,
+ * WHICH NOBODY USES. ;)
+ * -- Kitty
+ */
 package frost.util;
 
 import java.util.*;
@@ -69,7 +76,7 @@ public class TextSearchFun {
      * Splits an input search string into search words and NOT search words.
      * @return  List[2] where List[0] is a list of search string and List[1] is a List of NOT search strings
      */
-    public static List<String>[] splitStrings(String input, boolean makeLowerCase) {
+    public static List<List<String>> splitStrings(String input, boolean makeLowerCase) {
         
         List<String> strList;
 
@@ -78,11 +85,8 @@ public class TextSearchFun {
             strList = searchStringParser.parseSearchText(input);
         }
 
-        List<String>[] retVal = new List[2];
         List<String> searchStrings = new ArrayList<String>();
         List<String> notSearchStrings = new ArrayList<String>();
-        retVal[0] = searchStrings;
-        retVal[1] = notSearchStrings;
         
         // all strings until SearchStringParser.NOT_IDENT are ANDed, all after NOT are the notStrings
         boolean collectNotStrings = false;
@@ -101,6 +105,11 @@ public class TextSearchFun {
                 }
             }
         }
+
+        final List<List<String>> retVal = new ArrayList<List<String>>(2);
+        retVal.add(searchStrings); // idx 0
+        retVal.add(notSearchStrings); // idx 1
+
         return retVal;
     }
     

@@ -57,7 +57,6 @@ import javax.swing.event.ListSelectionListener;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableColumn;
 
-import org.joda.time.DateMidnight;
 import org.joda.time.DateTime;
 
 import frost.Core;
@@ -179,24 +178,11 @@ public class BoardInfoFrame extends JFrame implements BoardUpdateThreadListener 
         int height = (int) (parentFrame.getHeight() * 0.75);
         
         if( width < 1000 ) {
-        	Dimension screenSize = java.awt.Toolkit.getDefaultToolkit().getScreenSize();
-        	
-        	if( screenSize.width > 1300 ) {
-        		width = 1200;
-
-        	} else if( screenSize.width > 1000 ) {
-        		width = (int) (parentFrame.getWidth() * 0.99);
-        	}
+		width = 1000;
         }
         
-        if( height < 500 ) {
-        	Dimension screenSize = java.awt.Toolkit.getDefaultToolkit().getScreenSize();
-        	
-        	if( screenSize.width > 900 ) {
-        		height = 800;
-        	} else {
-        		height = (int) (screenSize.width * 0.85);
-        	}
+        if( height < 720 ) {
+       		height = 720;
         }
         
         parentFrame.getWidth();
@@ -213,13 +199,23 @@ public class BoardInfoFrame extends JFrame implements BoardUpdateThreadListener 
     private void Init() throws Exception {
 
         boardTableModel = new BoardInfoTableModel();
-        boardTable = new SortedTable<BoardInfoTableMember>(boardTableModel);
+        boardTable = new SortedTable<BoardInfoTableMember>(boardTableModel) {
+            // override the default sort order when clicking different columns
+            @Override
+            public boolean getColumnDefaultAscendingState(final int col) {
+                if( col == 7 ) {
+                    // sort "time of last message" column descending by default
+                    return false;
+                }
+                return true; // all other columns: ascending
+            }
+        };
 
         //------------------------------------------------------------------------
         // Configure objects
         //------------------------------------------------------------------------
 
-        final ImageIcon frameIcon = MiscToolkit.loadImageIcon("/data/jtc.jpg");
+        final ImageIcon frameIcon = MiscToolkit.loadImageIcon("/data/frost.png");
         setIconImage(frameIcon.getImage());
         setSize(new Dimension(350, 200));
         setResizable(true);
@@ -504,11 +500,10 @@ public class BoardInfoFrame extends JFrame implements BoardUpdateThreadListener 
         final int countFlaggedMessages = MessageStorage.inst().getFlaggedMessageCount(board);
         final int countStarredMessages = MessageStorage.inst().getStarredMessageCount(board);
         final int countUnreadMessages  = MessageStorage.inst().getUnreadMessageCount(board);
-        final DateTime dateTime = MessageStorage.inst().getDateTimeOfLatestMessage(board);
+        final DateTime latestMessageTime = MessageStorage.inst().getDateTimeOfLatestMessage(board);
         final String dateStr;
-        if (dateTime != null) {
-            final DateMidnight date = dateTime.toDateMidnight();
-            dateStr = DateFun.FORMAT_DATE_EXT.print(date);
+        if (latestMessageTime != null) {
+            dateStr = DateFun.FORMAT_DATE_EXT.print(latestMessageTime); // "2008.12.24"; at UTC
         } else {
             dateStr = "---";
         }

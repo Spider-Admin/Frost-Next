@@ -23,7 +23,6 @@ package frost.messaging.frost.gui;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
-import java.awt.Desktop;
 import java.awt.Font;
 import java.awt.HeadlessException;
 import java.awt.event.ActionEvent;
@@ -66,9 +65,11 @@ import javax.swing.text.Utilities;
 import frost.Core;
 import frost.MainFrame;
 import frost.SettingsClass;
+import frost.fcp.FreenetKeys;
+import frost.fileTransfer.FileTransferManager;
+import frost.fileTransfer.KeyParser;
 import frost.fileTransfer.download.DownloadManager;
 import frost.fileTransfer.download.FrostDownloadItem;
-import frost.gui.AddNewDownloadsDialog;
 import frost.gui.KnownBoardsManager;
 import frost.gui.SearchMessagesConfig;
 import frost.gui.TargetFolderChooser;
@@ -79,7 +80,10 @@ import frost.messaging.frost.FrostMessageObject;
 import frost.messaging.frost.boards.Board;
 import frost.messaging.frost.boards.Folder;
 import frost.util.CopyToClipboard;
+import frost.util.DesktopUtils;
 import frost.util.FileAccess;
+import frost.util.Mixed;
+import frost.util.gui.MiscToolkit;
 import frost.util.gui.JSkinnablePopupMenu;
 import frost.util.gui.SmileyCache;
 import frost.util.gui.TextHighlighter;
@@ -261,14 +265,13 @@ public class MessageTextPane extends JPanel {
         messageBodyScrollPane.getVerticalScrollBar().setValueIsAdjusting(false);
 
         if( searchMessagesConfig != null &&
-            searchMessagesConfig.content != null &&
-            searchMessagesConfig.content.length() > 0 )
+            searchMessagesConfig.contentPattern != null )
         {
-            // highlight words in content that the user searched for
+            // highlight words in content that the user searched for; only triggered if the message is opened from the search pane
             if( textHighlighter == null ) {
-                textHighlighter = new TextHighlighter(highlightColor, true);
+                textHighlighter = new TextHighlighter(highlightColor, true); // true = case-insensitive highlighting
             }
-            textHighlighter.highlight(messageTextArea, searchMessagesConfig.content, false);
+            textHighlighter.highlight(messageTextArea, searchMessagesConfig.contentPattern, false); // use the regex pattern for highlighting
         }
     }
 
@@ -402,7 +405,8 @@ public class MessageTextPane extends JPanel {
                 }
                 final MouseHyperlinkEvent e = (MouseHyperlinkEvent) evt;
                 if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
-                    // user clicked on 'clickedKey', List 'allKeys' contains all keys
+                    // user clicked on 'clickedKey', List 'allKeys' contains all keys from entire message (and quoted history)
+                    // NOTE: The all/current lists do NOT include Freesite keys (ones matching FreenetKeys.isFreesiteKey()).
                     final List<String> allKeys = ((MessageDecoder)messageTextArea.getDecoder()).getHyperlinkedKeys();
                     final List<String> currentMessageKeys = ((MessageDecoder)messageTextArea.getDecoder()).getHyperlinkedKeys(selectedMessage.getIdLinePos());
                     final String clickedKey = e.getDescription();
@@ -590,12 +594,12 @@ public class MessageTextPane extends JPanel {
 
             //ask if we already have the board
             if (board != null) {
-                if (JOptionPane.showConfirmDialog(
+                if (MiscToolkit.showConfirmDialog(
                         this,
                         "You already have a board named " + boardName + ".\n" +
                             "Are you sure you want to add this one over it?",
                         "Board already exists",
-                        JOptionPane.YES_NO_OPTION) != 0)
+                        MiscToolkit.YES_NO_OPTION) != MiscToolkit.YES_OPTION)
                 {
                     continue; // next row of table / next attached board
                 } else {
@@ -653,34 +657,11 @@ public class MessageTextPane extends JPanel {
     
     
     private void addKeysInText(final String text) {
-    	// parse text for keys
-    	List<FrostDownloadItem> parsedKeysfrostDownloadItemList = DownloadManager.parseKeys(text);
-
-    	List<FrostDownloadItem> frostDownloadItemList = new ArrayList<FrostDownloadItem>();
-    	HashMap<String, FrostDownloadItem> frostDownloadItemNameMap = new HashMap<String, FrostDownloadItem>();
-    	for(FrostDownloadItem frostDownloadItem : parsedKeysfrostDownloadItemList) {
-    		
-    		// duplicate check
-    		if( frostDownloadItemNameMap.containsKey(frostDownloadItem.getFileName())) {
-    			continue;
-    		}
-    		
-    		// add to download list
-    		frostDownloadItemList.add(frostDownloadItem);
-    		
-    		// configure download items
-    		frostDownloadItem.setAssociatedMessageId(selectedMessage.getMessageId());
-    		frostDownloadItem.setAssociatedBoardName(selectedMessage.getBoard().getBoardFilename());
-    		if( Core.frostSettings.getBoolValue(SettingsClass.USE_BOARDNAME_DOWNLOAD_SUBFOLDER_ENABLED) ){
-    			frostDownloadItem.setDownloadDir(frostDownloadItem.getDownloadDir().concat(frostDownloadItem.getAssociatedBoardName()));
-    		}
-    		
-    		// remember filename for duplicate check
-    		frostDownloadItemNameMap.put(frostDownloadItem.getFileName(), frostDownloadItem);
-    	}
-
-    	// Start add download dialog
-    	new AddNewDownloadsDialog(MainFrame.getInstance()).startDialog(frostDownloadItemList);
+        // start "add new downloads" dialog
+        // NOTE: text = find keys in this text, true = ask before redownloading keys,
+        // null, null = do not override prefix or download dir, false = no "paste more" button,
+        // msg = associate found keys with originating message
+        FileTransferManager.inst().getDownloadManager().getPanel().openAddNewDownloadsDialog(text, true, null, null, false, selectedMessage);
     }
     
     private void addKeysOfCurrentMessage() {
@@ -769,7 +750,7 @@ public class MessageTextPane extends JPanel {
         private final JMenuItem copyExtendedInfoItem = new JMenuItem();
 
         private final JMenuItem openFileInBrowserItem = new JMenuItem();
-        private final JMenuItem openAllFilesInBrowserItem = new JMenuItem();
+        private final JMenuItem openAllImageAttachmentsInBrowserItem = new JMenuItem();
 
         public PopupMenuAttachmentFile() throws HeadlessException {
             super();
@@ -777,16 +758,18 @@ public class MessageTextPane extends JPanel {
         }
 
         public void actionPerformed(final ActionEvent e) {
-            if (e.getSource() == saveAttachmentsItem || e.getSource() == saveAttachmentItem) {
-                downloadAttachments();
+            if (e.getSource() == saveAttachmentItem) {
+                downloadAttachments(false);
+            } else if (e.getSource() == saveAttachmentsItem) {
+                downloadAttachments(true);
             } else if (e.getSource() == copyKeysAndNamesItem) {
-                CopyToClipboard.copyKeysAndFilenames( getItems().toArray() );
+                CopyToClipboard.copyKeysAndFilenames( getAttachmentItems(false).toArray(), true ); // true = cleanup keys
             } else if (e.getSource() == copyExtendedInfoItem) {
-                CopyToClipboard.copyExtendedInfo( getItems().toArray() );
+                CopyToClipboard.copyExtendedInfo( getAttachmentItems(false).toArray(), true ); // true = cleanup keys
             } else if (e.getSource() == openFileInBrowserItem) {
-            	openFileInBrowser_actionWrapper( getItems() );
-            } else if (e.getSource() == openAllFilesInBrowserItem) {
-            	openFileInBrowser_actionWrapper( getItems() );
+            	openFileInBrowser_actionWrapper( getAttachmentItems(false), false );
+            } else if (e.getSource() == openAllImageAttachmentsInBrowserItem) {
+            	openFileInBrowser_actionWrapper( getAttachmentItems(true), true );
             }
         }
 
@@ -802,11 +785,8 @@ public class MessageTextPane extends JPanel {
             saveAttachmentsItem.addActionListener(this);
             saveAttachmentItem.addActionListener(this);
             
-            String browserAddress = Core.frostSettings.getValue(SettingsClass.BROWSER_ADDRESS);
-            if( browserAddress != null && browserAddress.length() > 0 ) {
-	            openFileInBrowserItem.addActionListener(this);
-	            openAllFilesInBrowserItem.addActionListener(this);
-            }
+            openFileInBrowserItem.addActionListener(this);
+            openAllImageAttachmentsInBrowserItem.addActionListener(this);
         }
 
         public void languageChanged(final LanguageEvent event) {
@@ -818,7 +798,7 @@ public class MessageTextPane extends JPanel {
             saveAttachmentItem.setText(language.getString("MessagePane.fileAttachmentTable.popupmenu.downloadSelectedAttachment"));
 
             openFileInBrowserItem.setText(language.getString("MessagePane.fileAttachmentTable.popupmenu.openAttachmentInBrowser"));
-            openAllFilesInBrowserItem.setText(language.getString("MessagePane.fileAttachmentTable.popupmenu.openAllAttachementsInBrowser"));
+            openAllImageAttachmentsInBrowserItem.setText(language.getString("MessagePane.fileAttachmentTable.popupmenu.openAllImageAttachmentsInBrowser"));
         }
 
         @Override
@@ -827,19 +807,14 @@ public class MessageTextPane extends JPanel {
 
             add(copyToClipboardMenu);
             addSeparator();
+            add(saveAttachmentItem);
+            add(saveAttachmentsItem);
 
-            if (filesTable.getSelectedRow() == -1) {
-                add(saveAttachmentsItem);
-            } else {
-                add(saveAttachmentItem);
-            }
-
-            addSeparator();
-
-            if (filesTable.getSelectedRow() == -1) {
-                add(openAllFilesInBrowserItem);
-            } else {
+            String browserAddress = Core.frostSettings.getValue(SettingsClass.BROWSER_ADDRESS);
+            if( browserAddress != null && browserAddress.length() > 0 ) {
+                addSeparator();
                 add(openFileInBrowserItem);
+                add(openAllImageAttachmentsInBrowserItem);
             }
 
             super.show(invoker, x, y);
@@ -848,81 +823,65 @@ public class MessageTextPane extends JPanel {
         /**
          * Adds either the selected or all files from the attachmentTable to downloads table.
          */
-        private void downloadAttachments() {
-            final Iterator<FileAttachment> it = getItems().iterator();
-            
-            List<FrostDownloadItem> frostDownloadItemList = new LinkedList<FrostDownloadItem>();
-            HashMap<String, FrostDownloadItem> frostDownloadItemKeyMap = new HashMap<String, FrostDownloadItem>();
-            HashMap<String, FrostDownloadItem> frostDownloadItemNameMap = new HashMap<String, FrostDownloadItem>();
-            
-            while (it.hasNext()) {
+        private void downloadAttachments(final boolean allAttachments) {
+            final Iterator<FileAttachment> it = getAttachmentItems(allAttachments).iterator();
+
+            // we'll be building a list of download items based on the original key-names,
+            // so that we ignore the possibly-prefixed/renamed/wrong attachment filename + size.
+            ArrayList<FrostDownloadItem> frostDownloadItemList = new ArrayList<FrostDownloadItem>();
+            final KeyParser.ParseResult result = new KeyParser.ParseResult();
+
+            while( it.hasNext() ) {
                 final FileAttachment fa = it.next();
-                
-                if( frostDownloadItemKeyMap.containsKey(fa.getKey())) {
-            		continue;
-            	}
-                
-                String filename = fa.getFileName();
-                // maybe convert html codes (e.g. %2c -> , )
-                if( filename.indexOf("%") > 0 ) {
-                    try {
-                        filename = java.net.URLDecoder.decode(filename, "UTF-8");
-                    } catch (final java.io.UnsupportedEncodingException ex) {
-                        logger.log(Level.SEVERE, "Decode of HTML code failed", ex);
+
+                final String key = fa.getKey();
+                if( key != null ) {
+                    // attempt to parse and validate the current key and extract its real filename
+                    // NOTE: we don't want Freesite keys so the 2nd argument is false
+                    KeyParser.parseKeyFromLine(key, false, result);
+
+                    // if this key was valid, then create a new download object for it
+                    if( result.key != null ) {
+                        frostDownloadItemList.add(new FrostDownloadItem(result.fileName, result.key));
                     }
                 }
-                if( frostDownloadItemNameMap.containsKey(filename)) {
-                	continue;
-                }
-                final FrostDownloadItem frostDwonloadItem = new FrostDownloadItem(
-	                filename,
-	                fa.getKey(),
-	                fa.getFileSize()
-                );
-                
-                frostDwonloadItem.setAssociatedMessageId(selectedMessage.getMessageId());
-                frostDwonloadItem.setAssociatedBoardName(selectedMessage.getBoard().getBoardFilename());
-                if( Core.frostSettings.getBoolValue(SettingsClass.USE_BOARDNAME_DOWNLOAD_SUBFOLDER_ENABLED) ){
-                	frostDwonloadItem.setDownloadDir(frostDwonloadItem.getDownloadDir().concat(frostDwonloadItem.getAssociatedBoardName()));
-                }
-                frostDownloadItemList.add( frostDwonloadItem );
-                frostDownloadItemKeyMap.put(fa.getKey(), frostDwonloadItem);
-                frostDownloadItemNameMap.put(filename, frostDwonloadItem);
             }
-            
-            frostDownloadItemKeyMap.clear();
-            frostDownloadItemNameMap.clear();
-            
-            new AddNewDownloadsDialog(mainFrame).startDialog(frostDownloadItemList);
+
+            // start "add new downloads" dialog
+            // NOTE: 1st arg = the list of keys to queue, true = ask before redownloading keys,
+            // null, null = do not override prefix or download dir, false = no "paste more" button,
+            // msg = associate found keys with originating message
+            FileTransferManager.inst().getDownloadManager().getPanel().openAddNewDownloadsDialog(frostDownloadItemList, true, null, null, false, selectedMessage);
         }
 
         /**
          * Returns a list of all items to process, either selected ones or all.
          */
-        private AttachmentList<FileAttachment> getItems() {
-            final int[] selectedRows = filesTable.getSelectedRows();
-            
-            if (selectedRows.length == 0) {
-                // If no rows are selected, add all attachments to download table
+        private AttachmentList<FileAttachment> getAttachmentItems(final boolean allAttachments) {
+            if( allAttachments ) {
+                // return all attachments
                 return selectedMessage.getAttachmentsOfTypeFile();
-            
             } else {
                 final AttachmentList<FileAttachment> attachments = selectedMessage.getAttachmentsOfTypeFile();
                 AttachmentList<FileAttachment> items = new AttachmentList<FileAttachment>();
-                for( final int rowPos : selectedRows ) {
-                    items.add(attachments.get(rowPos));
+
+                final int[] selectedRows = filesTable.getSelectedRows();
+                if( selectedRows.length > 0 ) {
+                    for( final int rowPos : selectedRows ) {
+                        items.add(attachments.get(rowPos));
+                    }
                 }
-                
+
                 return items;
             }
         }
         
-        private void openFileInBrowser_actionWrapper(final List<FileAttachment> fileAttachementList) {
+        private void openFileInBrowser_actionWrapper(final List<FileAttachment> fileAttachmentList, final boolean imagesOnly) {
         	List<String> keys = new LinkedList<String>();
-        	for(final FileAttachment fileAttachement : fileAttachementList) {
-        		keys.add(fileAttachement.getKey());
+        	for(final FileAttachment fileAttachment : fileAttachmentList) {
+        		keys.add(fileAttachment.getKey());
             }
-        	openFileInBrowser_action(keys);
+        	openFileInBrowser_action(keys, imagesOnly);
         }
     }
 
@@ -945,7 +904,8 @@ public class MessageTextPane extends JPanel {
         private final JMenuItem downloadAllFilesOfMessage = new JMenuItem();
 
         private final JMenuItem openFileInBrowser = new JMenuItem();
-        private final JMenuItem openAllFilesInBrowser = new JMenuItem();
+        private final JMenuItem openAllImageFilesInBrowser = new JMenuItem();
+        private final JMenuItem openAllImageFilesOfMessageInBrowser = new JMenuItem();
 
         private String clickedKey = null;
         private List<String> allKeys = null;
@@ -982,11 +942,13 @@ public class MessageTextPane extends JPanel {
             } else if( e.getSource() == downloadAllFiles ) {
                 downloadItems(true);
             } else if( e.getSource() == downloadAllFilesOfMessage ) {
-            	addKeysOfCurrentMessage();
+                addKeysOfCurrentMessage();
             } else if( e.getSource() == openFileInBrowser ) {
-            	openFileInBrowser_action(getItems(false));
-            } else if( e.getSource() == openAllFilesInBrowser ) {
-            	openFileInBrowser_action(getItems(true));
+                openFileInBrowser_action(Collections.singletonList(clickedKey), false);
+            } else if( e.getSource() == openAllImageFilesInBrowser ) {
+                openFileInBrowser_action(allKeys, true);
+            } else if( e.getSource() == openAllImageFilesOfMessageInBrowser ) {
+                openFileInBrowser_action(currentMessageKeys, true);
             }
         }
 
@@ -1002,8 +964,9 @@ public class MessageTextPane extends JPanel {
             downloadAllFiles.addActionListener(this);
             downloadAllFilesOfMessage.addActionListener(this);
             
-        	openFileInBrowser.addActionListener(this);
-            openAllFilesInBrowser.addActionListener(this);
+            openFileInBrowser.addActionListener(this);
+            openAllImageFilesInBrowser.addActionListener(this);
+            openAllImageFilesOfMessageInBrowser.addActionListener(this);
         }
 
         public void languageChanged(final LanguageEvent event) {
@@ -1016,7 +979,8 @@ public class MessageTextPane extends JPanel {
             downloadAllFiles.setText(language.getString("MessagePane.hyperlink.popupmenu.downloadAllFileKeys"));
             downloadAllFilesOfMessage.setText(language.getString("MessagePane.hyperlink.popupmenu.downloadAllFileKeysOfMessage"));
             openFileInBrowser.setText(language.getString("MessagePane.hyperlink.popupmenu.openFileInBrowser"));
-            openAllFilesInBrowser.setText(language.getString("MessagePane.hyperlink.popupmenu.openAllFlesInBrowser"));
+            openAllImageFilesInBrowser.setText(language.getString("MessagePane.hyperlink.popupmenu.openAllImageFilesInBrowser"));
+            openAllImageFilesOfMessageInBrowser.setText(language.getString("MessagePane.hyperlink.popupmenu.openAllImageFilesOfMessageInBrowser"));
 
 //            cancelItem.setText(language.getString("Common.cancel"));
         }
@@ -1025,52 +989,51 @@ public class MessageTextPane extends JPanel {
         public void show(final Component invoker, final int x, final int y) {
             removeAll();
 
-            // if clickedLink conatins no '/', its only a key without file, allow to copy this to clipboard only
-            // if clickedLink ends with a '/' its a freesite link, allow to copy this to clipboard only
-            // else the clickedLink is a filelink, allow to copy/download this link or ALL filelinks
+            // if clickedKey contains no '/', it's only a key without file, so only allow copying this key to the clipboard.
+            // if clickedKey matches the advanced freesite URL scanner, we can either copy to clipboard or browse (if a browser is configured).
+            // else the clickedKey is a filelink, so simply allow to copy/download this link or ALL filelinks, or browsing to them (if browser).
 
-			if (clickedKey.indexOf("/") < 0) {
+            if( clickedKey.indexOf("/") < 0 ) {
                 // key only
                 add(copyKeyOnlyToClipboard);
-            } else if( clickedKey.endsWith("/") ) {
-                // freesite link
-                add(copyFreesiteLinkToClipboard);
-
-				String browserAddress = Core.frostSettings.getValue(SettingsClass.BROWSER_ADDRESS);
-	            if( browserAddress != null && browserAddress.length() > 0 ) {
-	            	addSeparator();
-	            	add(openFileInBrowser);
-					if (allKeys.size() > 1) {
-						add(openAllFilesInBrowser);
-					}
-	            }
-				
             } else {
-                // file key
-                add(copyFileLinkToClipboard);
-                if( currentMessageKeys.size() > 0 ) {
-                    add(copyAllFileLinksOfMessageToClipboard);
+                // NOTE: this returns false for malformed Freesite keys (such as just a key with
+                // no slashes at all).
+                if( FreenetKeys.isFreesiteKey(clickedKey) ) {
+                    // freesite link
+                    add(copyFreesiteLinkToClipboard);
+                } else {
+                    // file key
+                    add(copyFileLinkToClipboard);
+                    if( currentMessageKeys.size() > 0 ) {
+                        add(copyAllFileLinksOfMessageToClipboard);
+                    }
+                    if( allKeys.size() > 1 ) {
+                        add(copyAllFileLinksToClipboard);
+                    }
+                    addSeparator();
+                    add(downloadFile);
+                    if( currentMessageKeys.size() > 0 ) {
+                        add(downloadAllFilesOfMessage);
+                    }
+                    if( allKeys.size() > 1 ) {
+                        add(downloadAllFiles);
+                    }
                 }
-                if( allKeys.size() > 1 ) {
-                    add(copyAllFileLinksToClipboard);
-                }
-                addSeparator();
-                add(downloadFile);
-                if( currentMessageKeys.size() > 0 ) {
-                    add(downloadAllFilesOfMessage);
-                }
-                if( allKeys.size() > 1 ) {
-                    add(downloadAllFiles);
-                }
+
+                // "open key in browser" should be visible for both freesites and file keys
                 String browserAddress = Core.frostSettings.getValue(SettingsClass.BROWSER_ADDRESS);
-	            if( browserAddress != null && browserAddress.length() > 0 ) {
-	            	addSeparator();
-	            	add(openFileInBrowser);
-					if (allKeys.size() > 1) {
-						add(openAllFilesInBrowser);
-					}
-	            }
-			}
+                if( browserAddress != null && browserAddress.length() > 0 ) {
+                    addSeparator();
+                    add(openFileInBrowser);
+                    if( currentMessageKeys.size() > 0 ) {
+                        add(openAllImageFilesOfMessageInBrowser);
+                    }
+                    if( allKeys.size() > 1 ) {
+                        add(openAllImageFilesInBrowser);
+                    }
+                }
+            }
 
 //            addSeparator();
 //            add(cancelItem);
@@ -1079,55 +1042,40 @@ public class MessageTextPane extends JPanel {
         }
 
         /**
-         * Adds either the selected or all files from the attachmentTable to downloads table.
+         * Adds either the selected or all files from the message to downloads table.
          */
         private void downloadItems(final boolean getAll) {
-
-            final List<String> items = getItems(getAll);
+            final List<String> items = getMessageKeyItems(getAll);
             if( items == null ) {
                 return;
             }
-            
-            List<FrostDownloadItem> frostDownloadItemList = new LinkedList<FrostDownloadItem>();
-            HashMap<String, FrostDownloadItem> frostDownloadItemKeyMap = new HashMap<String, FrostDownloadItem>();
-            HashMap<String, FrostDownloadItem> frostDownloadItemNameMap = new HashMap<String, FrostDownloadItem>();
+
+            // we'll be building a list of download items based on the original key-names
+            ArrayList<FrostDownloadItem> frostDownloadItemList = new ArrayList<FrostDownloadItem>();
+            final KeyParser.ParseResult result = new KeyParser.ParseResult();
 
             for( final String key : items ) {
-            	if( frostDownloadItemKeyMap.containsKey(key)) {
-            		continue;
-            	}
-            	
-                String name = key.substring(key.lastIndexOf("/")+1);
-                // maybe convert html codes (e.g. %2c -> , )
-                if( name.indexOf("%") >= 0 ) {
-                    try {
-                        name = java.net.URLDecoder.decode(name, "UTF-8");
-                    } catch (final java.io.UnsupportedEncodingException ex) {
-                        logger.log(Level.SEVERE, "Decode of HTML code failed", ex);
+                if( key != null ) {
+                    // attempt to parse and validate the current key and extract its real filename
+                    // NOTE: we don't want Freesite keys so the 2nd argument is false
+                    KeyParser.parseKeyFromLine(key, false, result);
+
+                    // if this key was valid, then create a new download object for it
+                    if( result.key != null ) {
+                        frostDownloadItemList.add(new FrostDownloadItem(result.fileName, result.key));
                     }
                 }
-                if( frostDownloadItemNameMap.containsKey(name)) {
-                	continue;
-                }
-                
-                FrostDownloadItem frostDownloadItem = new FrostDownloadItem(name, key);
-                frostDownloadItem.setAssociatedMessageId(selectedMessage.getMessageId());
-                frostDownloadItem.setAssociatedBoardName(selectedMessage.getBoard().getBoardFilename());
-                if( Core.frostSettings.getBoolValue(SettingsClass.USE_BOARDNAME_DOWNLOAD_SUBFOLDER_ENABLED) ){
-                	frostDownloadItem.setDownloadDir(frostDownloadItem.getDownloadDir().concat(frostDownloadItem.getAssociatedBoardName()));
-                }
-                frostDownloadItemList.add( frostDownloadItem );
-                frostDownloadItemKeyMap.put(key, frostDownloadItem);
-                frostDownloadItemNameMap.put(name, frostDownloadItem);
             }
-            frostDownloadItemKeyMap.clear();
-            frostDownloadItemNameMap.clear();
-            
-            new AddNewDownloadsDialog(mainFrame).startDialog(frostDownloadItemList);
+
+            // start "add new downloads" dialog
+            // NOTE: 1st arg = the list of keys to queue, true = ask before redownloading keys,
+            // null, null = do not override prefix or download dir, false = no "paste more" button,
+            // msg = associate found keys with originating message
+            FileTransferManager.inst().getDownloadManager().getPanel().openAddNewDownloadsDialog(frostDownloadItemList, true, null, null, false, selectedMessage);
         }
         
         
-        private List<String> getItems(final boolean getAll) {
+        private List<String> getMessageKeyItems(final boolean getAll) {
             List<String> items;
             if( getAll ) {
                 items = allKeys;
@@ -1142,6 +1090,7 @@ public class MessageTextPane extends JPanel {
 
         /**
          * This method copies the keys and file names of the items to the clipboard.
+         * It decodes and validates every key, to get rid of "%20" encoding and other junk.
          */
         private void copyToClipboard(final List<String> items) {
 
@@ -1149,53 +1098,143 @@ public class MessageTextPane extends JPanel {
                 return;
             }
 
-            String text;
-            if( items.size() > 1 ) {
-                final StringBuilder textToCopy = new StringBuilder();
-            	for( final String key : items ) {
-            		textToCopy.append(key).append("\n");
-            	}
-            	text = textToCopy.toString();
-            } else {
-            	// don't include a trailing \n if we only have one item
-            	text = items.get(0);
+            // build a string of all valid file or freesite keys from the input list
+            final StringBuilder textToCopy = new StringBuilder();
+            final KeyParser.ParseResult result = new KeyParser.ParseResult();
+            for( final String key : items ) {
+                // the input keys are raw, so first we must parse a clean, validated key
+                // NOTE: we DO want Freesite keys, so the 2nd argument is true
+                KeyParser.parseKeyFromLine(key, true, result);
+                if( result.key == null ) { continue; } // skip invalid key
+
+                // add the clean version of the validated key to the string builder
+                textToCopy.append(result.key).append("\n");
             }
-            CopyToClipboard.copyText(text);
+
+            // remove the additional \n at the end if the input array had valid items
+            if( textToCopy.length() > 0 ) {
+                textToCopy.deleteCharAt(textToCopy.length() - 1);
+            }
+
+            // now just put it in the clipboard
+            CopyToClipboard.copyText(textToCopy.toString());
         }
         
     }
 
-    private void openFileInBrowser_action(final List<String> items) {
-		if (!java.awt.Desktop.isDesktopSupported()) {
-			return;
-		}
-		if (!Desktop.getDesktop().isSupported(java.awt.Desktop.Action.BROWSE)) {
+    private void openFileInBrowser_action(final List<String> rawItems, final boolean imagesOnly) {
+		if( rawItems == null ) { return; }
+
+		if( !DesktopUtils.canPerformBrowse() ) {
 			return;
 		}
 
 		final String browserAddress = Core.frostSettings
 				.getValue(SettingsClass.BROWSER_ADDRESS);
-		if (browserAddress.length() == 0) {
-			System.out.println("DEBUG - Borser address not configured");
-			return;
-		}
-		if (items == null || items.size() < 1) {
+		if( browserAddress.length() == 0 ) {
+			System.out.println("DEBUG - Browser address not configured");
 			return;
 		}
 
-		for (final String key : items) {
-			try {
-				final URI browserURI = new URI(browserAddress);
-				final URI uri = new URI(browserURI.getScheme(), browserURI
-						.getSchemeSpecificPart()
-						+ key, null);
-				Desktop.getDesktop().browse(uri);
-			} catch (IOException ex) {
-				ex.printStackTrace();
-			} catch (URISyntaxException e) {
-				e.printStackTrace();
+		// build a list of unique keys from the input (and possibly only image-keys)
+		final List<String> items = new LinkedList<String>();
+		for( String key : rawItems ) {
+			if( key == null ) { continue; }
+
+			// if "images only" mode, do a case-insensitive search for the allowed file endings
+			boolean addThisKey = true;
+			if( imagesOnly ) {
+				if( ! key.matches("(?i)^.*?\\.(?:BMP|GIF|JPE?G|PNG)$") ) {
+					addThisKey = false;
+				}
+			}
+
+			// only add this key if it's unique (not seen yet)
+			// NOTE: this will see "example%20file" and "example file" as two different keys,
+			// because we haven't yet decoded the keys. but that's not a problem since nobody
+			// ever posts differently encoded duplicates of the exact same key. and the only
+			// drawback to a duplicate slipping through is an extra, useless web tab.
+			if( addThisKey && !items.contains(key) ) {
+				items.add(key);
 			}
 		}
+		if( items == null || items.size() < 1 ) {
+			// show msg if we're in "images only" mode and all of the input has been filtered away...
+			// NOTE: if the user suppresses this message via the checkbox, they'll never see it
+			// again unless they clear frost.ini. I preferred doing this so that users see it
+			// at least once and know why nothing appears, but have the option to not be annoyed
+			// by a constant popup telling them nothing was found in case they use the feature a lot.
+			if( imagesOnly && rawItems.size() > 0 ) {
+				MiscToolkit.showSuppressableConfirmDialog(
+						MainFrame.getInstance(),
+						language.getString("MessagePane.foundNoImageKeys.text"),
+						language.getString("MessagePane.foundNoImageKeys.title"),
+						MiscToolkit.SUPPRESSABLE_OK_BUTTON, // only show an "Ok" button
+						JOptionPane.INFORMATION_MESSAGE,
+						SettingsClass.WARN_NO_IMAGES_TO_OPEN, // will automatically choose "yes" if this is false
+						language.getString("Common.suppressConfirmationCheckbox") );
+			}
+
+			return;
+		}
+
+		// now start a thread which will open all of the requested keys in the system's default browser
+		// NOTE: the thread ensures that we can put some delay between spawning the processes, to avoid flooding
+		new Thread("OpenInBrowserThread") {
+			@Override
+			public void run() {
+				final KeyParser.ParseResult result = new KeyParser.ParseResult();
+				int openedTabs = 0;
+				int remainingItems = items.size();
+				for( String key : items ) {
+					try {
+						--remainingItems;
+
+						// the input keys are the raw text, so first we must parse a clean, validated key
+						// NOTE: we DO want Freesite keys, so the 2nd argument is true
+						KeyParser.parseKeyFromLine(key, true, result);
+						if( result.key == null ) { continue; } // skip invalid key
+
+						// now determine which key to use. if this is a Freesite, we must remove/strip everything
+						// after the # symbol (anchor), since Freenet will think "index.html#home" is the key
+						// if we encode "#" as part of the filename, which leads to "Not in archive" errors.
+						// but if it's a file, we DO keep the # symbols (and encode them), i.e. "foo#1.jpg".
+						if( FreenetKeys.isFreesiteKey(result.key) ) {
+							// freesite; strip everything after the first # if one exists
+							final int pos = result.key.indexOf('#');
+							if( pos >= 0 ) {
+								key = result.key.substring(0, pos); // end-offset is non-inclusive
+							} else {
+								key = result.key;
+							}
+						} else {
+							// regular file; use whole filename
+							key = result.key;
+						}
+
+						// now build the web URL
+						final URI browserURI = new URI(browserAddress);
+						final URI uri = new URI(
+								browserURI.getScheme(), // scheme: http
+								browserURI.getAuthority(), // host: 127.0.0.1:8888 (the authority is the host + optionally port and user:pass@, if specified)
+								"/" + key, // path: "/CHK@..." (spaces and special chars become raw-urlencoded)
+								null, // query (this would use form-urlencoding (spaces become +), which is why we don't use it)
+								null); // fragment
+						DesktopUtils.browse(uri);
+						++openedTabs;
+
+						if( remainingItems > 0 ) {
+							// pause 500ms after every tab (that's 2 tabs per second), since each tab
+							// spawns another process on the system and can overwhelm/deadlock certain
+							// browsers like Firefox if we don't give it time to breathe.
+							Mixed.wait(500);
+						}
+					} catch (URISyntaxException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		}.start();
 	}
 
     private class PopupMenuTofText extends JSkinnablePopupMenu implements ActionListener, LanguageListener {
@@ -1220,7 +1259,8 @@ public class MessageTextPane extends JPanel {
                 saveMessageButton_actionPerformed();
                 
             } else if (e.getSource() == copyItem) {
-            	final String text = sourceTextComponent.getSelectedText();
+                // copy selected text
+                final String text = sourceTextComponent.getSelectedText();
                 CopyToClipboard.copyText(text);
                 
             } else if(e.getSource() == downloadKeys ) {

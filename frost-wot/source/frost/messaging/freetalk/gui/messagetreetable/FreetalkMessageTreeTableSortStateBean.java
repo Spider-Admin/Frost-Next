@@ -21,6 +21,7 @@ package frost.messaging.freetalk.gui.messagetreetable;
 import java.util.*;
 
 import frost.messaging.freetalk.*;
+import frost.util.Mixed;
 
 public class FreetalkMessageTreeTableSortStateBean {
 
@@ -63,30 +64,31 @@ public class FreetalkMessageTreeTableSortStateBean {
         }
     }
 
-    // sorting for flat view
-    private static FlaggedComparator flaggedComparatorAscending = new FlaggedComparator(true);
-    private static FlaggedComparator flaggedComparatorDescending = new FlaggedComparator(false);
+    // sorting for flat (non-threaded) view
+    // NOTE: the date comparator is public so that the message objects can use it to sort their insert points in the model
+    private static MessageColumnComparator flaggedComparatorAscending = new MessageColumnComparator(MessageColumnComparator.Type.FLAGGED, true);
+    private static MessageColumnComparator flaggedComparatorDescending = new MessageColumnComparator(MessageColumnComparator.Type.FLAGGED, false);
 
-    private static StarredComparator starredComparatorAscending = new StarredComparator(true);
-    private static StarredComparator starredComparatorDescending = new StarredComparator(false);
+    private static MessageColumnComparator starredComparatorAscending = new MessageColumnComparator(MessageColumnComparator.Type.STARRED, true);
+    private static MessageColumnComparator starredComparatorDescending = new MessageColumnComparator(MessageColumnComparator.Type.STARRED, false);
 
-    private static JunkComparator junkComparatorAscending = new JunkComparator(true);
-    private static JunkComparator junkComparatorDescending = new JunkComparator(false);
+    private static MessageColumnComparator subjectComparatorAscending = new MessageColumnComparator(MessageColumnComparator.Type.SUBJECT, true);
+    private static MessageColumnComparator subjectComparatorDescending = new MessageColumnComparator(MessageColumnComparator.Type.SUBJECT, false);
 
-    private static SubjectComparator subjectComparatorAscending = new SubjectComparator(true);
-    private static SubjectComparator subjectComparatorDescending = new SubjectComparator(false);
+    private static MessageColumnComparator fromComparatorAscending = new MessageColumnComparator(MessageColumnComparator.Type.FROM, true);
+    private static MessageColumnComparator fromComparatorDescending = new MessageColumnComparator(MessageColumnComparator.Type.FROM, false);
 
-    private static FromComparator fromComparatorAscending = new FromComparator(true);
-    private static FromComparator fromComparatorDescending = new FromComparator(false);
+    private static MessageColumnComparator trustStateComparatorAscending = new MessageColumnComparator(MessageColumnComparator.Type.TRUSTSTATE, true);
+    private static MessageColumnComparator trustStateComparatorDescending = new MessageColumnComparator(MessageColumnComparator.Type.TRUSTSTATE, false);
 
-    private static TrustStateComparator trustStateComparatorAscending = new TrustStateComparator(true);
-    private static TrustStateComparator trustStateComparatorDescending = new TrustStateComparator(false);
+    public static MessageColumnComparator dateComparatorAscending = new MessageColumnComparator(MessageColumnComparator.Type.DATE, true);
+    public static MessageColumnComparator dateComparatorDescending = new MessageColumnComparator(MessageColumnComparator.Type.DATE, false);
 
-    public static DateComparator dateComparatorAscending = new DateComparator(true);
-    public static DateComparator dateComparatorDescending = new DateComparator(false);
+    private static MessageColumnComparator junkComparatorAscending = new MessageColumnComparator(MessageColumnComparator.Type.JUNK, true);
+    private static MessageColumnComparator junkComparatorDescending = new MessageColumnComparator(MessageColumnComparator.Type.JUNK, false);
 
-    public static IndexComparator indexComparatorAscending = new IndexComparator(true);
-    public static IndexComparator indexComparatorDescending = new IndexComparator(false);
+    private static MessageColumnComparator indexComparatorAscending = new MessageColumnComparator(MessageColumnComparator.Type.INDEX, true);
+    private static MessageColumnComparator indexComparatorDescending = new MessageColumnComparator(MessageColumnComparator.Type.INDEX, false);
 
     @SuppressWarnings("unchecked")
     private static Comparator<FreetalkMessage>[] ascendingComparators = new Comparator[] {
@@ -94,10 +96,10 @@ public class FreetalkMessageTreeTableSortStateBean {
         starredComparatorAscending,
         subjectComparatorAscending,
         fromComparatorAscending,
-        indexComparatorAscending,
-        junkComparatorAscending,
         trustStateComparatorAscending,
-        dateComparatorAscending
+        dateComparatorAscending,
+        junkComparatorAscending,
+        indexComparatorAscending
     };
     @SuppressWarnings("unchecked")
     private static Comparator<FreetalkMessage>[] descendingComparators = new Comparator[] {
@@ -105,265 +107,150 @@ public class FreetalkMessageTreeTableSortStateBean {
         starredComparatorDescending,
         subjectComparatorDescending,
         fromComparatorDescending,
-        indexComparatorDescending,
-        junkComparatorDescending,
         trustStateComparatorDescending,
-        dateComparatorDescending
+        dateComparatorDescending,
+        junkComparatorDescending,
+        indexComparatorDescending
+    };
+    // defines whether a column defaults to ascending (true) or descending (false) when clicked
+    public static boolean[] columnDefaultAscendingStates = new boolean[] {
+        false, //flagged (all boolean columns must use descending to show booleans at top)
+        false, //starred (boolean)
+        true, //subject
+        true, //from
+        true, //trustState
+        false, //date (always sort the newest dates at the top by default)
+        false, //junk (boolean)
+        true, //index
     };
 
-    private static class DateComparator implements Comparator<FreetalkMessage> {
-        private int retvalGreater;
-        private int retvalSmaller;
-        public DateComparator(final boolean ascending) {
-            if( ascending ) {
-                // oldest first
-                retvalGreater = +1;
-                retvalSmaller = -1;
-            } else {
-                // newest first
-                retvalGreater = -1;
-                retvalSmaller = +1;
-            }
-        }
-        public int compare(final FreetalkMessage t1, final FreetalkMessage t2) {
-            final long l1 = t1.getDateMillis();
-            final long l2 = t2.getDateMillis();
-            if( l1 > l2 ) {
-                return retvalGreater;
-            }
-            if( l1 < l2 ) {
-                return retvalSmaller;
-            }
-            return 0;
-        }
-    }
+    private static class MessageColumnComparator
+            implements Comparator<FreetalkMessage>
+    {
+        public static enum Type {
+            // "String"-based columns
+            SUBJECT(0), FROM(0), TRUSTSTATE(0),
+            // "boolean"-based columns
+            FLAGGED(1), STARRED(1), JUNK(1),
+            // "long"-based columns
+            DATE(2),
+            // "int"-based columns
+            INDEX(3);
 
-    private static class SubjectComparator implements Comparator<FreetalkMessage> {
-        private int retvalGreater;
-        private int retvalSmaller;
-        public SubjectComparator(final boolean ascending) {
-            if( ascending ) {
-                // oldest first
-                retvalGreater = +1;
-                retvalSmaller = -1;
-            } else {
-                // newest first
-                retvalGreater = -1;
-                retvalSmaller = +1;
+            private final int fObjType;
+            Type(int aObjType)
+            {
+                fObjType = aObjType;
             }
-        }
-        public int compare(final FreetalkMessage t1, final FreetalkMessage t2) {
-            final String s1 = t1.getTitle();
-            final String s2 = t2.getTitle();
-            if( s1 == null && s2 == null ) {
-                return 0;
-            }
-            if( s1 == null && s2 != null ) {
-                return -1;
-            }
-            if( s1 != null && s2 == null ) {
-                return 1;
-            }
-            final int r = s1.toLowerCase().compareTo(s2.toLowerCase());
-            if( r == 0 ) {
-                return r;
-            }
-            if( r > 0 ) {
-                return retvalGreater;
-            } else {
-                return retvalSmaller;
-            }
-        }
-    }
 
-    private static class FromComparator implements Comparator<FreetalkMessage> {
-        private int retvalGreater;
-        private int retvalSmaller;
-        public FromComparator(final boolean ascending) {
-            if( ascending ) {
-                // oldest first
-                retvalGreater = +1;
-                retvalSmaller = -1;
-            } else {
-                // newest first
-                retvalGreater = -1;
-                retvalSmaller = +1;
+            /**
+             * 0 = String, 1 = boolean, 2 = long, 3 = int
+             */
+            public int getObjType()
+            {
+                return fObjType;
             }
         }
-        public int compare(final FreetalkMessage t1, final FreetalkMessage t2) {
-            final String s1 = t1.getAuthor();
-            final String s2 = t2.getAuthor();
-            if( s1 == null && s2 == null ) {
-                return 0;
-            }
-            if( s1 == null && s2 != null ) {
-                return -1;
-            }
-            if( s1 != null && s2 == null ) {
-                return 1;
-            }
-            final int r = s1.compareTo(s2);
-            if( r == 0 ) {
-                return r;
-            }
-            if( r > 0 ) {
-                return retvalGreater;
-            } else {
-                return retvalSmaller;
-            }
-        }
-    }
 
-    private static class TrustStateComparator implements Comparator<FreetalkMessage> {
-        private int retvalGreater;
-        private int retvalSmaller;
-        public TrustStateComparator(final boolean ascending) {
-            if( ascending ) {
-                // oldest first
-                retvalGreater = +1;
-                retvalSmaller = -1;
-            } else {
-                // newest first
-                retvalGreater = -1;
-                retvalSmaller = +1;
-            }
-        }
-        public int compare(final FreetalkMessage t1, final FreetalkMessage t2) {
-            return 0;
-//            final String s1 = t1.getMessageStatusString();
-//            final String s2 = t2.getMessageStatusString();
-//            if( s1 == null && s2 == null ) {
-//                return 0;
-//            }
-//            if( s1 == null && s2 != null ) {
-//                return -1;
-//            }
-//            if( s1 != null && s2 == null ) {
-//                return 1;
-//            }
-//            final int r = s1.compareTo(s2);
-//            if( r == 0 ) {
-//                return r;
-//            }
-//            if( r > 0 ) {
-//                return retvalGreater;
-//            } else {
-//                return retvalSmaller;
-//            }
-        }
-    }
+        /* Instance variables */
+        private Type fType;
+        private boolean fAscending;
 
-    private static class FlaggedComparator implements Comparator<FreetalkMessage> {
-        private int retvalGreater;
-        private int retvalSmaller;
-        public FlaggedComparator(final boolean ascending) {
-            if( ascending ) {
-                // oldest first
-                retvalGreater = +1;
-                retvalSmaller = -1;
-            } else {
-                // newest first
-                retvalGreater = -1;
-                retvalSmaller = +1;
-            }
+        /**
+         * @param {Type} aType - the type of comparator column
+         * @param {boolean} aAscending - set to false if you want descending order instead
+         */
+        public MessageColumnComparator(
+                final Type aType,
+                final boolean aAscending)
+        {
+            fType = aType;
+            fAscending = aAscending;
         }
-        public int compare(final FreetalkMessage t1, final FreetalkMessage t2) {
-            return 0;
-//            final boolean s1 = t1.isFlagged();
-//            final boolean s2 = t2.isFlagged();
-//            if( s1 == s2 ) {
-//                return 0;
-//            }
-//            if( s1 == true ) {
-//                return retvalGreater;
-//            } else {
-//                return retvalSmaller;
-//            }
-        }
-    }
 
-    private static class StarredComparator implements Comparator<FreetalkMessage> {
-        private int retvalGreater;
-        private int retvalSmaller;
-        public StarredComparator(final boolean ascending) {
-            if( ascending ) {
-                // oldest first
-                retvalGreater = +1;
-                retvalSmaller = -1;
-            } else {
-                // newest first
-                retvalGreater = -1;
-                retvalSmaller = +1;
-            }
-        }
-        public int compare(final FreetalkMessage t1, final FreetalkMessage t2) {
-            return 0;
-//            final boolean s1 = t1.isStarred();
-//            final boolean s2 = t2.isStarred();
-//            if( s1 == s2 ) {
-//                return 0;
-//            }
-//            if( s1 == true ) {
-//                return retvalGreater;
-//            } else {
-//                return retvalSmaller;
-//            }
-        }
-    }
+        /**
+         * Compares two message objects.
+         */
+        public int compare(
+                final FreetalkMessage msg1,
+                final FreetalkMessage msg2)
+        {
+            int result = 0; // init to "both items are equal"
 
-    private static class IndexComparator implements Comparator<FreetalkMessage> {
-        private int retvalGreater;
-        private int retvalSmaller;
-        public IndexComparator(final boolean ascending) {
-            if( ascending ) {
-                // oldest first
-                retvalGreater = +1;
-                retvalSmaller = -1;
-            } else {
-                // newest first
-                retvalGreater = -1;
-                retvalSmaller = +1;
+            // compare the messages using the desired column
+            switch( fType.getObjType() ) {
+                case 0: // "String"
+                    // load the column-appropriate String values
+                    String s1 = null, s2 = null;
+                    switch( fType ) {
+                        case SUBJECT:
+                            s1 = msg1.getTitle(); s2 = msg2.getTitle();
+                            // when comparing subjects, we ignore the "Re: " prefix
+                            if( s1 != null && s1.indexOf("Re: ") == 0 ) { s1 = s1.substring(4); }
+                            if( s2 != null && s2.indexOf("Re: ") == 0 ) { s2 = s2.substring(4); }
+                            break;
+                        case FROM:
+                            s1 = msg1.getAuthor(); s2 = msg2.getAuthor();
+                            break;
+                        case TRUSTSTATE: // Signature
+                            return 0;
+                            /* COMMENTED OUT: FREETALK MESSAGES DO NOT HAVE TRUST STATE STRINGS
+                            s1 = msg1.getMessageStatusString(); s2 = msg2.getMessageStatusString();
+                            break;
+                            */
+                    }
+                    // perform a case-insensitive String comparison with null-support
+                    result = Mixed.compareStringWithNullSupport(s1, s2, /*ignoreCase=*/true);
+                    break;
+                case 1: // "boolean"
+                    return 0;
+                    /* COMMENTED OUT: FREETALK MESSAGES DO NOT HAVE FLAGGED/STARRED/JUNK STATES
+                    // load the column-appropriate boolean values
+                    boolean b1 = false, b2 = false;
+                    switch( fType ) {
+                        case FLAGGED:
+                            b1 = msg1.isFlagged(); b2 = msg2.isFlagged();
+                            break;
+                        case STARRED:
+                            b1 = msg1.isStarred(); b2 = msg2.isStarred();
+                            break;
+                        case JUNK:
+                            b1 = msg1.isJunk(); b2 = msg2.isJunk();
+                            break;
+                    }
+                    result = Mixed.compareBool(b1, b2);
+                    break;
+                    */
+                case 2: // "long"
+                    // load the column-appropriate long values
+                    long l1 = 0L, l2 = 0L;
+                    switch( fType ) {
+                        case DATE:
+                            l1 = msg1.getDateMillis(); l2 = msg2.getDateMillis();
+                            break;
+                    }
+                    result = Mixed.compareLong(l1, l2);
+                    break;
+                case 3: // "int"
+                    // load the column-appropriate int values
+                    int i1 = 0, i2 = 0;
+                    switch( fType ) {
+                        case INDEX:
+                            i1 = msg1.getMsgIndex(); i2 = msg2.getMsgIndex();
+                            break;
+                    }
+                    result = Mixed.compareInt(i1, i2);
+                    break;
             }
-        }
-        public int compare(final FreetalkMessage t1, final FreetalkMessage t2) {
-            final int s1 = t1.getMsgIndex();
-            final int s2 = t2.getMsgIndex();
-            if( s1 == s2 ) {
-                return 0;
-            } else if( s1 > s2 ) {
-                return retvalGreater;
-            } else {
-                return retvalSmaller;
-            }
-        }
-    }
 
-    private static class JunkComparator implements Comparator<FreetalkMessage> {
-        private int retvalGreater;
-        private int retvalSmaller;
-        public JunkComparator(final boolean ascending) {
-            if( ascending ) {
-                // oldest first
-                retvalGreater = +1;
-                retvalSmaller = -1;
+            // if the values are equal and this isn't the "Date" column, then use Date as tie-breaker
+            if( result == 0 && fType != Type.DATE ) {
+                // compare by Date using always-ascending order (by not inverting it)
+                return Mixed.compareLong(msg1.getDateMillis(), msg2.getDateMillis());
             } else {
-                // newest first
-                retvalGreater = -1;
-                retvalSmaller = +1;
+                // if they want a reverse/descending sort, we'll invert the result
+                return ( fAscending ? result : -result );
             }
-        }
-        public int compare(final FreetalkMessage t1, final FreetalkMessage t2) {
-            return 0;
-//            final boolean s1 = t1.isJunk();
-//            final boolean s2 = t2.isJunk();
-//            if( s1 == s2 ) {
-//                return 0;
-//            }
-//            if( s1 == true ) {
-//                return retvalGreater;
-//            } else {
-//                return retvalSmaller;
-//            }
         }
     }
 }

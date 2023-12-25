@@ -42,6 +42,8 @@ import java.awt.*;
 import java.awt.event.*;
 import java.beans.*;
 import java.util.*;
+import java.util.HashSet;
+import java.util.Set;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -53,7 +55,10 @@ import javax.swing.tree.*;
 import frost.*;
 import frost.fileTransfer.common.*;
 import frost.messaging.freetalk.*;
+import frost.util.Mixed;
 import frost.util.gui.*;
+import frost.util.gui.IconGenerator;
+import frost.util.gui.TrustStateColors;
 
 /**
  * This example shows how to create a simple JTreeTable component,
@@ -72,6 +77,8 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
 
     /** A subclass of JTree. */
     protected TreeTableCellRenderer tree;
+    /** A JTable model "adapter" which links the JTable to the JTree's model. */
+    protected final FreetalkTreeTableModelAdapter model;
 
     protected Border borderUnreadAndMarkedMsgsInThread = BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(0, 2, 0, 0, Color.blue),    // outside
@@ -87,9 +94,10 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
     private final StringCellRenderer stringCellRenderer = new StringCellRenderer();
     private final BooleanCellRenderer booleanCellRenderer = new BooleanCellRenderer();
 
-    private final ImageIcon flaggedIcon = MiscToolkit.loadImageIcon("/data/flagged.gif");
-    private final ImageIcon starredIcon = MiscToolkit.loadImageIcon("/data/starred.gif");
-    private final ImageIcon junkIcon    = MiscToolkit.loadImageIcon("/data/junk.gif");
+    private final ImageIcon flaggedIcon    = MiscToolkit.loadImageIcon("/data/flag.png");
+    private final ImageIcon starredIcon    = MiscToolkit.loadImageIcon("/data/star.png");
+    private final ImageIcon junkIcon       = MiscToolkit.loadImageIcon("/data/junk.png");
+//    private final ImageIcon junkFadedIcon  = MiscToolkit.loadImageIcon("/data/junk_faded.png");
 
     private final ImageIcon messageNewIcon = MiscToolkit.loadImageIcon("/data/messagenewicon.gif");
     private final ImageIcon messageDummyIcon = MiscToolkit.loadImageIcon("/data/messagedummyicon.gif");
@@ -103,18 +111,27 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
     private boolean showColoredLines;
     private boolean indicateLowReceivedMessages;
     private int indicateLowReceivedMessagesCountRed;
-    private int indicateLowReceivedMessagesCountLightRed;
+    private int indicateLowReceivedMessagesCountBlue;
+
+    private Color fMsgNormalColor;
+    private Color fMsgPrivColor;
+    private Color fMsgWithAttachmentsColor;
+    private Color fMsgUnsignedColor;
 
     private final int MINIMUM_ROW_HEIGHT = 20;
     private final int ROW_HEIGHT_MARGIN = 4;
 
+    private Set<Integer> fixedsizeColumns; // in "all columns" index space, default model ordering
+
     public FreetalkMessageTreeTable(final FreetalkTreeTableModel treeTableModel) {
     	super();
+
+        updateMessageColors();
 
         showColoredLines = Core.frostSettings.getBoolValue(SettingsClass.SHOW_COLORED_ROWS);
         indicateLowReceivedMessages = Core.frostSettings.getBoolValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES);
         indicateLowReceivedMessagesCountRed = Core.frostSettings.getIntValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_RED);
-        indicateLowReceivedMessagesCountLightRed = Core.frostSettings.getIntValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_LIGHTRED);
+        indicateLowReceivedMessagesCountBlue = Core.frostSettings.getIntValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_BLUE);
 
         Core.frostSettings.addPropertyChangeListener(SettingsClass.SHOW_COLORED_ROWS, this);
         Core.frostSettings.addPropertyChangeListener(SettingsClass.MESSAGE_LIST_FONT_NAME, this);
@@ -122,13 +139,16 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
         Core.frostSettings.addPropertyChangeListener(SettingsClass.MESSAGE_LIST_FONT_STYLE, this);
         Core.frostSettings.addPropertyChangeListener(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES, this);
         Core.frostSettings.addPropertyChangeListener(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_RED, this);
-        Core.frostSettings.addPropertyChangeListener(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_LIGHTRED, this);
+        Core.frostSettings.addPropertyChangeListener(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_BLUE, this);
+        Core.frostSettings.addPropertyChangeListener(SettingsClass.TREE_EXPANSION_ICON, this);
+        MainFrame.getInstance().getMessageColorManager().addPropertyChangeListener(this);
 
     	// Creates the tree. It will be used as a renderer and editor.
     	tree = new TreeTableCellRenderer(treeTableModel);
 
-    	// Installs a tableModel representing the visible rows in the tree.
-    	super.setModel(new FreetalkTreeTableModelAdapter(treeTableModel, tree, this));
+        // Installs a tableModel representing the visible rows in the tree.
+        model = new FreetalkTreeTableModelAdapter(treeTableModel, tree, this);
+        super.setModel(model);
 
     	// Forces the JTable and JTree to share their row selection models.
     	final ListToTreeSelectionModelWrapper selectionWrapper = new ListToTreeSelectionModelWrapper();
@@ -138,17 +158,72 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
         tree.setRootVisible(false);
         tree.setShowsRootHandles(true);
 
-    	// Installs the tree editor renderer and editor.
-    	setDefaultRenderer(FreetalkTreeTableModel.class, tree);
-    	setDefaultEditor(FreetalkTreeTableModel.class, new TreeTableCellEditor());
+        // installs the tree editor renderer and editor.
+        // NOTE: These use a custom class and will therefore never be overridden by look&feel changes
+        setDefaultRenderer(FreetalkTreeTableModel.class, tree);
+        setDefaultEditor(FreetalkTreeTableModel.class, new TreeTableCellEditor());
 
-        // install cell renderer
+        // install table header renderer
+        // NOTE: this one is not overridden by the l&f, and can only be set once or we get null pointers
+        final FreetalkMessageTreeTableHeader hdr = new FreetalkMessageTreeTableHeader(this);
+        setTableHeader(hdr);
+
+        // install all of the other custom component renderers and settings
+        setupTreeTableJTableUIStyle();
+
+        // NOTE: this tells the JTree that *all* tree rows will be identical height,
+        // and that it doesn't need to calculate (and cache) individual heights/widths,
+        // which makes tree rendering about 20% faster. just be aware that we MUST
+        // have used a "setRowHeight" of 1+ *before* this call, otherwise it's ignored.
+        // as luck would have it, the "setup JTable" call above sets the row height of
+        // both the tree and the table.
+        tree.setLargeModel(true);
+    }
+
+    // retrieves the user's custom messagetype colors
+    private void updateMessageColors()
+    {
+        fMsgNormalColor = MainFrame.getInstance().getMessageColorManager().getNormalColor();
+        fMsgPrivColor = MainFrame.getInstance().getMessageColorManager().getPrivColor();
+        fMsgWithAttachmentsColor = MainFrame.getInstance().getMessageColorManager().getWithAttachmentsColor();
+        fMsgUnsignedColor = MainFrame.getInstance().getMessageColorManager().getUnsignedColor();
+    }
+
+    private Color getMessageTypeColor(
+            final FreetalkMessage msg)
+    {
+        // paranoia
+        if( msg == null ) {
+            return fMsgNormalColor;
+        }
+        // color priority: private message > has attachments > unsigned/anonymous
+        // NOTE: Freetalk mode has no private messages, so this is commented out
+//        if( msg.getRecipientName() != null && msg.getRecipientName().length() > 0 ) {
+//            return fMsgPrivColor;
+        if( msg.getFileAttachments() != null ) {
+            return fMsgWithAttachmentsColor;
+        // NOTE: Freetalk mode has no anonymous (unsigned) messages, so this is commented out
+//        } else if( !msg.isSignatureStatusVERIFIED() ) {
+//            return fMsgUnsignedColor;
+        } else {
+            return fMsgNormalColor;
+        }
+    }
+
+    // only to be called by constructor, and updateUI (when look&feel changes).
+    // we *must* call this from updateUI when the L&F changes, since the change of skin will unbind our custom
+    // renderers if the skin provides ones for those object types (such as Boolean.class, very commonly)
+    private void setupTreeTableJTableUIStyle() {
+        // the renderers will be null if called from updateUI during app startup before GUI has been fully built
+        if( stringCellRenderer == null ) { return; }
+
+        // install custom cell renderers for common column types
+        // NOTE: if we don't re-apply these here, the l&f change will override Boolean.class with
+        // a regular checkbox style instead of our nice, custom starred/flagged/junk icon columns.
         setDefaultRenderer(String.class, stringCellRenderer);
         setDefaultRenderer(Boolean.class, booleanCellRenderer);
 
-        // install table header renderer
-        final FreetalkMessageTreeTableHeader hdr = new FreetalkMessageTreeTableHeader(this);
-        setTableHeader(hdr);
+        // the rest of these properties are re-applied just in case the l&f *may* affect them
 
     	// No grid.
     	setShowGrid(false);
@@ -191,18 +266,13 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
     // If expand is true, expands all nodes in the tree.
     // Otherwise, collapses all nodes in the tree.
     public void expandAll(final boolean expand) {
-        final TreeNode root = (TreeNode)tree.getModel().getRoot();
-        if( SwingUtilities.isEventDispatchThread() ) {
-            // Traverse tree from root
-            expandAll(new TreePath(root), expand);
-        } else {
-            SwingUtilities.invokeLater(new Runnable() {
-                public void run() {
-                    // Traverse tree from root
-                    expandAll(new TreePath(root), expand);
-                }
-            });
-        }
+        Mixed.invokeNowOrLaterInDispatchThread(new Runnable() {
+            public void run() {
+                // Traverse tree from root
+                final TreeNode root = (TreeNode)tree.getModel().getRoot();
+                expandAll(new TreePath(root), expand);
+            }
+        });
     }
 
     public void expandThread(final boolean expand, final FreetalkMessage msg) {
@@ -214,56 +284,100 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
 //        if( threadRootMsg == null ) {
 //            return;
 //        }
-//        if( SwingUtilities.isEventDispatchThread() ) {
-//            expandAll(new TreePath(threadRootMsg.getPath()), expand);
-//        } else {
-//            SwingUtilities.invokeLater(new Runnable() {
-//                public void run() {
-//                    expandAll(new TreePath(threadRootMsg.getPath()), expand);
-//                }
-//            });
-//        }
+//        Mixed.invokeNowOrLaterInDispatchThread(new Runnable() {
+//            public void run() {
+//                expandAll(new TreePath(threadRootMsg.getPath()), expand);
+//            }
+//        });
     }
 
+    /*
+     * EXPLANATION:
+     * See source/frost/messaging/frost/gui/messagetreetable/MessageTreeTable.java for full
+     * explanation of what this speed-trick does!
+     */
+    public void beforeBigChange() {
+        model.removeListener();
+        tree.setUI(null);
+    }
+    public void afterBigChange() {
+        tree.setupTreeTableJTreeUIStyle();
+        model.addListener();
+        model.fireTableDataChanged();
+    }
+
+    /**
+     * Used when loading boards (expands all messages by default), and when using the "expand all"
+     * and "collapse all" right-click menu items. It's an extremely slow action, so we fix that by
+     * using the GUI performance trick before and after any change that affects all nodes.
+     */
     private void expandAll(final TreePath parent, boolean expand) {
-        // Traverse children
+        // determine which node we're affecting and if it's the root or not
         final TreeNode node = (TreeNode)parent.getLastPathComponent();
-        if (node.getChildCount() >= 0) {
-            for (final Enumeration e=node.children(); e.hasMoreElements(); ) {
-                final TreeNode n = (TreeNode)e.nextElement();
-                final TreePath path = parent.pathByAddingChild(n);
-                expandAll(path, expand);
-            }
-        }
+        if( node == null ) { return; }
+        final boolean isRootNode = (node.getParent() == null); // NOTE: dummies are not nulls, only root is null
 
-        // Expansion or collapse must be done bottom-up
-        // never collapse the invisible rootnode!
-        if( node.getParent() == null ) {
-            expand = true;
-        }
-
-        if (expand) {
-            if( !tree.isExpanded(parent) ) {
-                tree.expandPath(parent);
+        try {
+            // if this is a heavy change (collapse/expand all nodes under root), then we must
+            // now use the performance trick to avoid taking an INSANE amount of time to load
+            // the board/change the expansion state. this affects all board loads (threaded mode
+            // expands all messages by default). and it also affects the "expand/collapse all"
+            // right-click menu items in boards.
+            if( isRootNode ) {
+                beforeBigChange();
             }
-        } else {
-            if( !tree.isCollapsed(parent) ) {
-                tree.collapsePath(parent);
+
+            // traverse all children and expand them
+            if( node.getChildCount() >= 0 ) {
+                final Enumeration textNodeEnumeration = node.children();
+                while( textNodeEnumeration.hasMoreElements() ) {
+                    expandAll(parent.pathByAddingChild(  ((TreeNode)textNodeEnumeration.nextElement())  ), expand);
+                }
+            }
+
+            // never collapse the invisible rootnode itself!
+            if( isRootNode ) {
+                expand = true;
+            }
+
+            // Expansion or collapse is done bottom-up
+            // When expanding, we expand the parent last
+            // When collapsing, we collapse the parent last
+            // However, Java itself doesn't care what order we do the expansion and fires
+            // treeExpanded events in a top-down fashion and opens them top-down, so even
+            // if we've requested it to open a child first, the child will be opened after
+            // its parents. Just be aware of that.
+            if( expand ) {
+                if( !tree.isExpanded(parent) ) {
+                    tree.expandPath(parent);
+                }
+            } else {
+                if( !tree.isCollapsed(parent) ) {
+                    tree.collapsePath(parent);
+                }
+            }
+        } finally {
+            // restore GUI after big changes to root
+            if( isRootNode ) {
+                afterBigChange();
             }
         }
     }
 
     public void expandNode(final DefaultMutableTreeNode n) {
-        if( SwingUtilities.isEventDispatchThread() ) {
-            expandAll(new TreePath(n.getPath()), true);
-        } else {
-            SwingUtilities.invokeLater(new Runnable() {
-                public void run() {
-                    expandAll(new TreePath(n.getPath()), true);
-                }
-            });
-        }
+        Mixed.invokeNowOrLaterInDispatchThread(new Runnable() {
+            public void run() {
+                expandAll(new TreePath(n.getPath()), true);
+            }
+        });
     }
+
+    /**
+     * TODO: There is no "go to message" function implemented here for Freetalk messages,
+     * because nobody uses Freetalk. But look at "setSelectedMessage" in
+     * "source/frost/messaging/frost/gui/messagetreetable/MessageTreeTable.java"
+     * if you ever feel like implementing that for the dead Freetalk protocol too.
+     */
 
     /**
      * Overridden to message super and forward the method to the tree.
@@ -272,15 +386,21 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
      */
     @Override
     public void updateUI() {
-    	super.updateUI();
-    	if(tree != null) {
-    	    tree.updateUI();
-    	    // Do this so that the editor is referencing the current renderer
-    	    // from the tree. The renderer can potentially change each time laf changes.
-    	    // setDefaultEditor(TreeTableModel.class, new TreeTableCellEditor());
-    	}
-	    // Use the tree's default foreground and background colors in the table.
+        super.updateUI();
+        if(tree != null) {
+            // sets the JTree to the current look&feel (basically calls setUI and replaces our current UI)
+            tree.updateUI();
+            // modifies the JTree look&feel UI to get the smart background-color renderer and indentation
+            tree.setupTreeTableJTreeUIStyle();
+
+            // Do this so that the editor is referencing the current renderer
+            // from the tree. The renderer can potentially change each time laf changes.
+            // setDefaultEditor(TreeTableModel.class, new TreeTableCellEditor());
+        }
+        // Use the tree's default foreground and background colors in the table.
         LookAndFeel.installColorsAndFont(this, "Tree.background", "Tree.foreground", "Tree.font");
+        // modify the JTable cell renderers and other properties to preserve our custom renderers and editors
+        FreetalkMessageTreeTable.this.setupTreeTableJTableUIStyle();
     }
 
     /**
@@ -340,12 +460,20 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
         return tree;
     }
 
+    // NOTE: the root node has been made invisible via "tree.setRootVisible(false)", so if you try to query
+    // the root node, we'll forcibly return 0 here (even though it's not actually shown on screen).
+    // all other nodes return their proper display-index; so the first child of root would be "0", etc
+    // if this returns -1, it means that one or more of the parents of the given node are collapsed.
     public int getRowForNode(final DefaultMutableTreeNode n) {
         if(n.isRoot()) {
             return 0;
         }
         final TreePath tp = new TreePath(n.getPath());
         return tree.getRowForPath(tp);
+    }
+
+    public boolean isExpanded(final TreePath path) {
+        return tree.isExpanded(path);
     }
 
     /**
@@ -376,22 +504,180 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
 
         private String toolTipText = null;
 
-    	public TreeTableCellRenderer(final TreeModel model) {
-    	    super(model);
+        public TreeTableCellRenderer(final TreeModel model) {
+            super(model);
+            // disable the "double-click to expand/collapse" to avoid annoyance
+            TreeTableCellRenderer.this.setToggleClickCount(0);
+
+            // modifies the look&feel UI to get the smart background-color renderer and indentation
+            setupTreeTableJTreeUIStyle();
+        }
+
+        // only to be called by constructor, and updateUI (when look&feel changes)
+        // we *must* call this when the L&F changes, since the change of skin unbinds our custom renderers
+        public void setupTreeTableJTreeUIStyle() {
             final Font baseFont = FreetalkMessageTreeTable.this.getFont();
             normalFont = baseFont.deriveFont(Font.PLAIN);
             boldFont = baseFont.deriveFont(Font.BOLD);
 
-            setCellRenderer(new OwnTreeCellRenderer());
+            // modifies the current look&feel UI to render row backgrounds properly
+            // NOTE: we always create a new GUI (and cell renderer) since the old one can have outdated layout caches
+            setUI(new NiceTreeUI());
 
-            if( getUI() instanceof BasicTreeUI ) {
-                final BasicTreeUI treeUI = (BasicTreeUI)getUI();
+            // changes the amount of JTree indentation used by each look&feel to a uniform value
+            if( getUI() instanceof NiceTreeUI ) {
+                final NiceTreeUI treeUI = (NiceTreeUI)getUI();
 //                System.out.println("1:"+treeUI.getLeftChildIndent()); // default 7
 //                System.out.println("2:"+treeUI.getRightChildIndent());// default 13
                 treeUI.setLeftChildIndent(6);
                 treeUI.setRightChildIndent(10);
             }
-    	}
+
+            // custom cell renderer draws a line through deleted posts
+            setCellRenderer(new OwnTreeCellRenderer());
+        }
+
+        /**
+         * Updates the expansion icon via the GUI thread whenever the property changes.
+         */
+        public void updateExpansionIcon() {
+            SwingUtilities.invokeLater(new Runnable() {
+                public void run() {
+                    if( !(tree.getUI() instanceof NiceTreeUI) ) { return; }
+                    final NiceTreeUI treeUI = (NiceTreeUI)tree.getUI();
+                    treeUI.updateExpansionIcon();
+                }
+            });
+        }
+
+        /**
+         * Properly renders the background color for the whole JTree row instead of just under the text label.
+         *
+         * This fixes all of the Look&Feels (such as the GTK/Ubuntu one) that otherwise look
+         * broken due to painting a white background over the tree component before painting
+         * its rows. So far I've only seen this affect the GTK/Ubuntu L&F, but it needed fixing.
+         *
+         * The reason this fix works is that the BasicTreeUI (unlike normal UIs) *never* renders
+         * any background, selection or foreground colors, so the tree itself actually has a
+         * transparent background. And since it sits on top of the JTable (in the TreeTable),
+         * it simply renders on top of the proper table row color. This is unlike the normal
+         * JTree L&F-UI, which in some L&Fs fills the background with white before rendering
+         * its own rows. This switch to a BasicTreeUI avoids the white-fill.
+         * NOTE: The only time a BasicTreeUI draws a background is during "drag and drop", when
+         * you drag a row and drop it somewhere else, in which case it draws a 2px tall background
+         * line which indicates the drop location. That's fine and won't interfere. :-)
+         *
+         * This "basic" TreeUI also lacks L&F-specific details like graphics for expansion handles
+         * unless the L&F has set the global UI defaults ("Tree.expandedIcon" etc), which means
+         * that we must implement the expansion icons ourselves to ensure that they're visible.
+         * That gave us a perfect opportunity to spice things up by *always* rendering our own,
+         * custom node-lines and expansion icons unique to Frost, for a unique, sexy look!
+         */
+        public class NiceTreeUI extends BasicTreeUI
+        {
+            private Icon treeNodeCollapsedIcon = null;
+            private Icon treeNodeExpandedIcon = null;
+
+            public NiceTreeUI()
+            {
+                super();
+                // install our custom colors and icons
+                this.setCustomLook();
+            }
+
+            @Override
+            public Icon getCollapsedIcon()
+            {
+                return this.treeNodeCollapsedIcon;
+            }
+
+            @Override
+            public Icon getExpandedIcon()
+            {
+                return this.treeNodeExpandedIcon;
+            }
+
+            @Override
+            protected void installDefaults()
+            {
+                // this is the function where the underlying BasicTreeUI's icons are set
+                // to the ones from the current L&F's defaults (via "Tree.expandedIcon", etc)
+                // so we simply set them here afterwards to thoroughly enforce the new icons,
+                // even though we've already overridden the getters (which is technically enough).
+                super.installDefaults();
+                if( treeNodeCollapsedIcon == null || treeNodeExpandedIcon == null ) {
+                    this.setCustomLook();
+                }
+                this.setCollapsedIcon(treeNodeCollapsedIcon);
+                this.setExpandedIcon(treeNodeExpandedIcon);
+            }
+
+            /**
+             * IMPORTANT: After the table has been created, we can ONLY call this from the GUI thread!
+             * Otherwise we risk nullpointer exceptions, since the GUI may be drawing the old icons.
+             */
+            private void setCustomLook()
+            {
+                // set all connecting node-lines to a light bluish color
+                // NOTE: almost every L&F draws the horizontal/vertical tree legs, but some
+                //   don't (notably Nimbus). there's nothing we can do about that without
+                //   totally re-implementing paint(), which is a huge task and not worth it.
+                // ALSO NOTE: we aren't overriding the "Tree.hash" global UI defaults,
+                //   since that would affect ALL trees.
+                final Color hashColor = new Color(184, 207, 229);
+                this.setHashColor(hashColor);
+
+                // determine what type of icon to use
+                final int iconType = getExpansionIconType();
+
+                // design the '+' and '-' icons and draw them in a slightly darker bluish gray
+                treeNodeCollapsedIcon = IconGenerator.generateTreeExpansionIcon(iconType, '+', Color.WHITE, hashColor.darker());
+                treeNodeExpandedIcon = IconGenerator.generateTreeExpansionIcon(iconType, '-', Color.WHITE, hashColor.darker());
+            }
+
+            /**
+             * Determines the integer value of the expansion icon type (falls back to 0 as default).
+             */
+            private int getExpansionIconType()
+            {
+                // parse the icon type from the setting-string (fall back to circles if invalid)
+                int iconType = 0;
+                String iconStr = Core.frostSettings.getValue(SettingsClass.TREE_EXPANSION_ICON);
+                if( iconStr != null ) {
+                    try {
+                        iconStr = iconStr.replace("Options.display.treeExpansionIcon.style", "");
+                        iconType = Integer.parseInt(iconStr, 10);
+                    } catch( final Exception e ) {
+                        iconType = 0;
+                    }
+                }
+                if( iconType < 0 || iconType > 3 ) {
+                    iconType = 0; // clamp invalid values back to 0
+                }
+                return iconType;
+            }
+
+            /**
+             * Does a live refresh of the table. Useful when the user is switching icon types.
+             */
+            public void updateExpansionIcon()
+            {
+                // if we're not running in the AWT GUI thread, then execute there instead so that we remain thread-safe.
+                Mixed.invokeNowInDispatchThread(new Runnable() {
+                    public void run() {
+                        // set the new icons and force the JTree and JTable to repaint
+                        // NOTE: validate marks ALL contents as invalid and lays it out again, paint refreshes.
+                        NiceTreeUI.this.setCustomLook();
+                        if( tree != null ) {
+                            tree.validate();
+                            tree.repaint();
+                            FreetalkMessageTreeTable.this.validate();
+                            FreetalkMessageTreeTable.this.repaint();
+                        }
+                    }
+                });
+            }
+        }
 
         public void fontChanged(final Font font) {
             normalFont = font.deriveFont(Font.PLAIN);
@@ -502,25 +788,18 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
     	    Color background;
     	    Color foreground;
 
-            final FreetalkTreeTableModelAdapter model = (FreetalkTreeTableModelAdapter)FreetalkMessageTreeTable.this.getModel();
-            final FreetalkMessage msg = (FreetalkMessage)model.getRow(row);
+            final FreetalkMessage msg = (FreetalkMessage)FreetalkMessageTreeTable.this.model.getRow(row); // NOTE: msg can be null in rare cases
 
             // first set font, bold for new msg or normal
-//            if (msg.isNew()) {
+//            if( msg != null && msg.isNew() ) {
 //                setFont(boldFont);
 //            } else {
 //                setFont(normalFont);
 //            }
 
-            // now set foreground color
-//            if( msg.getRecipientName() != null && msg.getRecipientName().length() > 0) {
-//                foreground = Color.RED;
-//            } else
-            if (msg.getFileAttachments() != null) {
-                foreground = Color.BLUE;
-            } else {
-                foreground = Color.BLACK;
-            }
+            // now set foreground color (used for the subject-JTree)
+            // NOTE: this is only applied if the item isn't currently selected
+            foreground = getMessageTypeColor(msg);
 
             if (!isSelected) {
                 final Color newBackground = TableBackgroundColors.getBackgroundColor(table, row, showColoredLines);
@@ -530,7 +809,7 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
                 foreground = table.getSelectionForeground();
             }
 
-//            setDeleted(msg.isDeleted());
+//            setDeleted( ( msg != null ? msg.isDeleted() : false ) );
 
     	    visibleRow = row;
     	    setBackground(background);
@@ -548,7 +827,7 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
         		}
 
                 dtcr.setBorder(null);
-//                if( ((FrostMessageObject)msg.getParent()).isRoot() ) {
+//                if( msg != null && ((FrostMessageObject)msg.getParent()).isRoot() ) {
 //                    final boolean[] hasUnreadOrMarked = msg.hasUnreadOrMarkedChilds();
 //                    final boolean hasUnread = hasUnreadOrMarked[0];
 //                    final boolean hasMarked = hasUnreadOrMarked[1];
@@ -568,7 +847,7 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
 //                }
 
                 final ImageIcon icon;
-//                if( msg.isDummy() ) {
+//                if( msg != null && msg.isDummy() ) {
 //                    icon = messageDummyIcon;
 //                    if( msg.getSubject() != null && msg.getSubject().length() > 0 ) {
 //                        setToolTipText(msg.getTitle());
@@ -576,20 +855,20 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
 //                        setToolTipText(null);
 //                    }
 //                } else {
-//                    if( msg.isNew() ) {
+//                    if( msg != null && msg.isNew() ) {
 //                        if( msg.isReplied() ) {
 //                            icon = messageNewRepliedIcon;
 //                        } else {
                             icon = messageNewIcon;
 //                        }
 //                    } else {
-//                        if( msg.isReplied() ) {
+//                        if( msg != null && msg.isReplied() ) {
 //                            icon = messageReadRepliedIcon;
 //                        } else {
 //                            icon = messageReadIcon;
 //                        }
 //                    }
-                    setToolTipText(msg.getTitle());
+                    setToolTipText( ( msg != null ? msg.getTitle() : "" ) );
 //                }
                 dtcr.setIcon(icon);
                 dtcr.setLeafIcon(icon);
@@ -732,7 +1011,9 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
                 final int row,
                 int column)
         {
-            final boolean val = ((Boolean)value).booleanValue();
+            // if the value is a Boolean, it means we do/don't want to have an icon for the column; however,
+            // sometimes the value is a string (for all non-icon columns), so in that case we set it to false manually
+            final boolean wantIcon = ( (value instanceof Boolean) ? ((Boolean)value).booleanValue() : false );
 
             // get the original model column index (maybe columns were reordered by user)
             final TableColumn tableColumn = getColumnModel().getColumn(column);
@@ -740,7 +1021,7 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
 
             ImageIcon iconToSet = null;
 
-            if( val == true ) {
+            if( wantIcon == true ) {
                 if( column == FreetalkMessageTreeTableModel.COLUMN_INDEX_FLAGGED ) {
                     iconToSet = flaggedIcon;
                 } else if( column == FreetalkMessageTreeTableModel.COLUMN_INDEX_STARRED ) {
@@ -787,10 +1068,10 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
         private Font boldItalicFont;
         private Font normalFont;
         private boolean isDeleted = false;
-        private final Color col_good    = new Color(0x00, 0x80, 0x00);
-        private final Color col_check   = new Color(0xFF, 0xCC, 0x00);
-        private final Color col_observe = new Color(0x00, 0xD0, 0x00);
-        private final Color col_bad     = new Color(0xFF, 0x00, 0x00);
+        private final Color col_BAD       = TrustStateColors.BAD;
+        private final Color col_NEUTRAL   = TrustStateColors.NEUTRAL;
+        private final Color col_GOOD      = TrustStateColors.GOOD;
+        private final Color col_FRIEND    = TrustStateColors.FRIEND;
         final javax.swing.border.EmptyBorder border = new javax.swing.border.EmptyBorder(0, 0, 0, 3);
 
         public StringCellRenderer() {
@@ -836,15 +1117,14 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
             setAlignmentY(CENTER_ALIGNMENT);
             setFont(normalFont);
             if (!isSelected) {
-                setForeground(Color.BLACK);
+                setForeground(Color.BLACK); // all columns default to black text (if not selected)
             }
             setToolTipText(null);
             setBorder(null);
             setHorizontalAlignment(SwingConstants.LEFT);
             setIcon(null);
 
-            final FreetalkTreeTableModelAdapter model = (FreetalkTreeTableModelAdapter) getModel();
-            Object obj = model.getRow(row);
+            Object obj = FreetalkMessageTreeTable.this.model.getRow(row);
             if( !(obj instanceof FreetalkMessage) ) {
                 return this; // paranoia
             }
@@ -864,12 +1144,7 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
 //                }
                 // now set color
                 if (!isSelected) {
-//                    if( msg.getRecipientName() != null && msg.getRecipientName().length() > 0) {
-//                        setForeground(Color.RED);
-//                    } else
-                    if (msg.getFileAttachments() != null) {
-                        setForeground(Color.BLUE);
-                    }
+                    setForeground(getMessageTypeColor(msg));
                 }
 //                if( !msg.isDummy() ) {
 //                    if( msg.isSignatureStatusVERIFIED() ) {
@@ -897,7 +1172,7 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
 //                                final int receivedMsgCount = id.getReceivedMessageCount();
 //                                if( receivedMsgCount <= indicateLowReceivedMessagesCountRed ) {
 //                                    setIcon(receivedOneMessage);
-//                                } else if( receivedMsgCount <= indicateLowReceivedMessagesCountLightRed ) {
+//                                } else if( receivedMsgCount <= indicateLowReceivedMessagesCountBlue ) {
 //                                    setIcon(receivedFiveMessages);
 //                                }
 //                            }
@@ -913,28 +1188,28 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
                 setBorder(border);
             } else if( column == FreetalkMessageTreeTableModel.COLUMN_INDEX_SIG ) {
                 // SIG
-                // state == good/bad/check/observe -> bold and coloured
+                // state == BAD/NEUTRAL/GOOD/FRIEND -> bold and colored
 //                final Font f;
 //                if( msg.isSignatureStatusVERIFIED_V2() ) {
 //                    f = boldFont;
 //                } else {
 //                    f = boldItalicFont;
 //                }
-//                if( msg.isMessageStatusGOOD() ) {
+//                if( msg.isMessageStatusNEUTRAL() ) {
 //                    setFont(f);
-//                    setForeground(col_good);
-//                } else if( msg.isMessageStatusCHECK() ) {
+//                    setForeground(col_NEUTRAL);
+//                } else if( msg.isMessageStatusGOOD() ) {
 //                    setFont(f);
-//                    setForeground(col_check);
-//                } else if( msg.isMessageStatusOBSERVE() ) {
+//                    setForeground(col_GOOD);
+//                } else if( msg.isMessageStatusFRIEND() ) {
 //                    setFont(f);
-//                    setForeground(col_observe);
+//                    setForeground(col_FRIEND);
 //                } else if( msg.isMessageStatusBAD() ) {
 //                    setFont(f);
-//                    setForeground(col_bad);
+//                    setForeground(col_BAD);
 //                } else if( msg.isMessageStatusTAMPERED() ) {
 //                    setFont(f);
-//                    setForeground(col_bad);
+//                    setForeground(col_BAD);
 //                }
             }
 
@@ -1050,19 +1325,23 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
      */
     public void loadLayout(final SettingsClass frostSettings) {
         final TableColumnModel tcm = getColumnModel();
+        fixedsizeColumns = new HashSet<Integer>();
 
         // hard set sizes of icons column
         tcm.getColumn(FreetalkMessageTreeTableModel.COLUMN_INDEX_FLAGGED).setMinWidth(20);
         tcm.getColumn(FreetalkMessageTreeTableModel.COLUMN_INDEX_FLAGGED).setMaxWidth(20);
         tcm.getColumn(FreetalkMessageTreeTableModel.COLUMN_INDEX_FLAGGED).setPreferredWidth(20);
+        fixedsizeColumns.add(FreetalkMessageTreeTableModel.COLUMN_INDEX_FLAGGED);
         // hard set sizes of icons column
         tcm.getColumn(FreetalkMessageTreeTableModel.COLUMN_INDEX_STARRED).setMinWidth(20);
         tcm.getColumn(FreetalkMessageTreeTableModel.COLUMN_INDEX_STARRED).setMaxWidth(20);
         tcm.getColumn(FreetalkMessageTreeTableModel.COLUMN_INDEX_STARRED).setPreferredWidth(20);
+        fixedsizeColumns.add(FreetalkMessageTreeTableModel.COLUMN_INDEX_STARRED);
         // hard set sizes of icons column
         tcm.getColumn(FreetalkMessageTreeTableModel.COLUMN_INDEX_JUNK).setMinWidth(20);
         tcm.getColumn(FreetalkMessageTreeTableModel.COLUMN_INDEX_JUNK).setMaxWidth(20);
         tcm.getColumn(FreetalkMessageTreeTableModel.COLUMN_INDEX_JUNK).setPreferredWidth(20);
+        fixedsizeColumns.add(FreetalkMessageTreeTableModel.COLUMN_INDEX_JUNK);
 
         // set icon table header renderer for icon columns
         tcm.getColumn(FreetalkMessageTreeTableModel.COLUMN_INDEX_FLAGGED).setHeaderRenderer(
@@ -1074,7 +1353,16 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
 
         if( !loadLayout(frostSettings, tcm) ) {
             // Sets the relative widths of the columns
-            final int[] widths = { 20,20, 185, 95, 40, 20, 130 };
+            final int[] widths = {
+                20, // flagged (fixed size)
+                20, // starred (fixed size)
+                350, // subject
+                160, // from
+                40, // signature
+                100, // date
+                20, // junk (fixed size)
+                30 // index
+            };
             for (int i = 0; i < widths.length; i++) {
                 tcm.getColumn(i).setPreferredWidth(widths[i]);
             }
@@ -1115,11 +1403,8 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
         for(int x=tcms.length-1; x >= 0; x--) {
             tcms[x] = tcm.getColumn(x);
             tcm.removeColumn(tcms[x]);
-            // keep icon columns 0,1 as is
-            if(x != FreetalkMessageTreeTableModel.COLUMN_INDEX_FLAGGED
-                    && x != FreetalkMessageTreeTableModel.COLUMN_INDEX_STARRED
-                    && x != FreetalkMessageTreeTableModel.COLUMN_INDEX_JUNK)
-            {
+            // keep the fixed-size columns as is
+            if( ! fixedsizeColumns.contains(x) ) {
                 tcms[x].setPreferredWidth(columnWidths[x]);
             }
         }
@@ -1170,8 +1455,26 @@ public class FreetalkMessageTreeTable extends JTable implements PropertyChangeLi
             indicateLowReceivedMessages = Core.frostSettings.getBoolValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES);
         } else if (evt.getPropertyName().equals(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_RED)) {
             indicateLowReceivedMessagesCountRed = Core.frostSettings.getIntValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_RED);
-        } else if (evt.getPropertyName().equals(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_LIGHTRED)) {
-            indicateLowReceivedMessagesCountLightRed = Core.frostSettings.getIntValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_LIGHTRED);
+        } else if (evt.getPropertyName().equals(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_BLUE)) {
+            indicateLowReceivedMessagesCountBlue = Core.frostSettings.getIntValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_BLUE);
+        } else if (evt.getPropertyName().equals(SettingsClass.TREE_EXPANSION_ICON)) {
+            tree.updateExpansionIcon();
+        } else if( evt.getPropertyName().equals("MessageColorsChanged") ) {
+            updateMessageColors();
+            SwingUtilities.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    // executed on swing since we can't guarantee that the event came from EDT
+                    // repaints all visible rows, which forces their cell renderers to reconstruct.
+                    // this method doesn't fire any "table data changed", thus preserving the user's selection.
+                    if( tree != null ) {
+                        tree.validate();
+                        tree.repaint();
+                    }
+                    FreetalkMessageTreeTable.this.validate();
+                    FreetalkMessageTreeTable.this.repaint();
+                }
+            });
         }
     }
 }

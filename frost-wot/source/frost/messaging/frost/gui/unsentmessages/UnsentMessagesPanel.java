@@ -25,6 +25,7 @@ import javax.swing.*;
 
 import frost.*;
 import frost.messaging.frost.*;
+import frost.util.gui.search.TableFindAction;
 import frost.util.gui.translation.*;
 
 @SuppressWarnings("serial")
@@ -116,6 +117,7 @@ public class UnsentMessagesPanel extends JPanel implements LanguageListener {
         this.add(p, BorderLayout.NORTH);
 
         unsentMessagesTable = new UnsentMessagesTable();
+        new TableFindAction().install(unsentMessagesTable.getTable());
         unsentMessagesTable.getScrollPane().setWheelScrollingEnabled(true);
         this.add(unsentMessagesTable.getScrollPane(), BorderLayout.CENTER);
 

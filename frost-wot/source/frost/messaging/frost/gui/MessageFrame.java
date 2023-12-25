@@ -23,9 +23,12 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.RenderingHints;
 import java.awt.Toolkit;
 import java.awt.Window;
 import java.awt.datatransfer.Clipboard;
@@ -38,22 +41,29 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.Color;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeMap;
 import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.swing.ComboBoxEditor;
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
@@ -61,6 +71,7 @@ import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -69,7 +80,10 @@ import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.JToolBar;
+import javax.swing.KeyStroke;
+import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
+import javax.swing.border.Border;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.AbstractDocument;
@@ -109,17 +123,20 @@ import frost.storage.perst.messages.MessageStorage;
 import frost.util.DateFun;
 import frost.util.FileAccess;
 import frost.util.Mixed;
+import frost.util.gui.CompoundUndoManager;
 import frost.util.gui.ImmutableArea;
 import frost.util.gui.ImmutableAreasDocument;
 import frost.util.gui.JSkinnablePopupMenu;
 import frost.util.gui.MiscToolkit;
+import frost.util.gui.SmartFileFilters;
 import frost.util.gui.TextComponentClipboardMenu;
+import frost.util.gui.search.FindAction;
+import frost.util.gui.search.TextComponentFindAction;
 import frost.util.gui.textpane.AntialiasedTextArea;
 import frost.util.gui.translation.Language;
 import frost.util.gui.translation.LanguageEvent;
 import frost.util.gui.translation.LanguageListener;
 
-@SuppressWarnings("serial")
 public class MessageFrame extends JFrame implements AltEditCallbackInterface {
 
     private static final Logger logger = Logger.getLogger(MessageFrame.class.getName());
@@ -150,14 +167,14 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
     private JSkinnablePopupMenu attBoardsPopupMenu;
     private MessageBodyPopupMenu messageBodyPopupMenu;
 
-    private final JButton Bsend = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/mail-forward.png"));
-    private final JButton Bcancel = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/user-trash.png"));
+    private final JButton Bsend = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/mail-send.png"));
+    private final JButton Bcancel = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/mail-discard.png"));
     private final JButton BattachFile = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/mail-attachment.png"));
     private final JButton BattachBoard = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/internet-group-chat.png"));
 
     private final JCheckBox sign = new JCheckBox();
     private final JCheckBox encrypt = new JCheckBox();
-    private JComboBox buddies;
+    private JComboBox<Identity> buddies;
 
     private final JLabel Lboard = new JLabel();
     private final JLabel Lfrom = new JLabel();
@@ -172,9 +189,12 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
     private String oldSender = null;
     private String currentSignature = null;
 
+    private CompoundUndoManager undoManager = null;
+
     private FrostMessageObject repliedMessage = null;
 
-    private JComboBox ownIdentitiesComboBox = null;
+    private IDJComboBox<Object> ownIdentitiesComboBox = null;
+    private RoundJLabel identityIndicator = null;
 
     private static int openInstanceCount = 0;
     
@@ -197,12 +217,28 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
             frostSettings.setValue(SettingsClass.MESSAGE_BODY_FONT_NAME, "Monospaced");
             tofFont = new Font("Monospaced", fontStyle, fontSize);
         }
+        updateTextColor();
+        Core.frostSettings.addPropertyChangeListener(SettingsClass.COLORS_MESSAGE_PRIVEDITOR, new PropertyChangeListener() {
+            @Override
+            public void propertyChange(final PropertyChangeEvent evt) {
+                if( evt.getPropertyName().equals(SettingsClass.COLORS_MESSAGE_PRIVEDITOR) ) {
+                    SwingUtilities.invokeLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            updateTextColor();
+                        }
+                    });
+                }
+            }
+        });
         messageTextArea.setFont(tofFont);
         messageTextArea.setAntiAliasEnabled(frostSettings.getBoolValue(SettingsClass.MESSAGE_BODY_ANTIALIAS));
         final ImmutableAreasDocument messageDocument = new ImmutableAreasDocument();
         headerArea = new ImmutableArea(messageDocument);
         messageDocument.addImmutableArea(headerArea); // user must not change the header of the message
         messageTextArea.setDocument(messageDocument);
+        final FindAction findAction = new TextComponentFindAction();
+        findAction.install(messageTextArea);
 //        textHighlighter = new TextHighlighter(Color.LIGHT_GRAY);
         addWindowListener(new WindowAdapter() {
             @Override
@@ -217,16 +253,74 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
         setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
     }
 
+    /**
+     * Colors the private message text editor according to the user's choice.
+     */
+    private void updateTextColor()
+    {
+        if( encrypt.isSelected() ) {
+            messageTextArea.setForeground(Core.frostSettings.getColorValue(SettingsClass.COLORS_MESSAGE_PRIVEDITOR));
+        } else {
+            messageTextArea.setForeground(Color.BLACK);
+        }
+    }
+
+    /**
+     * Returns true if the user has written some non-whitespace content in the message or edited
+     * their signature area. Otherwise false.
+     */
+    private boolean hasUserEdit() {
+        boolean hasUserEdit = false;
+        try {
+            // first get all text after the header area, including all empty newlines
+            final Document doc = messageTextArea.getDocument();
+            final int offset = headerArea.getEndPos();
+            final int length = doc.getLength() - offset;
+            String userText = doc.getText(offset, length);
+
+            // now remove the user's signature if they have one and it *hasn't* been manually edited
+            if( currentSignature != null ) {
+                final int sigLength = currentSignature.length();
+                final int sigStartOffset = userText.length() - sigLength;
+                final int sigEndOffset = sigStartOffset + sigLength;
+                if( sigStartOffset >= 0 && sigEndOffset <= userText.length() ) {
+                    final String checkSignature = userText.substring(sigStartOffset, sigEndOffset);
+                    if( checkSignature.equals(currentSignature) ) {
+                        // found an unedited signature at the end of the document; so just remove it
+                        userText = userText.substring(0, sigStartOffset); // grabs to endIndex - 1
+                    }
+                }
+            }
+
+            // lastly, trim the remaining user-written text to see if there's any non-whitespace content
+            userText = userText.trim();
+            if( ! userText.isEmpty() ) {
+                hasUserEdit = true;
+            }
+        } catch( final Exception e ) {}
+        return hasUserEdit;
+    }
+
     private void windowIsClosing() {
-        final String title = language.getString("MessageFrame.discardMessage.title");
-        final String text = language.getString("MessageFrame.discardMessage.text");
-        final int answer = JOptionPane.showConfirmDialog(
-                this,
-                text,
-                title,
-                JOptionPane.YES_NO_OPTION,
-                JOptionPane.WARNING_MESSAGE);
-        if( answer == JOptionPane.YES_OPTION ) {
+        boolean discardMessage = false;
+        // determine if the user has edited the document, and don't prompt them to confirm
+        // closing an unedited message, since there's no work to be lost by doing that
+        if( ! hasUserEdit() ) {
+            // they haven't edited the document, so just discard it without confirmation
+            discardMessage = true;
+        } else {
+            // ask them to confirm throwing away their edited, unsent message
+            final int answer = MiscToolkit.showConfirmDialog(
+                    this,
+                    language.getString("MessageFrame.discardMessage.text"),
+                    language.getString("MessageFrame.discardMessage.title"),
+                    MiscToolkit.YES_NO_OPTION,
+                    MiscToolkit.WARNING_MESSAGE);
+            if( answer == MiscToolkit.YES_OPTION ) {
+                discardMessage = true;
+            }
+        }
+        if( discardMessage ) {
             dispose();
         }
     }
@@ -258,11 +352,11 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
 
             if (privKey != null) {
                 final int answer =
-                    JOptionPane.showConfirmDialog(this,
+                    MiscToolkit.showConfirmDialog(this,
                         language.formatMessage("MessageFrame.attachBoard.sendPrivateKeyConfirmationDialog.body", chosedBoard.getName()),
                         language.getString("MessageFrame.attachBoard.sendPrivateKeyConfirmationDialog.title"),
-                        JOptionPane.YES_NO_OPTION);
-                if (answer == JOptionPane.NO_OPTION) {
+                        MiscToolkit.YES_NO_OPTION);
+                if( answer != MiscToolkit.YES_OPTION ) {
                     privKey = null; // don't provide privkey
                 }
             }
@@ -276,12 +370,18 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
     }
 
     private void attachFile_actionPerformed(final ActionEvent e) {
-        final String lastUsedDirectory = frostSettings.getValue(SettingsClass.DIR_LAST_USED);
-        final JFileChooser fc = new JFileChooser(lastUsedDirectory);
+        final JFileChooser fc = new JFileChooser(frostSettings.getValue(SettingsClass.DIR_LAST_USED));
         fc.setDialogTitle(language.getString("MessageFrame.fileChooser.title"));
-        fc.setFileHidingEnabled(false);
-        fc.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
-        fc.setMultiSelectionEnabled(true);
+        fc.setFileHidingEnabled(true); // hide hidden files
+        fc.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES); // accept both files and directories
+        fc.setMultiSelectionEnabled(true); // accept multiple files
+        SmartFileFilters.installDefaultFilters(fc, language); // install all common file filters
+        // let the L&F decide the dialog width (so that all labels fit), but we'll still set a minimum
+        // height and width so that the user never gets a cramped dialog
+        final Dimension fcSize = fc.getPreferredSize();
+        if( fcSize.width < 650 ) { fcSize.width = 650; }
+        if( fcSize.height < 450 ) { fcSize.height = 450; }
+        fc.setPreferredSize(fcSize);
 
         final int returnVal = fc.showOpenDialog(MessageFrame.this);
         if( returnVal == JFileChooser.APPROVE_OPTION ) {
@@ -321,7 +421,7 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
             newText += "\n\n";
         }
 
-        if (frostSettings.getBoolValue("useAltEdit")) {
+        if (frostSettings.getBoolValue(SettingsClass.ALTERNATE_EDITOR_ENABLED)) {
             // build our transfer object that the parser will provide us in its callback
             final TransferObject to = new TransferObject();
             to.newBoard = newBoard;
@@ -417,8 +517,8 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
 
         sign.setEnabled(false);
 
-        final ImageIcon signedIcon = MiscToolkit.loadImageIcon("/data/signed.gif");
-        final ImageIcon unsignedIcon = MiscToolkit.loadImageIcon("/data/unsigned.gif");
+        final ImageIcon signedIcon = MiscToolkit.loadImageIcon("/data/toolbar/message-signed.png");
+        final ImageIcon unsignedIcon = MiscToolkit.loadImageIcon("/data/toolbar/message-unsigned.png");
         sign.setDisabledSelectedIcon(signedIcon);
         sign.setDisabledIcon(unsignedIcon);
         sign.setSelectedIcon(signedIcon);
@@ -447,10 +547,10 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
             // set and lock controls (after we set the identity, the itemlistener would reset the controls!)
             sign.setSelected(true);
             encrypt.setSelected(true);
+            updateTextColor();
             buddies.removeAllItems();
             buddies.addItem(recipient);
             buddies.setSelectedItem(recipient);
-            messageTextArea.setForeground(Color.BLUE);
             // dont allow to disable signing/encryption
             encrypt.setEnabled(false);
             buddies.setEnabled(false);
@@ -483,6 +583,7 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
                 encrypt.setEnabled(false);
             }
             encrypt.setSelected(false);
+            updateTextColor();
             buddies.setEnabled(false);
         }
 
@@ -512,7 +613,7 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
             // maybe append a signature
             final LocalIdentity li = (LocalIdentity)getOwnIdentitiesComboBox().getSelectedItem();
             if( li.getSignature() != null ) {
-                currentSignature = "\n-- \n" + li.getSignature();
+                currentSignature = "\n--\n" + li.getSignature();
                 newText += currentSignature;
             }
         }
@@ -533,6 +634,20 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
         messageTextArea.requestFocusInWindow();
         messageTextArea.getCaret().setDot(caretPos);
         messageTextArea.getCaret().setVisible(true);
+
+        // attach the undo/redo handler (we have to do this last so that none of our internal editing above gets recorded)
+        undoManager = new CompoundUndoManager(messageTextArea);
+        messageTextArea.getActionMap().put("Undo", undoManager.getUndoAction());
+        messageTextArea.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_MASK, true), "Undo"); // ctrl + z
+        messageTextArea.getActionMap().put("Redo", undoManager.getRedoAction());
+        messageTextArea.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_MASK | InputEvent.SHIFT_MASK, true), "Redo"); // ctrl + shift + z
+        messageTextArea.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_Y, InputEvent.CTRL_MASK, true), "Redo"); // ctrl + y
+    }
+
+    private void resetUndoManager() {
+        if( undoManager != null ) {
+            undoManager.discardAllEdits();
+        }
     }
 
     public void composeNewMessage(final Board newBoard, final String newSubject, final String newText) {
@@ -570,7 +685,7 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
 
     private MessageBodyPopupMenu getMessageBodyPopupMenu() {
         if (messageBodyPopupMenu == null) {
-            messageBodyPopupMenu = new MessageBodyPopupMenu(messageTextArea);
+            messageBodyPopupMenu = new MessageBodyPopupMenu(messageTextArea, undoManager);
         }
         return messageBodyPopupMenu;
     }
@@ -597,7 +712,7 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
             filesTable.addMouseListener(listener);
 
 // FIXME: option to show own identities in list, or to hide them
-            final List<Identity> budList = Core.getIdentities().getAllGOODIdentities();
+            final List<Identity> budList = Core.getIdentities().getAllFRIENDIdentities();
             Identity id = null;
             if( repliedMessage != null ) {
                 id = repliedMessage.getFromIdentity();
@@ -605,16 +720,16 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
             if( budList.size() > 0 || id != null ) {
                 Collections.sort( budList, new BuddyComparator() );
                 if( id != null ) {
-                    if( id.isGOOD() == true ) {
+                    if( id.isFRIEND() == true ) {
                         budList.remove(id); // remove before put to top of list
                     }
                     // add id to top of list in case the user enables 'encrypt'
                     budList.add(0, id);
                 }
-                buddies = new JComboBox(new Vector<Identity>(budList));
+                buddies = new JComboBox<Identity>(new Vector<Identity>(budList));
                 buddies.setSelectedItem(budList.get(0));
             } else {
-                buddies = new JComboBox();
+                buddies = new JComboBox<Identity>();
             }
             buddies.setMaximumSize(new Dimension(300, 25)); // dirty fix for overlength combobox on linux
 
@@ -649,7 +764,9 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
             });
             Bcancel.addActionListener(new java.awt.event.ActionListener() {
                 public void actionPerformed(final ActionEvent e) {
-                    windowIsClosing();
+                    // create an event which acts exactly as if the user pressed the X, to close the window and dispose() it
+                    final WindowEvent closingEvent = new WindowEvent(MessageFrame.this, WindowEvent.WINDOW_CLOSING);
+                    Toolkit.getDefaultToolkit().getSystemEventQueue().postEvent(closingEvent);
                 }
             });
             BattachFile.addActionListener(new java.awt.event.ActionListener() {
@@ -731,10 +848,20 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
             constraints.gridx = 1;
 
             constraints.fill = GridBagConstraints.HORIZONTAL;
-            constraints.gridwidth = 2;
+            constraints.gridwidth = 1;
             constraints.insets = insets0;
             constraints.weightx = 1.0;
             panelTextfields.add(getOwnIdentitiesComboBox(), constraints);
+
+            constraints.gridx = 2;
+
+            identityIndicator = new RoundJLabel();
+            constraints.fill = GridBagConstraints.NONE;
+            constraints.gridwidth = 1;
+            constraints.insets = insets;
+            constraints.weightx = 0.0;
+            panelTextfields.add(identityIndicator, constraints);
+            getOwnIdentitiesComboBox().setIdentityIndicator(identityIndicator);
 
             constraints.gridx = 0;
             constraints.gridy++;
@@ -800,6 +927,17 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
             getContentPane().add(panelMain, BorderLayout.CENTER);
 
             initPopupMenu();
+
+            // keyboard shortcuts for compose window (reacts regardless of which component in the window is focused)
+            panelMain.getActionMap().put("CloseAction", new javax.swing.AbstractAction() {
+                public void actionPerformed(final ActionEvent event) {
+                    // create an event which acts exactly as if the user pressed the X, to close the window and dispose() it
+                    // NOTE: if they've written something, they will be asked whether to discard unsaved work
+                    final WindowEvent closingEvent = new WindowEvent(MessageFrame.this, WindowEvent.WINDOW_CLOSING);
+                    Toolkit.getDefaultToolkit().getSystemEventQueue().postEvent(closingEvent);
+                }
+            });
+            panelMain.getInputMap(JPanel.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_W, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask(), true), "CloseAction"); // ctrl + w on Windows/Linux, cmd + w on Mac
 
             pack();
 
@@ -896,7 +1034,7 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
     }
 
     protected void removeSelectedItemsFromTable( final JTable tbl ) {
-    	final SortedTableModel<? extends TableMember<?>> m = (SortedTableModel<? extends TableMember<?>>)tbl.getModel();
+        final SortedTableModel<? extends TableMember<?>> m = (SortedTableModel<? extends TableMember<?>>)tbl.getModel();
         final int[] sel = tbl.getSelectedRows();
         for(int x=sel.length-1; x>=0; x--)
         {
@@ -952,50 +1090,77 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
         subjectTextField.setText(subject); // if a pbl occurs show the subject we checked
         final String text = messageTextArea.getText().trim();
 
-        if( subject.equals("No subject") ) {
-            final int n = JOptionPane.showConfirmDialog( this,
-                                language.getString("MessageFrame.defaultSubjectWarning.text"),
-                                language.getString("MessageFrame.defaultSubjectWarning.title"),
-                                JOptionPane.YES_NO_OPTION,
-                                JOptionPane.QUESTION_MESSAGE);
-            if( n == JOptionPane.YES_OPTION ) {
-                return;
-            }
+        if( subject.equalsIgnoreCase("No subject") || subject.equalsIgnoreCase("Re: No subject") ) {
+            // we do not allow "No subject" posts; warn the user and return them to the compose window
+            MiscToolkit.showMessageDialog( this,
+                    language.getString("MessageFrame.defaultSubjectWarning.text"),
+                    language.getString("MessageFrame.defaultSubjectWarning.title"),
+                    MiscToolkit.WARNING_MESSAGE);
+            subjectTextField.requestFocusInWindow();
+            return;
         }
 
         if( subject.length() == 0) {
-            JOptionPane.showMessageDialog( this,
+            MiscToolkit.showMessageDialog( this,
                                 language.getString("MessageFrame.noSubjectError.text"),
                                 language.getString("MessageFrame.noSubjectError.title"),
-                                JOptionPane.ERROR);
+                                MiscToolkit.ERROR_MESSAGE);
+            subjectTextField.requestFocusInWindow();
             return;
         }
         if( from.length() == 0) {
-            JOptionPane.showMessageDialog( this,
+            MiscToolkit.showMessageDialog( this,
                                 language.getString("MessageFrame.noSenderError.text"),
                                 language.getString("MessageFrame.noSenderError.title"),
-                                JOptionPane.ERROR);
+                                MiscToolkit.ERROR_MESSAGE);
+            getOwnIdentitiesComboBox().requestFocusInWindow();
             return;
         }
         final int maxTextLength = (60*1024);
         final int msgSize = text.length() + subject.length() + from.length() + ((repliedMsgId!=null)?repliedMsgId.length():0);
         if( msgSize > maxTextLength ) {
-            JOptionPane.showMessageDialog( this,
+            MiscToolkit.showMessageDialog( this,
                     language.formatMessage("MessageFrame.textTooLargeError.text",
                             Integer.toString(text.length()),
                             Integer.toString(maxTextLength)),
                     language.getString("MessageFrame.textTooLargeError.title"),
-                    JOptionPane.ERROR_MESSAGE);
+                    MiscToolkit.ERROR_MESSAGE);
+            messageTextArea.requestFocusInWindow();
             return;
         }
-        final int idLinePos = headerArea.getStartPos();
-        final int idLineLen = headerArea.getEndPos() - headerArea.getStartPos();
-        if( text.length() == headerArea.getEndPos() ) {
-            JOptionPane.showMessageDialog( this,
+        if( ! hasUserEdit() ) { // must have at least 1 non-whitespace edit in their msg area
+            MiscToolkit.showMessageDialog( this,
                     language.getString("MessageFrame.noContentError.text"),
                     language.getString("MessageFrame.noContentError.title"),
-                    JOptionPane.ERROR_MESSAGE);
+                    MiscToolkit.ERROR_MESSAGE);
+            messageTextArea.requestFocusInWindow();
             return;
+        }
+
+        // verify that the user really wants to send an unsigned message
+        if( senderId == null ) {
+            // if the user unchecks "show this message again", they'll never be asked again
+            // until they clear frost.ini.
+            final int answer = MiscToolkit.showSuppressableConfirmDialog(
+                    this,
+                    language.getString("MessageFrame.confirmUnsignedMessage.text"),
+                    language.getString("MessageFrame.confirmUnsignedMessage.title"),
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.WARNING_MESSAGE,
+                    SettingsClass.CONFIRM_SEND_UNSIGNED_MSG, // will automatically choose "yes" if this is false
+                    language.getString("Common.suppressConfirmationCheckbox") );
+            if( answer != JOptionPane.YES_OPTION ) {
+                getOwnIdentitiesComboBox().requestFocusInWindow();
+                try {
+                    // attempt to select the 1st non-unsigned identity; this will always work unless
+                    // they've managed to delete their last remaining signing identity via an old version
+                    // of legacy Frost (which used to have a bug allowing final identity deletion).
+                    if( getOwnIdentitiesComboBox().getItemCount() > 1 ) {
+                        getOwnIdentitiesComboBox().setSelectedIndex(1);
+                    }
+                } catch( final Exception ex ) {}
+                return;
+            }
         }
 
         // for convinience set last used user
@@ -1005,6 +1170,8 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
         }
         frostSettings.setValue("userName."+board.getBoardFilename(), from);
 
+        final int idLinePos = headerArea.getStartPos();
+        final int idLineLen = headerArea.getEndPos() - headerArea.getStartPos();
         final FrostUnsentMessageObject newMessage = new FrostUnsentMessageObject();
         newMessage.setMessageId(Mixed.createUniqueId()); // new message, create a new unique msg id
         newMessage.setInReplyTo(repliedMsgId);
@@ -1041,10 +1208,10 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
         if( encrypt.isSelected() ) {
             recipient = (Identity)buddies.getSelectedItem();
             if( recipient == null ) {
-                JOptionPane.showMessageDialog( this,
+                MiscToolkit.showMessageDialog( this,
                         language.getString("MessageFrame.encryptErrorNoRecipient.body"),
                         language.getString("MessageFrame.encryptErrorNoRecipient.title"),
-                        JOptionPane.ERROR);
+                        MiscToolkit.ERROR_MESSAGE);
                 return;
             }
             newMessage.setRecipientName(recipient.getUniqueName());
@@ -1064,17 +1231,17 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
 //            tmpFile.delete();
 //            zipFile.delete();
 //            if( zipLen > 30000 ) { // 30000 because data+metadata must be smaller than 32k
-//                JOptionPane.showMessageDialog( this,
+//                MiscToolkit.showMessageDialog( this,
 //                        "The zipped message is too large ("+zipLen+" bytes, "+30000+" allowed)! Remove some text.",
 //                        "Message text too large!",
-//                        JOptionPane.ERROR_MESSAGE);
+//                        MiscToolkit.ERROR_MESSAGE);
 //                return;
 //            }
 //        } else {
-//            JOptionPane.showMessageDialog( this,
+//            MiscToolkit.showMessageDialog( this,
 //                    "Error verifying the resulting message size.",
 //                    "Error",
-//                    JOptionPane.ERROR_MESSAGE);
+//                    MiscToolkit.ERROR_MESSAGE);
 //            return;
 //        }
 
@@ -1099,61 +1266,71 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
             }
         }
 
-		// Download todays messages if message uploading isn't disabled. 
-		if (Core.isFreenetOnline() && !frostSettings.getBoolValue(SettingsClass.MESSAGE_UPLOAD_DISABLED)) {
-			TofTree tree = MainFrame.getInstance().getFrostMessageTab().getTofTree();
-			boolean threadStarted = false;
+        // "Quicksend mode" rapid message uploading:
+        // - used if Freenet is online, message uploading isn't disabled (via the [Outbox] checkbox),
+        //   *and* the user has enabled the quicksend option. the board must also allow updates.
+        //   "allowing updates" means: it is a board, and it isn't currently marked as DoS'd.
+        // - in that case, we'll instantly start a message download thread to refresh today's
+        //   messages. outgoing messages are uploaded when the today-refresh is done.
+        // NOTE: we don't start a new "today"-thread if one is already running. so if the user spams
+        //   a board with lots of messages in a row but waits too long between a few of them, then it's
+        //   possible that the current today-thread has already finished uploading the earliest batch
+        //   of messages and therefore won't upload their newly queued message.
+        //   solution? easy: such users should force a manual board refresh or learn to not spam.
+        if( Core.isFreenetOnline()
+                && !frostSettings.getBoolValue(SettingsClass.MESSAGE_UPLOAD_DISABLED)
+                && frostSettings.getBoolValue(SettingsClass.MESSAGE_UPLOAD_QUICKSEND)
+                && board.isManualUpdateAllowed()
+        ) {
+            final TofTree tree = MainFrame.getInstance().getFrostMessageTab().getTofTree();
 
-			// download the messages of today
-			if (tree.getRunningBoardUpdateThreads().isThreadOfTypeRunning(board, BoardUpdateThread.MSG_DNLOAD_TODAY) == false) {
-				tree.getRunningBoardUpdateThreads().startMessageDownloadToday(
-					board,
-					frostSettings,
-					tree.getRunningBoardUpdateThreads());
-				logger.info("Starting update (MSG_TODAY) of " + board.getName());
-				threadStarted = true;
-			}
-			// if there was a new thread started, update the lastUpdateStartTimeMillis
-			if (threadStarted == true) {
-				long now = System.currentTimeMillis();
-				board.setLastUpdateStartMillis(now);
-				board.incTimesUpdatedCount();
-			}
-		}
+            if( tree.getRunningBoardUpdateThreads().isThreadOfTypeRunning(board, BoardUpdateThread.MSG_DNLOAD_TODAY) == false ) {
+                tree.getRunningBoardUpdateThreads().startMessageDownloadToday(
+                        board,
+                        frostSettings,
+                        tree.getListener());
+                logger.info("Starting update (MSG_TODAY) of " + board.getName());
+
+                final long now = System.currentTimeMillis();
+                board.setLastUpdateStartMillis(now);
+                board.incTimesUpdatedCount();
+            }
+        }
 
         setVisible(false);
         dispose();
     }
 
     private void senderChanged(final LocalIdentity selectedId) {
+        try {
+            boolean isSigned = ( selectedId != null );
+            sign.setSelected(isSigned);
 
-        boolean isSigned;
-        if( selectedId == null ) {
-            isSigned = false;
-        } else {
-            isSigned = true;
-        }
-
-        sign.setSelected(isSigned);
-
-        if (isSigned) {
-            if( buddies.getItemCount() > 0 ) {
-                encrypt.setEnabled(true);
-                if( encrypt.isSelected() ) {
-                    buddies.setEnabled(true);
-                } else {
-                    buddies.setEnabled(false);
+            if( isSigned ) {
+                if( buddies.getItemCount() > 0 ) {
+                    encrypt.setEnabled(true);
+                    if( encrypt.isSelected() ) {
+                        buddies.setEnabled(true);
+                    } else {
+                        buddies.setEnabled(false);
+                    }
                 }
-            }
 
-            removeSignatureFromText(currentSignature); // remove signature if existing
-            currentSignature = addSignatureToText(selectedId.getSignature()); // add new signature if not existing
-        } else {
-            encrypt.setSelected(false);
-            encrypt.setEnabled(false);
-            buddies.setEnabled(false);
-            removeSignatureFromText(currentSignature); // remove signature if existing
-            currentSignature = null;
+                removeSignatureFromText(currentSignature); // remove signature if existing
+                currentSignature = addSignatureToText(selectedId.getSignature()); // add new signature if not existing
+            } else {
+                encrypt.setSelected(false);
+                updateTextColor();
+                encrypt.setEnabled(false);
+                buddies.setEnabled(false);
+                removeSignatureFromText(currentSignature); // remove signature if existing
+                currentSignature = null;
+            }
+        } finally {
+            // throw away entire undo-history to prevent user from undoing the changes to the
+            // signature from switching identity. it's unfortunately the only way to solve this
+            // since we cannot update the otherwise-invalid offsets of previous edits.
+            resetUndoManager();
         }
     }
 
@@ -1161,7 +1338,7 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
         if( sig == null ) {
             return null;
         }
-        final String newSig = "\n-- \n" + sig;
+        final String newSig = "\n--\n" + sig;
         if (!messageTextArea.getText().endsWith(newSig)) {
             try {
                 messageTextArea.getDocument().insertString(messageTextArea.getText().length(), newSig, null);
@@ -1188,11 +1365,10 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
     private void encrypt_actionPerformed(final ActionEvent e) {
         if( encrypt.isSelected() ) {
             buddies.setEnabled(true);
-            messageTextArea.setForeground(Color.BLUE);
         } else {
             buddies.setEnabled(false);
-            messageTextArea.setForeground(Color.BLACK);
         }
+        updateTextColor();
     }
 
     protected void updateHeaderArea(final String sender) {
@@ -1212,6 +1388,11 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
 //            textHighlighter.highlight(messageTextArea, headerArea.getStartPos(), headerArea.getEndPos()-headerArea.getStartPos(), true);
         } catch (final BadLocationException exception) {
             logger.log(Level.SEVERE, "Error while updating the message header", exception);
+        } finally {
+            // throw away entire undo-history to prevent user from undoing the changes to the
+            // header-area from switching identity. it's unfortunately the only way to solve this
+            // since we cannot update the otherwise-invalid offsets of previous edits.
+            resetUndoManager();
         }
 //        String s= messageTextArea.getText().substring(headerArea.getStartPos(), headerArea.getEndPos());
 //        System.out.println("DBG: "+headerArea.getStartPos()+" ; "+headerArea.getEndPos()+": '"+s+"'");
@@ -1220,12 +1401,26 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
 // DBG: 39 ; 119: '----- wegdami t@plewLcBTHKmPwpWakJNpUdvWSR8 ----- 2006.10.13 - 18:20:12GMT -----'
     }
 
+    /**
+     * Used for editing the IDJComboBox anonymous nickname.
+     */
     class TextComboBoxEditor extends JTextField implements ComboBoxEditor {
         boolean isSigned;
         public TextComboBoxEditor() {
             super();
         }
+        private void setupLook() {
+            // the editor is only used for anonymous nicknames, so apply the unsigned color and border
+            setBackground(IDJComboBox.UNSIGNEDCOLOR);
+            setBorder(new javax.swing.border.EmptyBorder(2,5,2,5));
+        }
+        @Override
+        public void updateUI() {
+            super.updateUI();
+            setupLook();
+        }
         public Component getEditorComponent() {
+            setupLook();
             return this;
         }
         public void setItem(final Object arg0) {
@@ -1244,9 +1439,254 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
         }
     }
 
-    private JComboBox getOwnIdentitiesComboBox() {
+    /**
+     * Used as an indicator for the selected identity's color, in case the L&F doesn't
+     * render the background color we're setting on the IDJComboBox.
+     */
+    private class RoundJLabel
+            extends JLabel
+    {
+        public RoundJLabel()
+        {
+            super();
+
+            setPreferredSize(new Dimension(30,16));
+            setOpaque(false); // don't render anything outside the rounded border
+        }
+
+        @Override
+        protected void paintComponent(
+                final Graphics g)
+        {
+            super.paintComponent(g);
+            final Dimension arcs = new Dimension(14,14);
+            final int width = getWidth();
+            final int height = getHeight();
+            final Graphics2D g2d = (Graphics2D)g;
+            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            // paint the background and border
+            g2d.setColor(getBackground());
+            g2d.fillRoundRect(0, 0, width-1, height-1, arcs.width, arcs.height);
+            g2d.setColor(getForeground());
+            g2d.drawRoundRect(0, 0, width-1, height-1, arcs.width, arcs.height);
+        }
+    }
+
+    /**
+     * Custom JComboBox which renders each identity using a different background color.
+     */
+    private static class IDJComboBox<E>
+            extends JComboBox<E>
+    {
+        // hover background (when the mouse is over the item in the dropdown)
+        private static final Color HOVERCOLOR = new Color(75,163,249); // sky blue
+
+        // anonymous (unsigned) color
+        public static final Color UNSIGNEDCOLOR = new Color(188,188,188); // medium gray
+
+        // light background colors for IDs (repeats if the user has more than 8 IDs)
+        private static final Color[] IDCOLORS = {
+            new Color(211, 250, 203), // green
+            new Color(216, 248, 251), // blue
+            new Color(254, 202, 247), // pink
+            new Color(254, 254, 190), // yellow
+            new Color(255, 159, 159), // red
+            new Color(250, 225, 216), // beige
+            new Color(241, 241, 241), // light gray
+            new Color(252, 237, 254), // light pink
+        };
+
+        // keeps track of which colors to apply to which items
+        private final Map<Object,Color> fColorMap;
+        private int fColorCounter = 0;
+        private RoundJLabel fIdColorIndicator = null;
+
+        public IDJComboBox()
+        {
+            super();
+
+            // the key is an object and therefore checks for object instance (reference) equality
+            fColorMap = new HashMap<Object,Color>();
+
+            // add our custom renderers
+            applyRenderers();
+
+            // update the indicator every time the user selects a different item
+            addItemListener(new java.awt.event.ItemListener() {
+                public void itemStateChanged(final java.awt.event.ItemEvent e) {
+                    if( e.getStateChange() == ItemEvent.DESELECTED ) {
+                        return;
+                    }
+                    updateIdentityIndicator();
+                }
+            });
+        }
+
+        public void setIdentityIndicator(
+                final RoundJLabel aIdColorIndicator)
+        {
+            fIdColorIndicator = aIdColorIndicator;
+            updateIdentityIndicator();
+        }
+
+        private void updateIdentityIndicator()
+        {
+            if( fIdColorIndicator != null ) {
+                Color bgColor = null;
+                Object value = getSelectedItem();
+                if( !(value instanceof LocalIdentity) ) {
+                    // an unsigned (anonymous) identity should always use the unsigned color
+                    bgColor = UNSIGNEDCOLOR;
+                } else {
+                    // we've found an ID, so look up its color index in the color map
+                    if( fColorMap != null && fColorMap.containsKey(value) ) {
+                        bgColor = fColorMap.get(value);
+                    } else { // fallback to white bg if not found (should never happen)
+                        bgColor = Color.WHITE;
+                    }
+                }
+                if( bgColor != null ) {
+                    fIdColorIndicator.setBackground(bgColor);
+                }
+            }
+        }
+
+        private void applyRenderers()
+        {
+            // create a dummy JComboBox to analyze the preferred size, since there's a weird bug
+            // in Java where calling getPreferredSize() on ourselves when the L&F changes leads
+            // to a number that keeps growing each time you switch L&F. my guess is that some L&Fs
+            // are trying to add some extra padding to whatever your own preferred size was, so
+            // we need a clean, blank dummy element to get the basic preferred size from.
+            final JComboBox dummyBox = new JComboBox();
+            final Dimension prefSize = dummyBox.getPreferredSize();
+            setRenderer(new IDCellColorRenderer(fColorMap, prefSize.height));
+        }
+
+        @Override
+        public void updateUI()
+        {
+            super.updateUI();
+            // make sure our custom renderers are kept even when the user switches L&F
+            applyRenderers();
+        }
+
+        @Override
+        public void addItem(E item)
+        {
+            // if this is a signed (non-anonymous) identity, we'll calculate a color for it
+            if( item instanceof LocalIdentity ) {
+                if( !fColorMap.containsKey(item) ) {
+                    // user IDs; calculate rolling colors (if fColorCounter == 8 (same as IDCOLORS.length), then the idx is 0)
+                    final int colorIdx = fColorCounter % IDCOLORS.length;
+                    fColorMap.put(item, IDCOLORS[colorIdx]);
+                    ++fColorCounter;
+                }
+            }
+            super.addItem(item);
+        }
+
+        /**
+        * JComboBox renderer with colored backgrounds based on the ID in that field.
+        */
+        private static class IDCellColorRenderer
+                extends DefaultListCellRenderer
+        {
+            private final Map<Object,Color> fColorMap;
+            private final Dimension fPrefSize;
+
+            public IDCellColorRenderer(
+                    final Map<Object,Color> aColorMap, // passed by reference
+                    final int aPrefHeight) // preferred height of a JComboBox
+            {
+                super();
+
+                // save the reference to the color map used by the JComboBox
+                fColorMap = aColorMap;
+
+                // save the preferred height of the list entries. otherwise the list renderer
+                // uses a default size that's smaller than the L&Fs normal JComboBox.
+                // NOTE: we don't have to set the width, since it scales automatically.
+                fPrefSize = new Dimension(0, aPrefHeight);
+
+                // tell Java that we'll paint everything inside our rectangle (no transparency)
+                // so that we're sure to paint the entire background.
+                setOpaque(true);
+            }
+
+            @Override
+            public void setBackground(
+                    final Color bg)
+            {
+                // do nothing; we don't want to allow outsiders to set the background color
+            }
+
+            private void setIDBackground(
+                    final Color bg)
+            {
+                // used by us to set the background of the list entry
+                super.setBackground(bg);
+            }
+
+            @Override
+            public Component getListCellRendererComponent(
+                    final JList list,
+                    Object value,
+                    int index,
+                    boolean isSelected,
+                    boolean cellHasFocus)
+            {
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+
+                // our job here is to return a component that's ready for paint()'ing; so now just add the color to it
+                Color bgColor = null;
+                Color fgColor = null;
+                if( index >= 0 && isSelected ) {
+                    // the index is 0 or greater which means that it's for the dropdown list,
+                    // and the item is being hovered, so make it white on blue
+                    bgColor = HOVERCOLOR;
+                    fgColor = Color.WHITE;
+                } else {
+                    // the index is either -1 (means the item's look when selected and the dropdown
+                    // is closed, OR that the dropdown is shown and the item isn't being hovered)
+                    // NOTE: if the index is -1, only *some* L&Fs honor the background color we set
+                    // here, which is why we ALSO use a colored circle to indicate which ID is used.
+                    if( !(value instanceof LocalIdentity) ) {
+                        // an unsigned (anonymous) identity should always use the unsigned color
+                        bgColor = UNSIGNEDCOLOR;
+//                        fgColor = Color.BLACK; // do not override L&Fs foreground color
+                    } else {
+                        // we've found an ID, so look up its color index in the color map
+                        if( fColorMap != null && fColorMap.containsKey(value) ) {
+                            bgColor = fColorMap.get(value);
+                        } else { // fallback to white bg if not found (should never happen)
+                            bgColor = Color.WHITE;
+                        }
+//                        fgColor = Color.BLACK; // do not override L&Fs foreground color
+                    }
+                }
+
+                // now just apply the colors
+                if( bgColor != null ) {
+                    setIDBackground(bgColor);
+                }
+                if( fgColor != null ) {
+                    setForeground(fgColor);
+                }
+
+                // apply the border insets (padding) and preferred height
+                setBorder(new javax.swing.border.EmptyBorder(2,5,2,5));
+                setPreferredSize(fPrefSize);
+
+                return this;
+            }
+        }
+    }
+
+    private IDJComboBox<Object> getOwnIdentitiesComboBox() {
         if( ownIdentitiesComboBox == null ) {
-            ownIdentitiesComboBox = new JComboBox();
+            ownIdentitiesComboBox = new IDJComboBox<Object>();
             ownIdentitiesComboBox.addItem("Anonymous");
             // sort own unique names
             final TreeMap<String,LocalIdentity> sortedIds = new TreeMap<String,LocalIdentity>();
@@ -1371,15 +1811,22 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
         private Clipboard clipboard;
 
         private final JTextComponent sourceTextComponent;
+        private final CompoundUndoManager sourceUndoManager;
 
+        private JMenuItem undoItem;
+        private JMenuItem redoItem;
         private final JMenuItem cutItem = new JMenuItem();
         private final JMenuItem copyItem = new JMenuItem();
         private final JMenuItem pasteItem = new JMenuItem();
-        private final JMenuItem cancelItem = new JMenuItem();
 
-        public MessageBodyPopupMenu(final JTextComponent sourceTextComponent) {
+        public MessageBodyPopupMenu(final JTextComponent sourceTextComponent, final CompoundUndoManager sourceUndoManager) {
             super();
             this.sourceTextComponent = sourceTextComponent;
+            this.sourceUndoManager = sourceUndoManager;
+            if( sourceUndoManager != null ) {
+                this.undoItem = new JMenuItem(sourceUndoManager.getUndoAction());
+                this.redoItem = new JMenuItem(sourceUndoManager.getRedoAction());
+            }
             initialize();
         }
 
@@ -1451,18 +1898,22 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
             copyItem.addActionListener(this);
             pasteItem.addActionListener(this);
 
+            if( undoItem != null && redoItem != null ) {
+                add(undoItem);
+                add(redoItem);
+                addSeparator();
+            }
             add(cutItem);
             add(copyItem);
             add(pasteItem);
-            addSeparator();
-            add(cancelItem);
         }
 
         private void refreshLanguage() {
+            if( undoItem != null ) { undoItem.setText(language.getString("Common.undo")); }
+            if( redoItem != null ) { redoItem.setText(language.getString("Common.redo")); }
             cutItem.setText(language.getString("Common.cut"));
             copyItem.setText(language.getString("Common.copy"));
             pasteItem.setText(language.getString("Common.paste"));
-            cancelItem.setText(language.getString("Common.cancel"));
         }
 
         public void lostOwnership(final Clipboard nclipboard, final Transferable contents) {}
@@ -1498,7 +1949,7 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
             return aBoard;
         }
 
-		public Comparable<?> getValueAt(final int column) {
+        public Comparable<?> getValueAt(final int column) {
             switch (column) {
                 case 0 : return aBoard.getName();
                 case 1 : return (aBoard.getPublicKey() == null) ? "N/A" : aBoard.getPublicKey();
@@ -1578,16 +2029,33 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
             return aFile;
         }
         
-		public Comparable<?> getValueAt(final int column)  {
+        public Comparable<?> getValueAt(final int column)  {
             switch(column) {
                 case 0: return aFile.getName();
                 case 1: return Long.toString(aFile.length());
             }
-            throw new IndexOutOfBoundsException("Nu such column: " + Integer.toString(column));
+            throw new IndexOutOfBoundsException("No such column: " + Integer.toString(column));
+        }
+
+        @Override
+        public int compareTo(final MFAttachedFile otherTableMember, final int tableColumnIndex) {
+            // override sorting of specific columns
+            if( tableColumnIndex == 1 ) { // filesize
+                // if the other table member object is null, just return -1 instantly so that the non-null
+                // member we're comparing will be sorted above the null-row. this is just a precaution.
+                // NOTE: we could also make sure "trackDownloadKey" is non-null for each, but it always is.
+                if( otherTableMember == null ) { return -1; }
+
+                // we know that both filesize is a long, so we don't need any null-checks since longs are a basic type (never null).
+                return Mixed.compareLong(aFile.length(), otherTableMember.getFile().length());
+            } else {
+                // all other columns use the default case-insensitive string comparator
+                return super.compareTo(otherTableMember, tableColumnIndex);
+            }
         }
     }
 
-	private class MFAttachedFilesTable extends SortedTable<MFAttachedFile> {
+    private class MFAttachedFilesTable extends SortedTable<MFAttachedFile> {
         public MFAttachedFilesTable(final MFAttachedFilesTableModel m) {
             super(m);
             

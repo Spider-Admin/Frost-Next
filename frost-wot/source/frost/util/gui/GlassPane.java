@@ -143,7 +143,7 @@ public class GlassPane extends JComponent implements AWTEventListener {
 			// Start receiving all events and consume them if necessary
 			Toolkit.getDefaultToolkit().addAWTEventListener(this, AWTEvent.KEY_EVENT_MASK);
 
-			this.requestFocus();
+			this.requestFocusInWindow();
 
 			// Activate the glass pane capabilities
 			super.setVisible(value);

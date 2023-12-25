@@ -82,6 +82,8 @@ class NewsPanel extends JPanel {
 
     private final Listener listener = new Listener();
 
+    private final JCheckBox quicksendMessageModeCheckBox = new JCheckBox();
+
     // 0.7 only
     private final JCheckBox useOneConnectionForMessagesCheckBox = new JCheckBox();
 
@@ -202,6 +204,9 @@ class NewsPanel extends JPanel {
         add(getUpdatePanel(), constraints);
 
         constraints.gridy++;
+        add(quicksendMessageModeCheckBox, constraints);
+
+        constraints.gridy++;
         add(useOneConnectionForMessagesCheckBox, constraints);
 
         constraints.gridy++;
@@ -244,6 +249,7 @@ class NewsPanel extends JPanel {
     private void loadSettings() {
         uploadPrioTextField.setText(settings.getValue(SettingsClass.FCP2_DEFAULT_PRIO_MESSAGE_UPLOAD));
         downloadPrioTextField.setText(settings.getValue(SettingsClass.FCP2_DEFAULT_PRIO_MESSAGE_DOWNLOAD));
+        quicksendMessageModeCheckBox.setSelected(settings.getBoolValue(SettingsClass.MESSAGE_UPLOAD_QUICKSEND));
         useOneConnectionForMessagesCheckBox.setSelected(settings.getBoolValue(SettingsClass.FCP2_USE_ONE_CONNECTION_FOR_MESSAGES));
 
         displayDaysTextField.setText(settings.getValue(SettingsClass.MAX_MESSAGE_DISPLAY));
@@ -271,11 +277,13 @@ class NewsPanel extends JPanel {
     }
 
     private void refreshLanguage() {
-        uploadPrioLabel.setText(language.getString("Options.news.1.messageUploadPriority") + " (2)");
+        uploadPrioLabel.setText(language.getString("Options.news.1.messageUploadPriority") + " (0)");
         downloadPrioLabel.setText(language.getString("Options.news.1.messageDownloadPriority") + " (2)");
+        quicksendMessageModeCheckBox.setText(language.getString("Options.news.1.quicksendMessageMode"));
+        quicksendMessageModeCheckBox.setToolTipText(language.getString("Options.news.1.quicksendMessageMode.tooltip"));
         useOneConnectionForMessagesCheckBox.setText(language.getString("Options.news.1.useOneConnectionForMessages"));
-        displayDaysLabel.setText(language.getString("Options.news.1.numberOfDaysToDisplay") + " (15)");
-        downloadDaysLabel.setText(language.getString("Options.news.1.numberOfDaysToDownloadBackwards") + " (5)");
+        displayDaysLabel.setText(language.getString("Options.news.1.numberOfDaysToDisplay") + " (9999)");
+        downloadDaysLabel.setText(language.getString("Options.news.1.numberOfDaysToDownloadBackwards") + " (30)");
         messageBaseLabel.setText(language.getString("Options.news.1.messageBase") + " (news)");
         alwaysDownloadBackloadCheckBox.setText(language.getString("Options.news.1.alwaysDownloadBackload"));
         alwaysDownloadBackloadCheckBox.setToolTipText(language.getString("Options.news.1.alwaysDownloadBackload.tooltip"));
@@ -290,8 +298,7 @@ class NewsPanel extends JPanel {
         storeSentMessagesCheckBox.setText(language.getString("Options.news.1.storeSentMessages"));
         silentlyRetryCheckBox.setText(language.getString("Options.news.3.silentlyRetryFailedMessages"));
 
-        final String off = language.getString("Options.common.off");
-        altEditCheckBox.setText(language.getString("Options.miscellaneous.useEditorForWritingMessages") + " (" + off + ")");
+        altEditCheckBox.setText(language.getString("Options.miscellaneous.useEditorForWritingMessages"));
     }
 
     /**
@@ -300,6 +307,7 @@ class NewsPanel extends JPanel {
     private void saveSettings() {
         settings.setValue(SettingsClass.FCP2_DEFAULT_PRIO_MESSAGE_UPLOAD, uploadPrioTextField.getText());
         settings.setValue(SettingsClass.FCP2_DEFAULT_PRIO_MESSAGE_DOWNLOAD, downloadPrioTextField.getText());
+        settings.setValue(SettingsClass.MESSAGE_UPLOAD_QUICKSEND, quicksendMessageModeCheckBox.isSelected());
         settings.setValue(SettingsClass.FCP2_USE_ONE_CONNECTION_FOR_MESSAGES, useOneConnectionForMessagesCheckBox.isSelected());
 
         settings.setValue(SettingsClass.MAX_MESSAGE_DISPLAY, displayDaysTextField.getText());

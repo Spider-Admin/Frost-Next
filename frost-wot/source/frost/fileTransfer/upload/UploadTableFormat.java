@@ -21,12 +21,19 @@ package frost.fileTransfer.upload;
 import java.awt.*;
 import java.beans.*;
 import java.util.*;
+import java.util.HashSet;
+import java.util.Set;
 
+import java.awt.Point;
+import java.awt.event.MouseEvent;
 import javax.swing.*;
+import javax.swing.SwingUtilities;
 import javax.swing.table.*;
 
 import frost.*;
 import frost.fileTransfer.*;
+import frost.fileTransfer.BlocksPerMinuteCounter;
+import frost.fileTransfer.FreenetPriority;
 import frost.fileTransfer.common.*;
 import frost.util.*;
 import frost.util.gui.*;
@@ -40,14 +47,16 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
     private static final String CFGKEY_COLUMN_TABLEINDEX = "UploadTable.tableindex.modelcolumn.";
     private static final String CFGKEY_COLUMN_WIDTH = "UploadTable.columnwidth.modelcolumn.";
 
-    private static ImageIcon isSharedIcon = MiscToolkit.loadImageIcon("/data/shared.png");
+//#DIEFILESHARING    private static ImageIcon isSharedIcon = MiscToolkit.loadImageIcon("/data/shared.png");
 
     private SortedModelTable<FrostUploadItem> modelTable = null;
 
     private boolean showColoredLines;
 
+    private Set<Integer> fixedsizeColumns; // in "all columns" index space, default model ordering
+
     /**
-     * Renders DONE with green background and FAILED with red background.
+     * Renders DONE with green background, FAILED with red background and PAUSED with blue background.
      */
     @SuppressWarnings("serial")
 	private class BaseRenderer extends DefaultTableCellRenderer {
@@ -75,6 +84,9 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
                         newBackground = TableBackgroundColors.getBackgroundColorDone(table, row, showColoredLines);
                     } else if( itemState == FrostUploadItem.STATE_FAILED) {
                         newBackground = TableBackgroundColors.getBackgroundColorFailed(table, row, showColoredLines);
+                    } else if( !uploadItem.isEnabled() || uploadItem.getPriority() == FreenetPriority.PAUSE ) {
+                        // if disabled or prio 6 (paused) in any of the other states: progress/waiting/encoding/encode requested
+                        newBackground = TableBackgroundColors.getBackgroundColorPaused(table, row, showColoredLines);
                     }
                 }
                 setBackground(newBackground);
@@ -90,6 +102,30 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
             super();
             setMinimum(0);
             setMaximum(100);
+
+            // we must now apply the user's L&F font and set it on the progress bar, otherwise
+            // some L&Fs won't render the string despite "setStringPainted(true)". we must also
+            // sanitize the font size so that it cannot go above 20, since some L&Fs refuse to
+            // render progress bars with huge fonts (i.e. GTK L&F doesn't work above 22).
+            // we also always subtract 1pt from the value, since the progressbar refuses to render
+            // certain fonts if we don't do this (probably because they don't fit the rowheight).
+            final String fontName = Core.frostSettings.getValue(SettingsClass.FILE_LIST_FONT_NAME);
+            int fontSize = Core.frostSettings.getIntValue(SettingsClass.FILE_LIST_FONT_SIZE);
+            fontSize -= 1;
+            if( fontSize < 1 ) { fontSize = 1; }
+            else if( fontSize > 20 ) { fontSize = 20; }
+            Font font = new Font(fontName, Font.PLAIN, fontSize);
+            if( !font.getFamily().equals(fontName) ) {
+                // if the user's font wasn't found, fall back to the regular OS-dependent sans-serif font
+                font = new Font("SansSerif", Font.PLAIN, fontSize);
+            }
+
+            // NOTE/FIXME: we only set this on initial construction at Frost startup, NOT when the user
+            // changes their font setting, because setFont() updates on the table do not propagate to cell
+            // renderers. would be annoyingly complicated to fix. the only workaround is to restart Frost.
+            setFont(font);
+
+            // now just enable string painting so that the user will see the block count.
             setStringPainted(true);
             setBorderPainted(false);
         }
@@ -104,30 +140,39 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
             final Color newBackground = TableBackgroundColors.getBackgroundColor(table, row, showColoredLines);
             setBackground(newBackground);
 
-            setValue(0);
-
+            // format: ~0% 0/60 [60]
             final FrostUploadItem uploadItem = modelTable.getItemAt(row);
-            if (uploadItem != null) {
-
-                final int totalBlocks = uploadItem.getTotalBlocks();
-                final int doneBlocks = uploadItem.getDoneBlocks();
-
-                if( totalBlocks > 0 ) {
-                    // format: ~0% 0/60 [60]
-
-                    int percentDone = 0;
-
-                    percentDone = ((doneBlocks * 100) / totalBlocks);
-                    if( percentDone > 100 ) {
-                        percentDone = 100;
-                    }
-                    setValue(percentDone);
-                }
-            }
+            setValue(calculatePercentDone(uploadItem));
             setString(value.toString());
 
             return this;
         }
+    }
+
+    // calculates an integer percentage from 0 to 100, for use in progress bars and sorting, etc
+    private static int calculatePercentDone(final FrostUploadItem ulItem) {
+        int percentDone = 0;
+        if( ulItem != null ) {
+            if( ulItem.getState() == FrostUploadItem.STATE_DONE ) {
+                // items marked "Finished" are always 100%, especially important
+                // since they may have finished during another Frost session,
+                // in which case we don't know their block count anymore.
+                percentDone = 100;
+            } else {
+                // calculate the percentage...
+                final int totalBlocks = ulItem.getTotalBlocks();
+                if( totalBlocks > 0 ) { // is only non-zero if transfer has begun
+                    final int doneBlocks = ulItem.getDoneBlocks();
+                    // NOTE: because we're dealing with integer truncation, we need to multiply
+                    // *before* the division; so 4/6 blocks -> 400/6 -> 66 percent.
+                    percentDone = (doneBlocks * 100) / totalBlocks;
+                    if( percentDone > 100 ) {
+                        percentDone = 100;
+                    }
+                }
+            }
+        }
+        return percentDone;
     }
 
     @SuppressWarnings("serial")
@@ -158,22 +203,28 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
 
     @SuppressWarnings("serial")
 	private class ShowNameTooltipRenderer extends BaseRenderer {
+
         public ShowNameTooltipRenderer() {
             super();
         }
-        @Override
-        public Component getTableCellRendererComponent(
-            final JTable table,
-            final Object value,
-            final boolean isSelected,
-            final boolean hasFocus,
-            final int row,
-            final int column) {
-            super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
 
-            String tooltip = null;
-            final FrostUploadItem uploadItem = modelTable.getItemAt(row); //It may be null
+        // deferred tooltip generation: this avoids re-generating the tooltip every time we receive
+        // an FCP message, since the regular cell renderer constructor is called every time the row
+        // updates. we instead only generate the tooltips when the user actually hovers over the cell.
+        @Override
+        public String getToolTipText(final MouseEvent ev) {
+            // determine which row the user is hovering over; note that the table and model rows correspond 1:1 even with sorting applied
+            final JTable theTable = modelTable.getTable();
+            final Point p = ev.getLocationOnScreen();
+            SwingUtilities.convertPointFromScreen(p, theTable); // directly updates "p"
+            final int row = theTable.rowAtPoint(p);
+            //not used: final int col = theTable.columnAtPoint(p);
+            //not used: final Object value = modelTable.getValueAt(row, col); // may be null
+            final FrostUploadItem uploadItem = modelTable.getItemAt(row); // may be null
+
+            // dynamically generate the tooltip
             if (uploadItem != null) {
+                // this row contains a download item, so build a summary tooltip for that transfer
                 final StringBuilder sb = new StringBuilder();
                 sb.append("<html>").append(uploadItem.getFileName());
                 if( uploadItem.getUploadAddedMillis() > 0 ) {
@@ -194,11 +245,92 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
                     sb.append("  ");
                     sb.append(DateFun.FORMAT_TIME_VISIBLE.print(uploadItem.getUploadFinishedMillis()));
                 }
+                // if this transfer has begun and is unfinished, then display various statistics such as
+                // block counter, blocks-per-minute, time estimate, "elapsed" and "last activity" statistics
+                if( uploadItem.getState() == FrostUploadItem.STATE_PROGRESS ) {
+                    // add the "blocks done/total percentage" display, for people whose look&feel
+                    // is rendering their blocks column as a solid line instead of showing the text
+                    String blocksAsString = getBlocksAsString(uploadItem);
+                    if( !blocksAsString.equals("") ) { // is empty string until the transfer actually begins
+                        sb.append("<br>Blocks: "+blocksAsString);
+                    }
+
+                    // if nothing has been transferred yet, or if we still need 1+ blocks, then
+                    // display the blocks/minute counter and the time since last activity
+                    final int doneBlocks = uploadItem.getDoneBlocks();
+                    final int totalBlocks = uploadItem.getTotalBlocks();
+                    final int neededBlocks = ( totalBlocks - doneBlocks );
+                    if( doneBlocks == 0 || neededBlocks > 0 ) {
+                        // determine how long ago the current measurement was updated
+                        final long millisSinceLastMeasurement = uploadItem.getMillisSinceLastMeasurement();
+
+                        // display the blocks/minute, the size in human readable bytes, and the
+                        // number of hours/minutes/seconds elapsed
+                        sb.append("<br>Blocks/Minute: ");
+                        if( millisSinceLastMeasurement > 240000 ) {
+                            // the transfer's speed counter has not been updated in 4 minutes since
+                            // measurement began; treat this as a stalled upload
+                            sb.append("Stalled...");
+                        } else {
+                            // get the current average number of blocks per minute, and what that corresponds to in bytes
+                            final double blocksPerMinute = uploadItem.getAverageBlocksPerMinute();
+                            final long bpmInBytesPerSecond = uploadItem.getAverageBytesPerSecond();
+
+                            if( blocksPerMinute < 0 ) {
+                                // either "-1" (measuring activity), or "-2" (no recent transfer
+                                // activity in the last X minutes), so no measurement is available
+                                // NOTE: this will only be triggered for newly started transfers, in
+                                // the time from 20 seconds to 4 minutes, before the "stalled"
+                                // indicator shows up
+                                if( millisSinceLastMeasurement > 20000 ) { // shown between seconds 20-60
+                                    sb.append("No activity...");
+                                } else { // shown between seconds 0-20 or until a measurement comes in (whichever comes first)
+                                    sb.append("Measuring...");
+                                }
+                            } else {
+                                // fantastic! there is a recent average available (less than 4 minutes old); display it!
+                                sb.append(String.format("%.2f", blocksPerMinute) + " (~" + Mixed.convertBytesToHuman(bpmInBytesPerSecond) + "/s)");
+
+                                // calculate the estimated time until completion, if we know how many blocks the file contains
+                                if( totalBlocks > 0 ) {
+                                    final long estimatedMillisRemaining = uploadItem.getEstimatedMillisRemaining(
+                                            doneBlocks,
+                                            totalBlocks,
+                                            BlocksPerMinuteCounter.TRANSFERTYPE_UPLOAD);
+
+                                    // only display the time estimate when it's at least 1 second remaining
+                                    if( estimatedMillisRemaining >= 1000 ) {
+                                        sb.append("<br>Rough Estimate: " + Mixed.convertMillisToHMmSs(estimatedMillisRemaining, "%dh, %dm, %ds remaining"));
+                                    }
+                                }
+                            }
+                        }
+
+                        // if we know the last activity time for this item (regardless of internal or external), then display it
+                        sb.append("<br>Last Activity: ");
+                        final long lastActivityMillis = uploadItem.getLastActivityMillis();
+                        if( lastActivityMillis > 0 ) {
+                            final long timeElapsed = ( System.currentTimeMillis() - lastActivityMillis );
+                            sb.append(Mixed.convertMillisToHMmSs(timeElapsed, "%dh, %dm, %ds ago"));
+                        } else {
+                            // never seen any activity (or this is external so it wasn't stored, and none seen this session).
+                            // there's no good description for it, although the "Blocks/Minute" counter
+                            // above it will also be stalled and make it very clear why there's no activity here.
+                            sb.append("...");
+                        }
+                    }
+
+                    // if this is an internal item, then show how long the transfer has been in progress.
+                    // isn't shown for external items, since they don't have a known start time.
+                    if( uploadItem.getUploadStartedMillis() > 0 ) {
+                        final long timeElapsed = ( System.currentTimeMillis() - uploadItem.getUploadStartedMillis() );
+                        sb.append("<br>Elapsed: " + Mixed.convertMillisToHMmSs(timeElapsed, "%dh, %dm, %ds"));
+                    }
+                }
                 sb.append("</html>");
-                tooltip = sb.toString();
+                return sb.toString();
             }
-            setToolTipText(tooltip);
-            return this;
+            return null; // no tooltip
         }
     }
 
@@ -218,11 +350,15 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
             super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
             String tooltip = null;
             final FrostUploadItem uploadItem = modelTable.getItemAt(row); //It may be null
-            if (uploadItem != null) {
-                final String errorCodeDescription = uploadItem.getErrorCodeDescription();
-                if( errorCodeDescription != null && errorCodeDescription.length() > 0 ) {
-                    tooltip = "Last error: "+errorCodeDescription;
+            String errorCodeDescription = getFailureString(uploadItem, /*escapeTags=*/true);
+            if( errorCodeDescription != null ) {
+                // if this *isn't* a Frost-MD5 failure reason, then break the possibly-long error code sentences into separate lines
+                if( errorCodeDescription.indexOf("[MD5]") < 0 ) {
+                    errorCodeDescription = errorCodeDescription
+                        .replaceAll("[\\r\\n]+", "<br>") // 1 or more line separators
+                        .replaceAll("([.?!])\\s+", "$1<br>"); // end-of-sentence punctuation followed by whitespace
                 }
+                tooltip = "<html><b>Latest Error:</b><br>"+errorCodeDescription+"</html>";
             }
             setToolTipText(tooltip);
             return this;
@@ -252,11 +388,11 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
 
             final FrostUploadItem uploadItem = modelTable.getItemAt(row); //It may be null
             if (uploadItem != null) {
-                if( uploadItem.isExternal() ) {
-                    setEnabled(false);
-                    setSelected(true); // external items are always enabled
+                if( uploadItem.isExternal() || uploadItem.getState() == FrostUploadItem.STATE_DONE ) {
+                    setEnabled(false); // render the column in a "faded" way
+                    setSelected(true); // external items and finished items should always look "enabled"
                 } else {
-                    setEnabled(true);
+                    setEnabled(true); // render the checkmark in a normal way
                     setSelected((value != null && value instanceof Boolean && ((Boolean) value).booleanValue()));
                 }
             }
@@ -264,6 +400,39 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
         }
     }
 
+    @SuppressWarnings("serial")
+	private class IsCompressRenderer extends JCheckBox implements TableCellRenderer {
+        public IsCompressRenderer() {
+            super();
+            setHorizontalAlignment(JLabel.CENTER); // we want the checkboxes in the middle of the column
+        }
+        public Component getTableCellRendererComponent(
+            final JTable table,
+            final Object value,
+            final boolean isSelected,
+            final boolean hasFocus,
+            final int row,
+            final int column)
+        {
+            if (isSelected) {
+                setForeground(table.getSelectionForeground());
+                super.setBackground(table.getSelectionBackground());
+            } else {
+                setForeground(table.getForeground());
+                setBackground(table.getBackground());
+            }
+
+            final FrostUploadItem uploadItem = modelTable.getItemAt(row); //It may be null
+            if (uploadItem != null) {
+                setEnabled(false); // render the "compress" column in a faded way, since Freenet
+                                   // won't let you change compression of ongoing uploads.
+                setSelected((value != null && value instanceof Boolean && ((Boolean) value).booleanValue()));
+            }
+            return this;
+        }
+    }
+
+    /* //#DIEFILESHARING: This entire block has been commented out since filesharing is removed in Frost-Next.
     @SuppressWarnings("serial")
 	private class IsSharedRenderer extends BaseRenderer {
         public IsSharedRenderer() {
@@ -292,6 +461,7 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
             return this;
         }
     }
+    */
 
     /**
      * This inner class implements the renderer for the column "FileSize"
@@ -318,139 +488,274 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
         }
     }
 
-    /**
-     * This inner class implements the comparator for the column "Name"
-     */
-    private class NameComparator implements Comparator<FrostUploadItem> {
-        public int compare(final FrostUploadItem item1, final FrostUploadItem item2) {
-            return item1.getFileName().compareToIgnoreCase(item2.getFileName());
-        }
-    }
+    private static class ColumnComparator
+            implements Comparator<FrostUploadItem>
+    {
+        public static enum Type {
+            // "String"-based columns
+            FILENAME(0), PATH(0), KEY(0), COMPAT_MODE(0), CRYPTOKEY(0),
+            // "boolean"-based columns
+            ENABLED(1), COMPRESS(1),
+            // "long"-based columns
+            FILESIZE(2),
+            // "int"-based columns
+            STATE(3), BLOCKS(3), TRIES(3), PRIORITY(3);
 
-    private class PriorityComparator implements Comparator<FrostUploadItem> {
-        public int compare(final FrostUploadItem o1, final FrostUploadItem o2) {
-        	return o1.getPriority().compareTo(o2.getPriority());
-        }
-    }
+            private final int fObjType;
+            Type(int aObjType)
+            {
+                fObjType = aObjType;
+            }
 
-    /**
-     * This inner class implements the comparator for the column "Last Upload"
-     */
-    private class StateComparator implements Comparator<FrostUploadItem> {
-        public int compare(final FrostUploadItem item1, final FrostUploadItem item2) {
-            return Mixed.compareInt(item1.getState(), item2.getState());
-        }
-    }
-
-    private class BlocksComparator implements Comparator<FrostUploadItem> {
-        public int compare(final FrostUploadItem item1, final FrostUploadItem item2) {
-
-            // compare by percent completed. Finalized items are grouped.
-            final int percentDone1 = calculatePercentDone(item1);
-            final int percentDone2 = calculatePercentDone(item2);
-
-            return Mixed.compareInt(percentDone1, percentDone2);
+            /**
+             * 0 = String, 1 = boolean, 2 = long, 3 = int, 4 = double
+             */
+            public int getObjType()
+            {
+                return fObjType;
+            }
         }
 
-        private int calculatePercentDone(final FrostUploadItem item) {
-            final Boolean isFinalized = item.isFinalized();
-            final int totalBlocks     = item.getTotalBlocks();
-            final int doneBlocks      = item.getDoneBlocks();
+        /* Instance variables */
+        private Type fType;
+        private boolean fAscending;
 
-            int percentDone = 0;
-            if (isFinalized != null) {
-                // isFinalized is set because the node sent progress
-                if( totalBlocks > 0 ) {
-                    percentDone = ((doneBlocks * 100) / totalBlocks);
-                    if( percentDone > 100 ) {
-                        percentDone = 100;
+        /**
+         * @param {Type} aType - the type of comparator column
+         * @param {boolean} aAscending - set to false if you want descending order instead
+         * IMPORTANT: THE DOWNLOAD/UPLOAD TABLES DO NOT SUPPORT INVERTED COMPARATORS,
+         * SO THIS MUST ALWAYS BE TRUE. To change sort order, override the table's "default
+         * ascension state for column" getter instead (which we do!).
+         */
+        public ColumnComparator(
+                final Type aType,
+                final boolean aAscending)
+        {
+            fType = aType;
+            fAscending = aAscending;
+        }
+
+        /**
+         * Compares two upload objects.
+         */
+        public int compare(
+                final FrostUploadItem ulItem1,
+                final FrostUploadItem ulItem2)
+        {
+            int result = 0; // init to "both items are equal"
+
+            // compare the objects using the desired column
+            switch( fType.getObjType() ) {
+                case 0: // "String"
+                    // load the column-appropriate String values
+                    String s1 = null, s2 = null;
+                    switch( fType ) {
+                        case FILENAME:
+                            s1 = ulItem1.getFileName(); s2 = ulItem2.getFileName();
+                            break;
+                        case PATH:
+                            s1 = ulItem1.getFile().getPath(); s2 = ulItem2.getFile().getPath();
+                            break;
+                        case KEY:
+                            // nulls (no keys) are sorted last in ascending mode
+                            s1 = ulItem1.getKey(); s2 = ulItem2.getKey();
+                            break;
+                        case COMPAT_MODE:
+                            s1 = ulItem1.getFreenetCompatibilityMode(); s2 = ulItem2.getFreenetCompatibilityMode();
+                            break;
+                        case CRYPTOKEY:
+                            // nulls (no crypto keys) are sorted last in ascending mode
+                            s1 = ulItem1.getCryptoKey(); s2 = ulItem2.getCryptoKey();
+                            break;
                     }
+                    // perform a case-insensitive String comparison with null-support
+                    result = Mixed.compareStringWithNullSupport(s1, s2, /*ignoreCase=*/true);
+                    break;
+                case 1: // "boolean"
+                    // load the column-appropriate boolean values
+                    boolean b1 = false, b2 = false;
+                    switch( fType ) {
+                        case ENABLED:
+                            // external items and finished items are *always* rendered as "enabled", so sort them like that too
+                            if( ulItem1.isExternal() || ulItem1.getState() == FrostUploadItem.STATE_DONE ) {
+                                b1 = true;
+                            } else {
+                                b1 = ulItem1.isEnabled().booleanValue();
+                            }
+                            if( ulItem2.isExternal() || ulItem2.getState() == FrostUploadItem.STATE_DONE ) {
+                                b2 = true;
+                            } else {
+                                b2 = ulItem2.isEnabled().booleanValue();
+                            }
+                            break;
+                        case COMPRESS:
+                            b1 = ulItem1.getCompress(); b2 = ulItem2.getCompress();
+                            break;
+                    }
+                    result = Mixed.compareBool(b1, b2);
+                    break;
+                case 2: // "long"
+                    // load the column-appropriate long values
+                    long l1 = 0L, l2 = 0L;
+                    switch( fType ) {
+                        case FILESIZE:
+                            l1 = ulItem1.getFileSize(); l2 = ulItem2.getFileSize();
+                            break;
+                    }
+                    result = Mixed.compareLong(l1, l2);
+                    break;
+                case 3: // "int"
+                    // load the column-appropriate int values
+                    int i1 = 0, i2 = 0;
+                    switch( fType ) {
+                        case STATE:
+                            i1 = calculateStateSortValue(ulItem1); i2 = calculateStateSortValue(ulItem2);
+                            break;
+                        case BLOCKS:
+                            i1 = calculateBlocksSortValue(ulItem1); i2 = calculateBlocksSortValue(ulItem2);
+                            break;
+                        case TRIES:
+                            i1 = ulItem1.getRetries(); i2 = ulItem2.getRetries();
+                            break;
+                        case PRIORITY:
+                            i1 = ulItem1.getPriority().getNumber(); i2 = ulItem2.getPriority().getNumber();
+                            break;
+                    }
+                    result = Mixed.compareInt(i1, i2);
+                    break;
+                case 4: // "double"
+                    // load the column-appropriate double values
+                    double d1 = 0.0d, d2 = 0.0d;
+                    switch( fType ) {
+                        /* nothing in this table uses doubles */
+                    }
+                    result = Mixed.compareDouble(d1, d2);
+                    break;
+            }
+
+            // if the values are equal and this isn't the "Filename" column, then use Filename as tie-breaker
+            if( result == 0 && fType != Type.FILENAME ) {
+                // compare by case-insensitive Filename using always-ascending order.
+                result = Mixed.compareStringWithNullSupport(ulItem1.getFileName(), ulItem2.getFileName(), /*ignoreCase=*/true);
+                // NOTE:IMPORTANT: for this table, we achieve the "always-ascending" order by inverting
+                // the filename sort results *if* this is one of the columns that default to descending order.
+                // by pre-inverting our result in those cases, the tables will flip the filenames back
+                // to normal order, which means that we get (for example) descending block sorting,
+                // but ascending filenames. this trick only works on their first click, since we don't
+                // know the sort-order of the table column, so inversion will reverse the filename order
+                // too, but that's fine, since that just means the *entire* list is inverted nicely.
+                switch( fType ) {
+                    // NOTE:XXX: this is the same list as UploadPanel.java:getColumnDefaultAscendingState()
+                    case ENABLED:
+                    case FILESIZE:
+                    case STATE:
+                    case BLOCKS:
+                    case COMPRESS:
+                        result = -result;
+                        break;
                 }
-            }
-            if (isFinalized != null && isFinalized.booleanValue()) {
-                // finalized get highest value
-                percentDone = (percentDone+2)*100;
-            } else if (isFinalized != null && !isFinalized.booleanValue()) {
-                // not finalized, but obviously started by node
-                percentDone = percentDone+1;
+                return result;
             } else {
-                // not started by node
-                percentDone = 0;
+                // if they want a reverse/descending sort, we'll invert the result
+                return ( fAscending ? result : -result );
             }
+        }
+
+        /**
+         * Sort the current state of the transfers, with the highest importance
+         * given to the highest states of completion.
+         */
+        private int calculateStateSortValue(
+                final FrostUploadItem ulItem)
+        {
+            final int state = ulItem.getState();
+            int sortValue = 0;
+            switch( state ) {
+                case FrostUploadItem.STATE_DONE: // Finished
+                    sortValue = 100;
+                    break;
+                case FrostUploadItem.STATE_PROGRESS: // Uploading
+                    sortValue = 90;
+                    break;
+                case FrostUploadItem.STATE_ENCODING: // Pre-calculating key
+                    sortValue = 80;
+                    break;
+                case FrostUploadItem.STATE_ENCODING_REQUESTED: // Waiting for pre-encode
+                    sortValue = 70;
+                    break;
+                case FrostUploadItem.STATE_WAITING: // Waiting
+                    sortValue = 60;
+                    break;
+                case FrostUploadItem.STATE_FAILED: // Failed
+                    sortValue = 50;
+                    break;
+                default: // no other states exist, this is just futureproofing
+                    sortValue = state;
+            }
+            return sortValue;
+        }
+
+        /**
+         * Sorts Finished items at the top, then Uploading main-data items (1% 1/100) after that, then
+         * Uploading metadata items (~10% 1/10), then all remaining items that aren't Finished/Uploading.
+         */
+        private int calculateBlocksSortValue(
+                final FrostUploadItem ulItem)
+        {
+            // invalid items (should never happen) get a very negative value to be sorted last
+            if( ulItem == null ) {
+                return -1000; // invalid
+            }
+
+            // if the item is Finished, we use the highest value for topmost sorting
+            // NOTE: normal items that have reached 100% but aren't done yet (due to still finishing
+            // the final blocks) are still treated as STATE_PROGRESS and will calculate a percentage below.
+            if( ulItem.getState() == FrostUploadItem.STATE_DONE ) {
+                return 1000; // finished
+            }
+
+            // if the item isn't Finished and isn't Uploading, then it's waiting/failed/whatever,
+            // so give it a negative sort value so that it's below 0%-progress *running* items
+            if( ulItem.getState() != FrostUploadItem.STATE_PROGRESS ) { // PROGRESS means "Uploading"
+                return -100; // not in progress
+            }
+
+            // calculate the transfer percentage
+            int percentDone = calculatePercentDone(ulItem);
+
+            // boost the value if this is the percentage for the main transfer (Finalized=true),
+            // because otherwise it's just the percentage for the preparatory (~0% 0/1) metadata.
+            // NOTE: to be honest... this code is just a precaution. upload-items never live in the
+            // "non-finalized" stage; they simply tell the node to upload the item and instantly
+            // get an accurate "done + total" block count in response, since they don't have to
+            // wait for any metadata. this code is just here for correctness.
+            final Boolean isFinalized = ulItem.isFinalized();
+            if( isFinalized != null && isFinalized.booleanValue() == true ) {
+                // add 101 to the percentage for items that have actually progressed past
+                // the "uploading metadata" stage. this ensures that even a 0% done normal
+                // item is sorted above a "100% done uploading metadata" item. so normal items
+                // will live in the 101-201 percent value range.
+                percentDone += 101; // main transfer value boost
+            }
+
             return percentDone;
         }
     }
 
-    /**
-     * This inner class implements the comparator for the column "Tries"
-     */
-    private class TriesComparator implements Comparator<FrostUploadItem> {
-        public int compare(final FrostUploadItem o1, final FrostUploadItem o2) {
-            final int retries1 = o1.getRetries();
-            final int retries2 = o2.getRetries();
-            return Mixed.compareInt(retries1, retries2);
-//            return new Integer(retries1).compareTo(new Integer(retries2));
-        }
-    }
-
+    /* //#DIEFILESHARING: This entire block has been commented out since filesharing is removed in Frost-Next.
+    //if filesharing ever comes back, this should be migrated to ColumnComparator format.
     private class IsSharedComparator implements Comparator<FrostUploadItem> {
         public int compare(final FrostUploadItem item1, final FrostUploadItem item2) {
-            final Boolean b1 = Boolean.valueOf( item1.isSharedFile() );
-            final Boolean b2 = Boolean.valueOf( item2.isSharedFile() );
-            return b1.compareTo(b2);
+            return Mixed.compareBool(item1.isSharedFile(), item2.isSharedFile());
         }
     }
-
-    /**
-     * This inner class implements the comparator for the column "Path"
-     */
-    private class PathComparator implements Comparator<FrostUploadItem> {
-        public int compare(final FrostUploadItem item1, final FrostUploadItem item2) {
-            return item1.getFile().getPath().compareToIgnoreCase(item2.getFile().getPath());
-        }
-    }
-
-    /**
-     * This inner class implements the comparator for the column "Enabled"
-     */
-    private class EnabledComparator implements Comparator<FrostUploadItem> {
-        public int compare(final FrostUploadItem item1, final FrostUploadItem item2) {
-            final Boolean b1 = Boolean.valueOf( item1.isEnabled().booleanValue() );
-            final Boolean b2 = Boolean.valueOf( item2.isEnabled().booleanValue() );
-            return b1.compareTo(b2);
-        }
-    }
-
-    /**
-     * This inner class implements the comparator for the column "Key"
-     */
-    private class KeyComparator implements Comparator<FrostUploadItem> {
-        public int compare(final FrostUploadItem o1, final FrostUploadItem o2) {
-            String key1 = o1.getKey();
-            String key2 = o2.getKey();
-            if (key1 == null) {
-                key1 = unknown;
-            }
-            if (key2 == null) {
-                key2 = unknown;
-            }
-            return key1.compareToIgnoreCase(key2);
-        }
-    }
-
-    /**
-     * This inner class implements the comparator for the column "FileSize"
-     */
-    private class FileSizeComparator implements Comparator<FrostUploadItem> {
-        public int compare(final FrostUploadItem item1, final FrostUploadItem item2) {
-            return Mixed.compareLong(item1.getFileSize(), item2.getFileSize());
-        }
-    }
+    */
 
     private final Language language;
 
     // with persistence we have 1 additional column: priority
-    private final static int COLUMN_COUNT = ( PersistenceManager.isPersistenceEnabled() ? 10 : 9 );
+//#DIEFILESHARING    private final static int COLUMN_COUNT = ( PersistenceManager.isPersistenceEnabled() ? 13 : 12 );
+    private final static int COLUMN_COUNT = ( PersistenceManager.isPersistenceEnabled() ? 12 : 11 );
 
     private String stateDone;
     private String stateFailed;
@@ -459,9 +764,10 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
     private String stateEncoding;
     private String stateWaiting;
 
-    private String unknown;
+    private String unknownKeyString; // language-specific placeholder: files without CHK keys yet
+    private String autoCryptoKeyString; // ...: files without custom crypto key
 
-    private String isSharedTooltip;
+//#DIEFILESHARING    private String isSharedTooltip;
 
     public UploadTableFormat() {
         super(COLUMN_COUNT);
@@ -470,17 +776,20 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
         language.addLanguageListener(this);
         refreshLanguage();
 
-        setComparator(new EnabledComparator(), 0);
-        setComparator(new IsSharedComparator(), 1);
-        setComparator(new NameComparator(), 2);
-        setComparator(new FileSizeComparator(), 3);
-        setComparator(new StateComparator(), 4);
-        setComparator(new PathComparator(), 5);
-        setComparator(new BlocksComparator(), 6);
-        setComparator(new TriesComparator(), 7);
-        setComparator(new KeyComparator(), 8);
+        setComparator(new ColumnComparator(ColumnComparator.Type.ENABLED, true), 0);
+//#DIEFILESHARING        setComparator(new IsSharedComparator(), 1); // NOTE: all other columns have been reordered with this removal
+        setComparator(new ColumnComparator(ColumnComparator.Type.FILENAME, true), 1);
+        setComparator(new ColumnComparator(ColumnComparator.Type.FILESIZE, true), 2);
+        setComparator(new ColumnComparator(ColumnComparator.Type.STATE, true), 3);
+        setComparator(new ColumnComparator(ColumnComparator.Type.PATH, true), 4);
+        setComparator(new ColumnComparator(ColumnComparator.Type.BLOCKS, true), 5);
+        setComparator(new ColumnComparator(ColumnComparator.Type.KEY, true), 6);
+        setComparator(new ColumnComparator(ColumnComparator.Type.COMPRESS, true), 7);
+        setComparator(new ColumnComparator(ColumnComparator.Type.COMPAT_MODE, true), 8);
+        setComparator(new ColumnComparator(ColumnComparator.Type.CRYPTOKEY, true), 9);
+        setComparator(new ColumnComparator(ColumnComparator.Type.TRIES, true), 10);
         if( PersistenceManager.isPersistenceEnabled() ) {
-            setComparator(new PriorityComparator(), 9);
+            setComparator(new ColumnComparator(ColumnComparator.Type.PRIORITY, true), 11);
         }
 
         showColoredLines = Core.frostSettings.getBoolValue(SettingsClass.SHOW_COLORED_ROWS);
@@ -489,16 +798,19 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
 
     private void refreshLanguage() {
         setColumnName(0, language.getString("Common.enabled"));
-        setColumnName(1, language.getString("UploadPane.fileTable.shared"));
-        setColumnName(2, language.getString("UploadPane.fileTable.filename"));
-        setColumnName(3, language.getString("UploadPane.fileTable.size"));
-        setColumnName(4, language.getString("UploadPane.fileTable.state"));
-        setColumnName(5, language.getString("UploadPane.fileTable.path"));
-        setColumnName(6, language.getString("UploadPane.fileTable.blocks"));
-        setColumnName(7, language.getString("UploadPane.fileTable.tries"));
-        setColumnName(8, language.getString("UploadPane.fileTable.key"));
+//#DIEFILESHARING        setColumnName(1, language.getString("UploadPane.fileTable.shared")); // NOTE: all other columns have been reordered with this removal
+        setColumnName(1, language.getString("UploadPane.fileTable.filename"));
+        setColumnName(2, language.getString("UploadPane.fileTable.size"));
+        setColumnName(3, language.getString("UploadPane.fileTable.state"));
+        setColumnName(4, language.getString("UploadPane.fileTable.path"));
+        setColumnName(5, language.getString("UploadPane.fileTable.blocks"));
+        setColumnName(6, language.getString("UploadPane.fileTable.key"));
+        setColumnName(7, language.getString("UploadPane.fileTable.compress"));
+        setColumnName(8, language.getString("UploadPane.fileTable.freenetCompatibilityMode"));
+        setColumnName(9, language.getString("UploadPane.fileTable.cryptoKey"));
+        setColumnName(10, language.getString("UploadPane.fileTable.tries"));
         if( PersistenceManager.isPersistenceEnabled() ) {
-            setColumnName(9, language.getString("UploadPane.fileTable.priority"));
+            setColumnName(11, language.getString("UploadPane.fileTable.priority"));
         }
 
         stateDone =               language.getString("UploadPane.fileTable.state.done");
@@ -507,9 +819,10 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
         stateEncodingRequested =  language.getString("UploadPane.fileTable.state.encodeRequested");
         stateEncoding =           language.getString("UploadPane.fileTable.state.encodingFile") + "...";
         stateWaiting =            language.getString("UploadPane.fileTable.state.waiting");
-        unknown =                 language.getString("UploadPane.fileTable.state.unknown");
+        unknownKeyString =        language.getString("UploadPane.fileTable.state.unknown");
+        autoCryptoKeyString =     language.getString("UploadPane.fileTable.cryptoKey.autoCryptoKey");
 
-        isSharedTooltip = language.getString("UploadPane.fileTable.shared.tooltip");
+//#DIEFILESHARING        isSharedTooltip = language.getString("UploadPane.fileTable.shared.tooltip");
 
         refreshColumnNames();
     }
@@ -519,6 +832,10 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
         switch (columnIndex) {
 
             case 0 : //Enabled
+                // refuse toggling "enabled" if this is an external upload or if the upload is complete
+                if( uploadItem.isExternal() || uploadItem.getState() == FrostUploadItem.STATE_DONE ) {
+                    return;
+                }
                 final Boolean valueBoolean = (Boolean) value;
                 uploadItem.setEnabled(valueBoolean);
                 FileTransferManager.inst().getUploadManager().notifyUploadItemEnabledStateChanged(uploadItem);
@@ -538,35 +855,53 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
             case 0 : //Enabled
                 return uploadItem.isEnabled();
 
-            case 1 :    // isShared
-                return Boolean.valueOf(uploadItem.isSharedFile());
+//#DIEFILESHARING            case 1 :    // isShared // NOTE: all other columns have been reordered with this removal
+//#DIEFILESHARING                return Boolean.valueOf(uploadItem.isSharedFile());
 
-            case 2 :    //Filename
+            case 1 :    //Filename
                 return uploadItem.getFileName();
 
-            case 3 :    //Size
+            case 2 :    //Size
                 return FormatterUtils.formatSize(uploadItem.getFileSize());
 
-            case 4 :    // state
-                return getStateAsString(uploadItem, uploadItem.getState());
+            case 3 :    // state
+                return getStateAsString(uploadItem);
 
-            case 5 :    //Path
+            case 4 :    //Path
                 return uploadItem.getFile().getPath();
 
-            case 6 :    //blocks
-                return getUploadProgress(uploadItem);
+            case 5 :    //blocks
+                return getBlocksAsString(uploadItem);
 
-            case 7 :    //Tries
-                return new Integer(uploadItem.getRetries());
-
-            case 8 :    //Key
+            case 6 :    //Key
                 if (uploadItem.getKey() == null) {
-                    return unknown;
+                    return unknownKeyString;
                 } else {
                     return uploadItem.getKey();
                 }
 
-            case 9: // Priority
+            case 7 :    //Compress
+                return uploadItem.getCompress();
+
+            case 8 :    //Compatibility mode
+                // NOTE: we save table space (and make the column much more readable) by not showing
+                // the leading "COMPAT_" string, since they all begin with that; so "COMPAT_1468" is
+                // simply shown as "1468" (for example). we don't use the more efficient .substring(7),
+                // in the unlikely case that future Freenet versions change the name of these
+                // constants to no longer have a leading "COMPAT_".
+                return uploadItem.getFreenetCompatibilityMode().replace("COMPAT_", "");
+
+            case 9 :    //Crypto Key
+                if (uploadItem.getCryptoKey() == null) {
+                    return autoCryptoKeyString;
+                } else {
+                    return uploadItem.getCryptoKey();
+                }
+
+            case 10 :   //Tries
+                return new Integer(uploadItem.getRetries());
+
+            case 11 : // Priority
             	// FIXME: handle native type, not int
                 final int value = uploadItem.getPriority().getNumber();
                 if( value < 0 ) {
@@ -580,8 +915,8 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
         }
     }
 
-    private String getStateAsString(final FrostUploadItem item, final int state) {
-        switch (state) {
+    private String getStateAsString(final FrostUploadItem ulItem) {
+        switch( ulItem.getState() ) {
 
             case FrostUploadItem.STATE_PROGRESS :
                 return stateUploading;
@@ -593,7 +928,12 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
                 return stateEncoding;
 
             case FrostUploadItem.STATE_FAILED :
-                return stateFailed;
+                final String errorCodeDescription = getFailureString(ulItem, /*escapeTags=*/false);
+                if( errorCodeDescription != null ) {
+                    return stateFailed + ": " + errorCodeDescription; // NOTE: the table cell completely ignores newlines so we don't need to trim them
+                } else {
+                    return stateFailed;
+                }
 
             case FrostUploadItem.STATE_DONE :
                 return stateDone;
@@ -606,32 +946,44 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
         }
     }
 
-    private String getUploadProgress(final FrostUploadItem uploadItem) {
+    /**
+     * Returns a non-null String if there is a failure reason.
+     * Optionally escapes <, >, and & html/xml characters.
+     */
+    private String getFailureString(final FrostUploadItem ulItem, final boolean escapeTags) {
+        if( ulItem == null ) { return null; }
+        final String errorCodeDescription = ulItem.getErrorCodeDescription();
+        if( errorCodeDescription != null && errorCodeDescription.length() > 0 ) {
+            return ( escapeTags ? Mixed.htmlSpecialChars(errorCodeDescription) : errorCodeDescription );
+        } else {
+            return null;
+        }
+    }
+
+    private String getBlocksAsString(final FrostUploadItem uploadItem) {
 
         final int totalBlocks = uploadItem.getTotalBlocks();
         final int doneBlocks = uploadItem.getDoneBlocks();
         final Boolean isFinalized = uploadItem.isFinalized();
 
-        // format: ~0% 0/60 [60]
-
         if( totalBlocks <= 0 ) {
-            return "";
+            // if we don't know the block total but it's marked "DONE", it means the transfer
+            // finished during a previous session, so we'll simply display 100%. on the other
+            // hand, if a transfer hasn't even started yet, we simply show nothing instead.
+            return ( uploadItem.getState() == FrostUploadItem.STATE_DONE ? "100%" : "" );
         }
 
-        int percentDone = 0;
-        if (totalBlocks > 0) {
-            percentDone = ((doneBlocks * 100) / totalBlocks);
-        }
-        if( percentDone > 100 ) {
-            percentDone = 100;
-        }
+        // format: ~0% 0/60 [60]
 
         final StringBuilder sb = new StringBuilder();
 
-        if( isFinalized != null && !isFinalized.booleanValue() ) {
+        // add a tilde prefix while downloading metadata (finalized becomes false when the
+        // real transfer begins, after the metadata has been fully retrieved).
+        if( isFinalized != null && isFinalized.booleanValue() == false ) {
             sb.append("~");
         }
 
+        int percentDone = calculatePercentDone(uploadItem);
         sb.append(percentDone).append("% ");
         sb.append(doneBlocks).append("/").append(totalBlocks).append(" [").append(totalBlocks).append("]");
 
@@ -649,60 +1001,66 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
         {
             final int sortedColumn = Core.frostSettings.getIntValue(CFGKEY_SORTSTATE_SORTEDCOLUMN);
             final boolean isSortedAsc = Core.frostSettings.getBoolValue(CFGKEY_SORTSTATE_SORTEDASCENDING);
-            if( sortedColumn > -1 ) {
+            if( sortedColumn > -1 && sortedColumn < modelTable.getTable().getColumnModel().getColumnCount() ) {
                 modelTable.setSortedColumn(sortedColumn, isSortedAsc);
             }
         } else {
-            modelTable.setSortedColumn(2, true);
+//#DIEFILESHARING            modelTable.setSortedColumn(2, true);
+            modelTable.setSortedColumn(1, true);
         }
 
         lModelTable.getTable().setAutoResizeMode(JTable.AUTO_RESIZE_NEXT_COLUMN);
 
         final TableColumnModel columnModel = lModelTable.getTable().getColumnModel();
+        fixedsizeColumns = new HashSet<Integer>();
 
         // Column "Enabled"
         columnModel.getColumn(0).setCellRenderer(BooleanCell.RENDERER);
         columnModel.getColumn(0).setCellEditor(BooleanCell.EDITOR);
         setColumnEditable(0, true);
         columnModel.getColumn(0).setCellRenderer(new IsEnabledRenderer());
-        // hard set sizes of checkbox column
+        // hard set sizes of "enabled" checkbox column
         columnModel.getColumn(0).setMinWidth(20);
         columnModel.getColumn(0).setMaxWidth(20);
         columnModel.getColumn(0).setPreferredWidth(20);
+        fixedsizeColumns.add(0);
+        /* //#DIEFILESHARING: This entire block has been commented out since filesharing is removed in Frost-Next. And all other columns have been re-numbered below.
         // hard set sizes of icon column
         columnModel.getColumn(1).setMinWidth(20);
         columnModel.getColumn(1).setMaxWidth(20);
         columnModel.getColumn(1).setPreferredWidth(20);
         columnModel.getColumn(1).setCellRenderer(new IsSharedRenderer());
-        if( PersistenceManager.isPersistenceEnabled() ) {
-            // hard set sizes of priority column
-            columnModel.getColumn(9).setMinWidth(20);
-            columnModel.getColumn(9).setMaxWidth(20);
-            columnModel.getColumn(9).setPreferredWidth(20);
-        }
+        fixedsizeColumns.add(1);
+        */
 
         final RightAlignRenderer numberRightRenderer = new RightAlignRenderer();
         final ShowContentTooltipRenderer showContentTooltipRenderer = new ShowContentTooltipRenderer();
 
-        columnModel.getColumn(2).setCellRenderer(new ShowNameTooltipRenderer()); // filename
-        columnModel.getColumn(3).setCellRenderer(numberRightRenderer); // filesize
-        columnModel.getColumn(4).setCellRenderer(new ShowStateContentTooltipRenderer()); // state
-        columnModel.getColumn(5).setCellRenderer(showContentTooltipRenderer); // path
-        columnModel.getColumn(6).setCellRenderer(new BlocksProgressRenderer()); // blocks
-        columnModel.getColumn(7).setCellRenderer(numberRightRenderer); // tries
-        columnModel.getColumn(8).setCellRenderer(showContentTooltipRenderer); // key
+        columnModel.getColumn(1).setCellRenderer(new ShowNameTooltipRenderer()); // filename
+        columnModel.getColumn(2).setCellRenderer(numberRightRenderer); // filesize
+        columnModel.getColumn(3).setCellRenderer(new ShowStateContentTooltipRenderer()); // state
+        columnModel.getColumn(4).setCellRenderer(showContentTooltipRenderer); // path
+        columnModel.getColumn(5).setCellRenderer(new BlocksProgressRenderer()); // blocks
+        columnModel.getColumn(6).setCellRenderer(showContentTooltipRenderer); // key
+        // custom renderer which disables editing of the values in the "compress" column (since they can't be changed after uploads have begun)
+        columnModel.getColumn(7).setCellRenderer(new IsCompressRenderer()); // compress
+        columnModel.getColumn(8).setCellRenderer(showContentTooltipRenderer); // compatibility mode
+        columnModel.getColumn(9).setCellRenderer(showContentTooltipRenderer); // crypto key
+        columnModel.getColumn(10).setCellRenderer(numberRightRenderer); // tries
         if( PersistenceManager.isPersistenceEnabled() ) {
-            columnModel.getColumn(9).setCellRenderer(numberRightRenderer);
+            columnModel.getColumn(11).setCellRenderer(numberRightRenderer); // priority
         }
 
         if( !loadTableLayout(columnModel) ) {
             // Sets the relative widths of the columns
             int[] widths;
             if( PersistenceManager.isPersistenceEnabled() ) {
-                final int[] newWidths = { 20, 20, 200, 65, 30, 60, 50, 15, 70, 20 };
+//#DIEFILESHARING                final int[] newWidths = { 20, 20, 200, 65, 30, 60, 50, 70, 30, 60, 60, 20, 20 };
+                final int[] newWidths = { 20, 200, 65, 30, 60, 50, 70, 30, 60, 60, 20, 20 };
                 widths = newWidths;
             } else {
-                final int[] newWidths = { 20, 20, 200, 65, 30, 60, 50, 15, 70 };
+//#DIEFILESHARING                final int[] newWidths = { 20, 20, 200, 65, 30, 60, 50, 70, 30, 60, 60, 20 };
+                final int[] newWidths = { 20, 200, 65, 30, 60, 50, 70, 30, 60, 60, 20 };
                 widths = newWidths;
             }
 
@@ -762,13 +1120,13 @@ class UploadTableFormat extends SortedTableFormat<FrostUploadItem> implements La
             columnWidths[x] = columnWidth;
         }
         // columns are currently added in model order, remove them all and save in an array
-        // while on it, set the loaded width of each column
+        // while we're at it, set the loaded width of each column
         final TableColumn[] tcms = new TableColumn[tcm.getColumnCount()];
         for(int x=tcms.length-1; x >= 0; x--) {
             tcms[x] = tcm.getColumn(x);
             tcm.removeColumn(tcms[x]);
-            // keep icon columns 0,1 as is
-            if(x != 0 && x != 1) {
+            // keep the fixed-size columns as is
+            if( ! fixedsizeColumns.contains(x) ) {
                 tcms[x].setPreferredWidth(columnWidths[x]);
             }
         }

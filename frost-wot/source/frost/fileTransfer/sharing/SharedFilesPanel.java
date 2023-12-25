@@ -29,10 +29,12 @@ import java.util.logging.*;
 import javax.swing.*;
 
 import frost.*;
+import frost.MainFrame;
 import frost.fileTransfer.filelist.*;
 import frost.storage.perst.*;
 import frost.util.*;
 import frost.util.gui.*;
+import frost.util.gui.SmartFileFilters;
 import frost.util.gui.search.*;
 import frost.util.gui.translation.*;
 import frost.util.model.*;
@@ -148,6 +150,7 @@ public class SharedFilesPanel extends JPanel {
 
     private void removeSelectedFiles() {
         final List<FrostSharedFileItem> selectedItems = modelTable.getSelectedItems();
+        if( selectedItems == null ) { return; }
         model.removeItems(selectedItems);
 
         modelTable.getTable().clearSelection();
@@ -162,17 +165,30 @@ public class SharedFilesPanel extends JPanel {
 
         final JFileChooser fc = new JFileChooser(Core.frostSettings.getValue(SettingsClass.DIR_LAST_USED));
         fc.setDialogTitle(language.getString("SharedFilesPane.filechooser.title"));
-        fc.setFileHidingEnabled(true);
-        fc.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
-        fc.setMultiSelectionEnabled(true);
-        fc.setPreferredSize(new Dimension(600, 400));
+        fc.setFileHidingEnabled(true); // hide hidden files
+        fc.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES); // accept both files and directories
+        fc.setMultiSelectionEnabled(true); // accept multiple files
+        SmartFileFilters.installDefaultFilters(fc, language); // install all common file filters
+        // let the L&F decide the dialog width (so that all labels fit), but we'll still set a minimum
+        // height and width so that the user never gets a cramped dialog
+        final Dimension fcSize = fc.getPreferredSize();
+        if( fcSize.width < 650 ) { fcSize.width = 650; }
+        if( fcSize.height < 450 ) { fcSize.height = 450; }
+        fc.setPreferredSize(fcSize);
 
-        if (fc.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
-            return;
+        // NOTE: this check guarantees that we center the first "add files" picker over the mainframe,
+        // and subsequent ones over the "add new files" window (if they click its "Add [more]" button)
+        final int returnVal = fc.showOpenDialog(
+                ( this != null && this.isVisible() ? this : MainFrame.getInstance() )
+        );
+        if( returnVal != JFileChooser.APPROVE_OPTION ) {
+            return; // user canceled file dialog
         }
+
+        // retrieve the list of chosen files
         final File[] selectedFiles = fc.getSelectedFiles();
         if( selectedFiles == null || selectedFiles.length == 0 ) {
-            return;
+            return; // file dialog failed
         }
 
         // ask for owner to use
@@ -276,7 +292,7 @@ public class SharedFilesPanel extends JPanel {
 
     private void showProperties() {
         final List<FrostSharedFileItem> selectedItems = modelTable.getSelectedItems();
-        if( selectedItems.size() == 0 ) {
+        if( selectedItems == null || selectedItems.size() == 0 ) {
             return;
         }
 
@@ -399,10 +415,14 @@ public class SharedFilesPanel extends JPanel {
 
         public void actionPerformed(final ActionEvent e) {
             if (e.getSource() == copyKeysAndNamesItem) {
-                CopyToClipboard.copyKeysAndFilenames(modelTable.getSelectedItems().toArray());
+                final List<FrostSharedFileItem> selectedItems = modelTable.getSelectedItems();
+                if( selectedItems == null ) { return; }
+                CopyToClipboard.copyKeysAndFilenames(selectedItems.toArray());
             }
             if (e.getSource() == copyExtendedInfoItem) {
-                CopyToClipboard.copyExtendedInfo(modelTable.getSelectedItems().toArray());
+                final List<FrostSharedFileItem> selectedItems = modelTable.getSelectedItems();
+                if( selectedItems == null ) { return; }
+                CopyToClipboard.copyExtendedInfo(selectedItems.toArray());
             }
             if (e.getSource() == removeSelectedFilesItem) {
                 removeSelectedFiles();
@@ -419,7 +439,9 @@ public class SharedFilesPanel extends JPanel {
          * Reload selected files
          */
         private void uploadSelectedFiles() {
-            model.requestItems(modelTable.getSelectedItems());
+            final List<FrostSharedFileItem> selectedItems = modelTable.getSelectedItems();
+            if( selectedItems == null ) { return; }
+            model.requestItems(selectedItems);
         }
 
         public void languageChanged(final LanguageEvent event) {
@@ -432,7 +454,7 @@ public class SharedFilesPanel extends JPanel {
 
             final List<FrostSharedFileItem> selectedItems = modelTable.getSelectedItems();
 
-            if( selectedItems.size() == 0 ) {
+            if( selectedItems == null || selectedItems.size() == 0 ) {
                 return;
             }
 

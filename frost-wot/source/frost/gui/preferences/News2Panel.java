@@ -54,14 +54,14 @@ class News2Panel extends JPanel {
     private final JCheckBox blockSubjectCheckBox = new JCheckBox();
     private final JTextArea blockSubjectTextField = new JTextArea(2,0);
 
-    private final JCheckBox hideBadMessagesCheckBox = new JCheckBox();
-    private final JCheckBox hideCheckMessagesCheckBox = new JCheckBox();
-    private final JCheckBox hideObserveMessagesCheckBox = new JCheckBox();
+    private final JCheckBox hideBADMessagesCheckBox = new JCheckBox();
+    private final JCheckBox hideNEUTRALMessagesCheckBox = new JCheckBox();
+    private final JCheckBox hideGOODMessagesCheckBox = new JCheckBox();
     private final JCheckBox hideUnsignedMessagesCheckBox = new JCheckBox();
 
-    private final JCheckBox blockBoardsFromBadCheckBox = new JCheckBox();
-    private final JCheckBox blockBoardsFromCheckCheckBox = new JCheckBox();
-    private final JCheckBox blockBoardsFromObserveCheckBox = new JCheckBox();
+    private final JCheckBox blockBoardsFromBADCheckBox = new JCheckBox();
+    private final JCheckBox blockBoardsFromNEUTRALCheckBox = new JCheckBox();
+    private final JCheckBox blockBoardsFromGOODCheckBox = new JCheckBox();
     private final JCheckBox blockBoardsFromUnsignedCheckBox = new JCheckBox();
 
     private final JLabel hideMessagesLabel = new JLabel();
@@ -147,14 +147,14 @@ class News2Panel extends JPanel {
 
         constraints.gridx = 0;
         constraints.insets = new Insets(5, 20, 5, 5);
-        hidePanel.add(hideObserveMessagesCheckBox, constraints);
+        hidePanel.add(hideGOODMessagesCheckBox, constraints);
 
         constraints.gridx = 1;
         constraints.insets = new Insets(5, 5, 0, 5);
-        hidePanel.add(hideCheckMessagesCheckBox, constraints);
+        hidePanel.add(hideNEUTRALMessagesCheckBox, constraints);
 
         constraints.gridx = 2;
-        hidePanel.add(hideBadMessagesCheckBox, constraints);
+        hidePanel.add(hideBADMessagesCheckBox, constraints);
 
         constraints.gridx = 3;
         hidePanel.add(hideUnsignedMessagesCheckBox, constraints);
@@ -182,14 +182,14 @@ class News2Panel extends JPanel {
 
         constraints.gridx = 0;
         constraints.insets = new Insets(5, 20, 5, 5);
-        blockBoardsPanel.add(blockBoardsFromObserveCheckBox, constraints);
+        blockBoardsPanel.add(blockBoardsFromGOODCheckBox, constraints);
 
         constraints.gridx = 1;
         constraints.insets = new Insets(5, 5, 0, 5);
-        blockBoardsPanel.add(blockBoardsFromCheckCheckBox, constraints);
+        blockBoardsPanel.add(blockBoardsFromNEUTRALCheckBox, constraints);
 
         constraints.gridx = 2;
-        blockBoardsPanel.add(blockBoardsFromBadCheckBox, constraints);
+        blockBoardsPanel.add(blockBoardsFromBADCheckBox, constraints);
 
         constraints.gridx = 3;
         blockBoardsPanel.add(blockBoardsFromUnsignedCheckBox, constraints);
@@ -291,14 +291,14 @@ class News2Panel extends JPanel {
      */
     private void loadSettings() {
         hideUnsignedMessagesCheckBox.setSelected(settings.getBoolValue(SettingsClass.MESSAGE_HIDE_UNSIGNED));
-        hideBadMessagesCheckBox.setSelected(settings.getBoolValue(SettingsClass.MESSAGE_HIDE_BAD));
-        hideCheckMessagesCheckBox.setSelected(settings.getBoolValue(SettingsClass.MESSAGE_HIDE_CHECK));
-        hideObserveMessagesCheckBox.setSelected(settings.getBoolValue(SettingsClass.MESSAGE_HIDE_OBSERVE));
+        hideBADMessagesCheckBox.setSelected(settings.getBoolValue(SettingsClass.MESSAGE_HIDE_BAD));
+        hideNEUTRALMessagesCheckBox.setSelected(settings.getBoolValue(SettingsClass.MESSAGE_HIDE_NEUTRAL));
+        hideGOODMessagesCheckBox.setSelected(settings.getBoolValue(SettingsClass.MESSAGE_HIDE_GOOD));
 
         blockBoardsFromUnsignedCheckBox.setSelected(settings.getBoolValue(SettingsClass.KNOWNBOARDS_BLOCK_FROM_UNSIGNED));
-        blockBoardsFromBadCheckBox.setSelected(settings.getBoolValue(SettingsClass.KNOWNBOARDS_BLOCK_FROM_BAD));
-        blockBoardsFromCheckCheckBox.setSelected(settings.getBoolValue(SettingsClass.KNOWNBOARDS_BLOCK_FROM_CHECK));
-        blockBoardsFromObserveCheckBox.setSelected(settings.getBoolValue(SettingsClass.KNOWNBOARDS_BLOCK_FROM_OBSERVE));
+        blockBoardsFromBADCheckBox.setSelected(settings.getBoolValue(SettingsClass.KNOWNBOARDS_BLOCK_FROM_BAD));
+        blockBoardsFromNEUTRALCheckBox.setSelected(settings.getBoolValue(SettingsClass.KNOWNBOARDS_BLOCK_FROM_NEUTRAL));
+        blockBoardsFromGOODCheckBox.setSelected(settings.getBoolValue(SettingsClass.KNOWNBOARDS_BLOCK_FROM_GOOD));
 
         blockSubjectCheckBox.setSelected(settings.getBoolValue(SettingsClass.MESSAGE_BLOCK_SUBJECT_ENABLED));
         blockSubjectTextField.setEnabled(blockSubjectCheckBox.isSelected());
@@ -320,16 +320,16 @@ class News2Panel extends JPanel {
 
     private void refreshLanguage() {
         hideMessagesLabel.setText(language.getString("Options.news.2.hideMessagesWithTrustStates"));
-        hideUnsignedMessagesCheckBox.setText(language.getString("Options.news.2.trustState.none"));
-        hideBadMessagesCheckBox.setText(language.getString("Options.news.2.trustState.bad"));
-        hideCheckMessagesCheckBox.setText(language.getString("Options.news.2.trustState.check"));
-        hideObserveMessagesCheckBox.setText(language.getString("Options.news.2.trustState.observe"));
+        hideUnsignedMessagesCheckBox.setText(language.getString("Options.news.2.trustState.NONE"));
+        hideBADMessagesCheckBox.setText(language.getString("Options.news.2.trustState.BAD"));
+        hideNEUTRALMessagesCheckBox.setText(language.getString("Options.news.2.trustState.NEUTRAL"));
+        hideGOODMessagesCheckBox.setText(language.getString("Options.news.2.trustState.GOOD"));
 
         blockBoardsLabel.setText(language.getString("Options.news.2.dontAddBoardsFromTrustStates"));
-        blockBoardsFromUnsignedCheckBox.setText(language.getString("Options.news.2.trustState.none"));
-        blockBoardsFromBadCheckBox.setText(language.getString("Options.news.2.trustState.bad"));
-        blockBoardsFromCheckCheckBox.setText(language.getString("Options.news.2.trustState.check"));
-        blockBoardsFromObserveCheckBox.setText(language.getString("Options.news.2.trustState.observe"));
+        blockBoardsFromUnsignedCheckBox.setText(language.getString("Options.news.2.trustState.NONE"));
+        blockBoardsFromBADCheckBox.setText(language.getString("Options.news.2.trustState.BAD"));
+        blockBoardsFromNEUTRALCheckBox.setText(language.getString("Options.news.2.trustState.NEUTRAL"));
+        blockBoardsFromGOODCheckBox.setText(language.getString("Options.news.2.trustState.GOOD"));
 
         blockSubjectCheckBox.setText(language.getString("Options.news.2.blockMessagesWithSubject"));
         blockBodyCheckBox.setText(language.getString("Options.news.2.blockMessagesWithBody"));
@@ -351,14 +351,14 @@ class News2Panel extends JPanel {
         settings.setValue(SettingsClass.MESSAGE_BLOCK_BOARDNAME_ENABLED, blockBoardCheckBox.isSelected());
 
         settings.setValue(SettingsClass.MESSAGE_HIDE_UNSIGNED, hideUnsignedMessagesCheckBox.isSelected());
-        settings.setValue(SettingsClass.MESSAGE_HIDE_BAD, hideBadMessagesCheckBox.isSelected());
-        settings.setValue(SettingsClass.MESSAGE_HIDE_CHECK, hideCheckMessagesCheckBox.isSelected());
-        settings.setValue(SettingsClass.MESSAGE_HIDE_OBSERVE, hideObserveMessagesCheckBox.isSelected());
+        settings.setValue(SettingsClass.MESSAGE_HIDE_BAD, hideBADMessagesCheckBox.isSelected());
+        settings.setValue(SettingsClass.MESSAGE_HIDE_NEUTRAL, hideNEUTRALMessagesCheckBox.isSelected());
+        settings.setValue(SettingsClass.MESSAGE_HIDE_GOOD, hideGOODMessagesCheckBox.isSelected());
 
         settings.setValue(SettingsClass.KNOWNBOARDS_BLOCK_FROM_UNSIGNED, blockBoardsFromUnsignedCheckBox.isSelected());
-        settings.setValue(SettingsClass.KNOWNBOARDS_BLOCK_FROM_BAD, blockBoardsFromBadCheckBox.isSelected());
-        settings.setValue(SettingsClass.KNOWNBOARDS_BLOCK_FROM_CHECK, blockBoardsFromCheckCheckBox.isSelected());
-        settings.setValue(SettingsClass.KNOWNBOARDS_BLOCK_FROM_OBSERVE, blockBoardsFromObserveCheckBox.isSelected());
+        settings.setValue(SettingsClass.KNOWNBOARDS_BLOCK_FROM_BAD, blockBoardsFromBADCheckBox.isSelected());
+        settings.setValue(SettingsClass.KNOWNBOARDS_BLOCK_FROM_NEUTRAL, blockBoardsFromNEUTRALCheckBox.isSelected());
+        settings.setValue(SettingsClass.KNOWNBOARDS_BLOCK_FROM_GOOD, blockBoardsFromGOODCheckBox.isSelected());
 
         settings.setValue(SettingsClass.MESSAGE_HIDE_COUNT, hideMessageCountTextField.getText());
         settings.setValue(SettingsClass.MESSAGE_HIDE_COUNT_EXCLUDE_PRIVATE, hideMessageCountExcludePrivateCheckBox.isSelected());

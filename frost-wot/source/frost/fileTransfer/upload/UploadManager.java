@@ -20,15 +20,21 @@ package frost.fileTransfer.upload;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+
 import frost.Core;
 import frost.MainFrame;
 import frost.SettingsClass;
+import frost.ext.Execute;
 import frost.fcp.FcpResultPut;
 import frost.fileTransfer.FileTransferInformation;
 import frost.fileTransfer.FileTransferManager;
@@ -36,6 +42,9 @@ import frost.fileTransfer.FreenetPriority;
 import frost.fileTransfer.sharing.FrostSharedFileItem;
 import frost.storage.ExitSavable;
 import frost.storage.StorageException;
+import frost.util.ArgumentTokenizer;
+import frost.util.CopyToClipboard;
+import frost.util.DateFun;
 import frost.util.FileAccess;
 import frost.util.Mixed;
 
@@ -137,51 +146,86 @@ public class UploadManager implements ExitSavable {
 
             // notify model that shared upload file can be removed
             if( uploadItem.isSharedFile() ) {
+                // NOTE: the only thing this function does is remove the "shared file" upload
+                // from the "Uploads" table regardless of the state of the "remove finished" checkbox.
+                // and yes, this special-case for shared files means that we don't log finished
+                // shared-file uploads or run the external program for them. that's intentional,
+                // since they *aren't* normal uploads.
                 getModel().notifySharedFileUploadWasSuccessful(uploadItem);
             } else {
-                // maybe log successful manual upload to file localdata/uploads.txt
+                // if logging is enabled, then log the successful upload to localdata/Frost-Uploads_2015-01.log (UTC year/month).
+                // the reason that we use the current year+month in the filename is to avoid creating huge, unwieldy log files over time.
                 if( Core.frostSettings.getBoolValue(SettingsClass.LOG_UPLOADS_ENABLED) && !uploadItem.isLoggedToFile() ) {
-                    final String line = uploadItem.getKey() + "/" + uploadItem.getFileName();
-                    final String fileName = Core.frostSettings.getValue(SettingsClass.DIR_LOCALDATA) + "Frost-Uploads.log";
-                    final File targetFile = new File(fileName);
-                    FileAccess.appendLineToTextfile(targetFile, line);
+                    // generate an extended information string (with all upload settings)
+                    final String infoStr = CopyToClipboard.getItemInformation(uploadItem, true, false);
+
+                    // append the extended information to the file, along with the current date/time
+                    if( infoStr != null ) {
+                        // generate date string and the final lines
+                        final DateTime now = new DateTime(DateTimeZone.UTC);
+                        final String dateStr = DateFun.FORMAT_DATE_EXT.print(now)
+                            + " - "
+                            + DateFun.FORMAT_TIME_EXT.print(now);
+                        // format: "[ 2015.09.24 - 21:34:19GMT ]\n<Extended Information>\n\n"
+                        final String lines = "[ " + dateStr + " ]\n" + infoStr + "\n"; // NOTE: only needs a single newline since appendLine adds one too
+
+                        // output to disk
+                        final String fileName = Core.frostSettings.getValue(SettingsClass.DIR_LOCALDATA)
+                            + "Frost-Uploads_" + now.toString("yyyy-MM") + ".log";
+                        final File targetLogFile = new File(fileName);
+                        FileAccess.appendLineToTextfile(targetLogFile, lines);
+                    }
+
+                    // mark the file as logged, even if we failed to generate an info string for it
                     uploadItem.setLoggedToFile(true);
                 }
 
-                final String execProg = Core.frostSettings.getValue(SettingsClass.EXEC_ON_UPLOAD);
-                if( execProg != null && execProg.length() > 0 && !uploadItem.isCompletionProgRun() ) {
-                    final File dir = uploadItem.getFile().getParentFile();
-                    final Map<String, String> oldEnv = System.getenv();
-                    final String[] newEnv = new String[oldEnv.size() + 2];
-                    String args[] = new String[3];
-                    int i;
+                // execute an external program if the user has enabled that option
+                final String execCmd = Core.frostSettings.getValue(SettingsClass.EXEC_ON_UPLOAD);
+                if (execCmd != null && execCmd.length() > 0
+                        && !uploadItem.isExternal()
+                        && !uploadItem.isCompletionProgRun()) {
 
-                    args[0] = execProg;
-                    args[1] = uploadItem.getFileName();
-                    args[2] = result.getChkKey();
-
-                    for( i = 0; i < args.length; i++ ) {
-                        if( args[i] == null ) {
-                            args[i] = "";
+                    // build a fixed-order list of the file's information and replace nulls with empty strings
+                    final String fileInfo[] = new String[5];
+                    fileInfo[0] = uploadItem.getFileName();
+                    fileInfo[1] = uploadItem.getKey();
+                    fileInfo[2] = uploadItem.getFreenetCompatibilityMode();
+                    fileInfo[3] = ( uploadItem.getCompress() ? "YES_AUTO" : "NO" );
+                    final String cryptoKey = uploadItem.getCryptoKey(); // null if no custom key
+                    fileInfo[4] = ( cryptoKey == null ? "AUTO" : cryptoKey );
+                    for( int i=0; i<fileInfo.length; ++i ) {
+                        if( fileInfo[i] == null ) {
+                            fileInfo[i] = "";
                         }
                     }
 
-                    i = 0;
-                    for (final Map.Entry<String, String> entry : oldEnv.entrySet()) {
-                        newEnv[i++] = entry.getKey() + "=" + entry.getValue();
-                    }
+                    // now parse the exec command into individual arguments, add the additional arguments
+                    // to the end of the user's program/argument list, and convert it to a regular array
+                    final List<String> argList = ArgumentTokenizer.tokenize(execCmd, false);
+                    argList.addAll(Arrays.asList(fileInfo));
+                    final String[] args = argList.toArray(new String[argList.size()]);
 
-                    newEnv[i++] = "FROST_FILENAME=" + uploadItem.getFileName();
-                    newEnv[i++] = "FROST_KEY=" + result.getChkKey();
+                    // construct additional environment variables describing the file transfer
+                    final Map<String,String> extraEnvironment = new HashMap<String,String>();
+                    extraEnvironment.put("FROST_FILENAME", fileInfo[0]);
+                    extraEnvironment.put("FROST_KEY", fileInfo[1]);
+                    extraEnvironment.put("FROST_MODE", fileInfo[2]);
+                    extraEnvironment.put("FROST_COMPRESS", fileInfo[3]);
+                    extraEnvironment.put("FROST_CRYPTOKEY", fileInfo[4]);
 
-                    try {
-                        Runtime.getRuntime().exec(args, newEnv, dir);
-                    } catch (Exception e) {
-                        System.out.println("Could not exec " + execProg + ": " + e.getMessage());
-                    }
+                    // use the file transfer's folder as the working directory for the new process
+                    final File workingDirectory = uploadItem.getFile().getParentFile();
+
+                    // execute the external program asynchronously (non-blocking)
+                    // NOTE: if the program couldn't be launched, we won't be notified about it since
+                    // it's asynchronous. but the most common failure reason is just that the program
+                    // doesn't exist, which is the user's fault (so who cares).
+                    Execute.run_async(args, workingDirectory, extraEnvironment);
+
+                    // mark the "has completion program executed" as true even if it possibly failed
+                    uploadItem.setCompletionProgRun(true);
                 }
-
-                uploadItem.setCompletionProgRun(true);
             }
 
             // maybe remove finished upload immediately
@@ -193,13 +237,13 @@ public class UploadManager implements ExitSavable {
             logger.warning("Upload of " + uploadItem.getFile().getName() + " was NOT successful.");
 
             if( result != null && result.isFatal() ) {
-                uploadItem.setEnabled(Boolean.FALSE);
+                uploadItem.setEnabled(false);
                 uploadItem.setState(FrostUploadItem.STATE_FAILED);
             } else {
                 uploadItem.setRetries(uploadItem.getRetries() + 1);
 
                 if (uploadItem.getRetries() > Core.frostSettings.getIntValue(SettingsClass.UPLOAD_MAX_RETRIES)) {
-                    uploadItem.setEnabled(Boolean.FALSE);
+                    uploadItem.setEnabled(false);
                     uploadItem.setState(FrostUploadItem.STATE_FAILED);
                 } else {
                     // retry
@@ -215,6 +259,8 @@ public class UploadManager implements ExitSavable {
 
     /**
      * Start upload now (manually).
+     * Automatically uses the global queue "persistence manager" if enabled (it is by default),
+     * otherwise it uses the built-in Frost uploader instead.
      */
     public boolean startUpload(final FrostUploadItem ulItem) {
         if( FileTransferManager.inst().getPersistenceManager() != null ) {

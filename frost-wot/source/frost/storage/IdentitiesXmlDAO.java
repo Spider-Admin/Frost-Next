@@ -33,7 +33,7 @@ public class IdentitiesXmlDAO {
     private static final Logger logger = Logger.getLogger(IdentitiesXmlDAO.class.getName());
 
     /**
-     * Loads good, observe and bad identities from xml file.
+     * Loads FRIEND, GOOD and BAD identities from xml file.
      */
     public static List<Identity> loadIdentities(final File file) {
 
@@ -52,11 +52,11 @@ public class IdentitiesXmlDAO {
                 try {
                     buddyList.loadXMLElement(current);
                 } catch (final SAXException e) {
-                    logger.log(Level.SEVERE, "Error loading good identities", e);
+                    logger.log(Level.SEVERE, "Error loading FRIEND identities", e);
                 }
                 for( final Object element : buddyList.getAllValues() ) {
                     final Identity id = (Identity)element;
-                    id.setGOODWithoutUpdate();
+                    id.setFRIENDWithoutUpdate();
                     identities.add(id);
                 }
             } else if (current.getAttribute("type").equals("enemies")) {
@@ -64,7 +64,7 @@ public class IdentitiesXmlDAO {
                 try {
                     buddyList.loadXMLElement(current);
                 } catch (final SAXException e) {
-                    logger.log(Level.SEVERE, "Error loading bad identities", e);
+                    logger.log(Level.SEVERE, "Error loading BAD identities", e);
                 }
                 for( final Object element : buddyList.getAllValues() ) {
                     final Identity id = (Identity)element;
@@ -76,23 +76,25 @@ public class IdentitiesXmlDAO {
                 try {
                     buddyList.loadXMLElement(current);
                 } catch (final SAXException e) {
-                    logger.log(Level.SEVERE, "Error loading check identities", e);
+                    logger.log(Level.SEVERE, "Error loading NEUTRAL identities", e);
                 }
                 for( final Object element : buddyList.getAllValues() ) {
                     final Identity id = (Identity)element;
-                    id.setCHECKWithoutUpdate();
+                    id.setNEUTRALWithoutUpdate();
                     identities.add(id);
                 }
-            } else if (current.getAttribute("type").equals("observed")) {
+            } else if (current.getAttribute("type").equals("good") || current.getAttribute("type").equals("observed")) {
+                // NOTE: the "observed" type above is just the LEGACY FROST name for exported GOOD identities (which it used to call OBSERVE),
+                // so we simply support either "good" (the new name) or "observed" as the GOOD type, so that very old XML files work.
                 final BuddyList buddyList = new BuddyList();
                 try {
                     buddyList.loadXMLElement(current);
                 } catch (final SAXException e) {
-                    logger.log(Level.SEVERE, "Error loading observe identities", e);
+                    logger.log(Level.SEVERE, "Error loading GOOD identities", e);
                 }
                 for( final Object element : buddyList.getAllValues() ) {
                     final Identity id = (Identity)element;
-                    id.setOBSERVEWithoutUpdate();
+                    id.setGOODWithoutUpdate();
                     identities.add(id);
                 }
             }
@@ -108,24 +110,24 @@ public class IdentitiesXmlDAO {
     public static int saveIdentities(final File file, final List<Identity> identities) {
 
         final BuddyList friends = new BuddyList();
-        final BuddyList observed = new BuddyList();
+        final BuddyList good = new BuddyList();
         final BuddyList enemies = new BuddyList();
 
         int count = 0;
 
         for( final Object element : identities ) {
             final Identity id = (Identity) element;
-            if( id.isGOOD() ) {
+            if( id.isFRIEND() ) {
                 friends.add(id);
                 count++;
-            } else if( id.isOBSERVE() ) {
-                observed.add(id);
+            } else if( id.isGOOD() ) {
+                good.add(id);
                 count++;
             } else if( id.isBAD() ) {
                 enemies.add(id);
                 count++;
             }
-            // we ignore CHECK ids here! this is the default
+            // we ignore NEUTRAL ids during export! since it is the default/neutral state
         }
 
         if( count == 0 ) {
@@ -144,10 +146,10 @@ public class IdentitiesXmlDAO {
         final Element enemiesElement = enemies.getXMLElement(d);
         enemiesElement.setAttribute("type", "enemies");
         rootElement.appendChild(enemiesElement);
-        // then observed
-        final Element observedElement = observed.getXMLElement(d);
-        observedElement.setAttribute("type", "observed");
-        rootElement.appendChild(observedElement);
+        // then good
+        final Element goodElement = good.getXMLElement(d);
+        goodElement.setAttribute("type", "good");
+        rootElement.appendChild(goodElement);
 
         d.appendChild(rootElement);
 

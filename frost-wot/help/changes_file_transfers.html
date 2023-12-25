@@ -1,0 +1,839 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="Content-Style-Type" content="text/css">
+    <link rel="stylesheet" href="style.css" type="text/css">
+    <title>Changes: File Transfers (Frost-Next)</title>
+  </head>
+<body>
+<h1>Changes: File Transfers (Frost-Next)</h1>
+<p><a href="index.html">Back to Help Index</a></p>
+<table class="cltable" cellspacing="0" cellpadding="0">
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">1.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Uploading] You asked for it, and you got it... <i>full</i> support for Crypto Keys to secure your uploaded files! You can now <i>insert</i> and <i>heal</i> these vastly more secure files. It was a huge undertaking, but the amount of requests for it was overwhelming. See the dedicated "Feature Details: Crypto Keys" page for more information.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">2.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Uploading] New and innovative "Quickheal mode" feature, which does exactly what it sounds like. See the dedicated "Feature Details: Quickheal Mode" page for more information.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">3.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Uploading] There's an advanced, new tool in town for Freesite creators! See the dedicated "Feature Details: Key Conversion Utility" page for more information.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">4.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Downloading] Frost-Next has a fast and memory-efficient hash-blocklist feature, which helps you avoid downloading duplicate files by detecting and stopping duplicate Freenet downloads even when the files have been renamed or re-inserted with different settings, etc. The memory-efficiency isn't a joke; despite the fact that hashes (and their file paths) can consume hundreds of megabytes or even <i>gigabytes</i> of RAM, the implementation in Frost-Next only uses 2 megabytes of RAM, period, regardless of how large your hash list is! See the dedicated "Feature Details: Hash Blocklist" page for more information.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">5.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Downloading] Wrote an <i>extremely</i> fast (it's as fast as <i>OpenSSL</i>) and <i>very</i> advanced MD5 file hashing utility, called "UpdateMD5". It's now available as part of Frost-Next, and is used for indexing your hard disk for use with Frost-Next's hash-blocklist feature. See the dedicated "Feature Details: Hash Blocklist" page for more information.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">6.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>The "Add new downloads" and "Add new uploads" windows now have a new Type column, which shows the (lowercase) file extensions of all files. This allows you to quickly sort by Type and delete the files you don't want (such as .csv files, preview .jpgs, etc). You no longer have to waste minutes carefully reading through a huge, messy filename list to try to see if there are any files you don't want.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">7.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Major new convenience function: You can now right-click on your uploads/downloads and choose "Open this [upload/download] directory" (or press Shift + D on the keyboard), and it will open that folder in your default file manager. This means that you can finally jump directly to your download folders without tediously having to navigate the filesystem over and over again. You can even select <i>multiple</i> files and open all of their <i>unique</i> directories at once.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">8.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>If you press the "Download keys from clipboard" button on the Downloads tab, the resulting "Add new downloads" dialog now has an additional button, saying "Paste more keys from clipboard" (it's also bound to the "v" keyboard shortcut). If activated, it scans your clipboard contents and adds all additional keys that it discovers (while ignoring duplicates). The feature is very useful if you're reading a Freesite and want to queue a few keys, and then some other keys, etc. You can now simply build up the download list gradually, chunk by chunk.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">9.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>The "File" menu now lets you "Open download directory", which opens your default Frost download folder (usually "downloads/").</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">10.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Uploading] Added the missing Freenet compatibility modes (COMPAT_1416, COMPAT_1468).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">11.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Uploading] Created a new, dynamic "Compatibility Mode" manager, which is capable of building and maintaining a list of hardcoded (internal), user-provided, <i>and</i> auto-learned compatibility modes. This takes cares of one of Frost's greatest weaknesses, which is that people constantly had to release new versions to support new compatibility modes whenever Freenet changed (for instance, legacy Frost is currently half a decade out of date and missing all new modes). Funnily enough, Frost-Next wouldn't exist if Frost hadn't had that flaw, since that was the initial reason that I began rewriting code.</p>
+    <p>The compatibility mode manager dynamically learns new modes as you use Freenet, and all discovered modes are instantly available in the "Change compatibility mode" menu without even needing a restart. Whenever you start an upload using "COMPAT_CURRENT", we learn what that means in Freenet at the moment. Likewise, we detect compatibility modes from all of your <i>downloads</i>, so if you've been gone from Freenet for a while and haven't seen any of the latest modes, then you can just download a bunch of files that used those modes and it will learn about them. Most people should rely completely on the auto-learning, since only healers care about being able to upload using very old modes.</p>
+    <p>The last option (if you're a healer and a lot of new modes exist and you don't want to wait for Frost-Next to encounter them automatically) is to manually edit frost.ini, and simply give it a semicolon-separated list of all new modes. You should never, <i>ever</i> re-compile Frost-Next to add any new modes, and <i>must never trust anyone</i> who claims to have done that, since they might have added backdoors. Instead, you should simply edit frost.ini and write "compatManager.userModes=COMPAT_1468;COMPAT_1539;COMPAT_1642", or whichever modes you want to add. There is no limit to how many modes you can write in the list.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">12.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Uploading] The "Add new uploads" window <i>and</i> the message composer's file attachment picker now feature custom-written file filters, which means that you can filter your files to only see Archives, Audio, Documents, Executables, Images or Videos. This allows you to quickly find the exact files you want to upload. You can even use your own case-insensitive custom filters, by simply typing in the filename box of the file-picker (use asterisks to match "any character", as usual).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">13.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>You can now quickly adjust the priority of your uploads and downloads via the numpad (0-6) or the regular number row. This works in both the "Add new [uploads/downloads]" window and in the Uploads/Downloads tables.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">14.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Added keyboard control for the most common old and new features that lacked shortcuts, in both the Uploads and Downloads tables as well as in the "Add new uploads" and "Add new downloads" windows. You can now effortlessly start waiting transfers and toggle the enabled-state of the selected items, or easily apply crypto-keys to your uploads, among other things. See the general keyboard shortcut overview for more information.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">15.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>An extremely advanced Blocks Per Minute counter algorithm is now available in Frost-Next. It performs very advanced weighting and smoothing of all data to determine a super accurate blocks-per-minute count for every upload/download, complete with <i>both</i> full burst-resistance <i>and</i> protection against temporary drops in speed, while simultaneously being very quick to react whenever paused/stalled transfers suddenly begin moving again. It reacts quickly to sharp <i>increases</i> in speed and more slowly to sharp <i>decreases</i> in speed, and if the speed stays within +/- 40% of the last measurement it reacts very smoothly as it stabilizes around the correct speed. Almost a whole week was spent hand-tuning the algorithm. It does the best possible job that can be done on Freenet. The sampling interval is 15 seconds, and it uses a weighted, moving-average to give you up-to-date information. This is <i>not</i> some basic "blocks divided by time" counter.</p>
+    <p>The transfer speed is calculated in both blocks/minute and KiB/s (which is more useful for most people). You can see these new blocks/minute statistics in several places. The Uploads and Downloads tabs have a BPM value in the top right, which is the combined value for all transfer that are visible in the transfer-list (if you want to include external/global transfers, you must enable "Show global queue"). That information gives you a very good idea of your current Freenet throughput. You can also view per-transfer speed statistics via their individual information tooltips, accessible by hovering over the filenames.</p>
+    <p>Note that the per-transfer speed will vary a lot if you have lots of transfers that are sharing the bandwidth, since Freenet distributes the bandwidth randomly at any given time. The blocks-per-minute counter reflects the current reality of both the per-transfer speeds and the combined speed of all transfers.</p>
+    <p>You should also be aware that small <i>uploads</i> are very difficult to measure, since their block counts usually take many minutes to progress, and they frequently stall for between 5-60 minutes. The algorithms for downloads and uploads are different and take the incredible slowness of small uploads <i>into account</i>, but you <i>still</i> need to be aware that <i>very small</i> uploads are <i>extremely</i> difficult to measure due to the lack of status updates for them, and that your Blocks/Minute measurement <i>obviously</i> can't measure what <i>isn't moving</i>.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">16.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>The per-transfer file statistics (accessible by hovering over the filenames) now include the current block count and a super accurate blocks-per-minute statistic for the transfer. Example:</p>
+    <ul>
+      <li>Blocks: 22% 20279/9195 [18160]</li>
+      <li>Blocks/Minute: 789.26 (~420.94 KiB/s)</li>
+    </ul>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">17.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>The per-transfer file statistics (accessible by hovering over the filenames) now include how much time has elapsed since a transfer was started. This information is only available for Frost's own queued transfers (not for external/global items). Example:</p>
+    <ul>
+      <li>Elapsed: 0h, 2m, 38s</li>
+    </ul>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">18.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>The per-transfer file statistics (accessible by hovering over the filenames) now include a rough estimate of the completion time for the transfer. Example:</p>
+    <ul>
+      <li>Rough Estimate: 0h, 3m, 18s remaining</li>
+    </ul>
+    <p>The estimate is based on the current blocks/minute for the transfer and the amount of data that is remaining. However, Freenet allocates your bandwidth randomly between all ongoing transfers and speeds are never completely constant, which is why there's <i>no way</i> to <i>perfectly</i> estimate how much time is remaining. In other words, we do as good a job <i>as possible on Freenet</i>.</p>
+    <p>Furthermore, the estimate is a bit wild in the beginning of a transfer, before its blocks/minute speed has stabilized. It takes about 10-60 seconds for newly started transfers to stabilize, depending on the health of the file and how many other transfers are currently running. There is also a risk of slowdown at the end of transfers. In the case of downloads, the final blocks are when Freenet is trying to find the last, possibly-dead or severely crippled blocks, which means that any transfer could potentially stall forever at the end. And in the case of uploads, there is <i>always</i> a long stall at the end when the metadata is inserted. There is no way to predict such things or how long they will last (computers are not mind-readers), so I suggest that you learn how your machine performs and then use the rough "time remaining" estimates as a great guideline, instead of a hard rule. It's not possible to do any better estimates than this on Freenet, since its data transfer method is so unreliable.</p>
+    <p>If it's important for you that a certain file completes quicker than all other ongoing transfers, you should simply give it a higher transfer Priority (as usual), so that Freenet knows that it's important. Also remember that it will often take about a minute for Freenet to see the effects of a change to the priority.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">19.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Uploading] Added control over the number of <i>Extra Inserts</i> of file metadata (via Preferences &gt; Uploads &gt; Extra Inserts of Metadata). See the dedicated "Feature Details: Extra Inserts of Metadata" page for more information.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">20.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>All of your downloads and uploads now feature an extremely accurate new "Last Activity" tracker, which keeps track of how long ago (in hours, minutes and seconds) that your transfer last had any block-progress. Just hover over the filename column to see this information in the per-transfer details tooltip. Note that Frost measures activity <i>while Frost is open</i> (there is no Freenet API for checking the last activity time of a file which is why Frost can't know about it unless we're open while the status changes). If progress happens while Frost is closed, it won't know about it. However, it will learn about the new "last activity time" as soon as it sees some new progress again. Most people will never run into any issues with that, since any ongoing transfers will be either totally stalled (in which case the old value stored in the database is still correct), or will be healthily in progress and will update their progress again very soon after the Frost restart, which would then refresh the last activity tracker.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">21.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Downloading] The downloads table now has a "Last Activity" column, which allows you to see which in-progress files have stalled, and lets you easily sort them by activity to remove problematic transfers. Note that this column wasn't added for the uploads table, since it's useless there (uploads cannot stall), and because "Last Activity" is still available for uploads via their information tooltip.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">22.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Uploading] We now support the "URIGenerated" message, to be able to show the final key faster during uploads. However, seeing a key does <i>not</i> mean that the upload is complete. It is only done when the item turns green and says "Finished".</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">23.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Downloading] The Play/Pause buttons on the Download tab now <i>actually work</i>. In the past they did <i>absolutely nothing</i> (like several other places in Frost where the insane legacy author had completely forgot to hook up any code). Pressing the Pause button now prevents Frost from starting any "Waiting" downloads (but it obviously doesn't affect any of the currently-in-progress transfers, since they're being processed by your node). You can use this button if you want to prevent any further downloading after all currently-progressing items have finished.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">24.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Downloading] The "Manage downloaded keys" window has been completely rewritten and re-designed from the ground up. It used to block all access to the main Frost window while it was open. It is now a convenient window which floats and can be put off to the side instead, so that you can use it next to the main Frost window. If you lose it behind other windows by accident, just activate the main menu item again and the key manager will re-appear in front of everything. The entire window has also been re-designed to be more pleasing and easy to use.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">25.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Downloading] The "Manage downloaded keys" window has been completely rewritten and re-designed from the ground up. You can now right-click items and "Copy keys with filenames", which makes it easy to share keys that you've downloaded in the past.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">26.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Downloading] The "Manage downloaded keys" window has been completely rewritten and re-designed from the ground up. Added a search field which lets you filter based on the case-insensitive filename of the keys, so if you want to find all keys you've ever downloaded with the word "banana" somewhere in the name, you'd just type "banana" and you will see all the matching keys. This makes it super easy to copy or re-download exactly the keys you want and nothing else.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">27.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Downloading] The "Manage downloaded keys" window has been completely rewritten and re-designed from the ground up. The new "Refresh" button lets you instantly see the most up-to-date keylist without having to close and re-open the key manager.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">28.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Downloading] The "Manage downloaded keys" window has been completely rewritten and re-designed from the ground up. You can now right-click items and "Download selected keys again", which lets you instantly queue the files again with a maximum of comfort and ease (it even suppresses the "Are you sure that you want to re-download this key?" question).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">29.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Downloading] The "Manage downloaded keys" window has been completely rewritten and re-designed from the ground up. The "Add keys from downloadlog" feature now intelligently navigates to Frost-Next's default log location, and has <i>full support</i> for all common log formats: Frost-Next's download and upload text-logs, <i>and</i> all 3 of <i>Fuqid</i>'s log formats: "Fuqid-Downloads.log" (double filenames after pipe character), "Fuqid-Keys.log" and "Fuqid-InsertOptions.txt". When importing a Fuqid download log, its filename doesn't matter. We detect their log format with its weird, double filenames, and will ask if this is a Fuqid log. Say Yes to import the log correctly. Otherwise you'll import with double filenames (the way they were stored in Fuqid's log file). Also worth noting: Fuqid's can only log 2000 downloads. Frost-Next's key manager can log unlimited (easily tens of thousands).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">30.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Downloading] The "Manage downloaded keys" window has been completely rewritten and re-designed from the ground up. To avoid accidents, the "Remove selected keys" and "Remove all from same board" features now ask you to confirm the removal, so that you have a chance to abort. It even shows the name of the board whose tracked keys will be deleted, so that you can catch any mistakes before it's too late.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">31.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Downloading] The "Manage downloaded keys" window has been completely rewritten and re-designed from the ground up. Added keyboard control for all common actions, which makes it super convenient to manage your list of previously downloaded keys. See the general keyboard shortcut documentation for information.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">32.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Paused transfers are now displayed in a blue row color, which instantly and clearly lets you see which uploads/downloads you've paused, without having to manually read their fiddly "Priority" numbers. The "paused" state is anything with priority 6, or which has been disabled by unchecking the "Enabled" column. However, if the item is Done (green) or Failed (red), then those colors take precedence.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">33.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Downloading] Removed the confusing "Create folder" button and yellow background for the Download tab's "Directory" feature. It now <i>automatically</i> creates the typed-in folder if it doesn't exist, as soon as you queue an item with that folder name. And if the folder cannot be created, it simply won't change the directory for those download items.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">34.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Uploading] It's no longer possible to add the same file multiple times to the same "Add new uploads" dialog, which means that you don't have to worry about queuing duplicates of the same file. Nor is it possible to queue a filepath for upload that's already in your current upload-queue. If you accidentally do that, it simply skips those files and shows a summary of all files that were skipped due to already existing in the queue. It displays up to 10 duplicate files per error dialog, and uses multiple dialogs if necessary, so that it doesn't overwhelm the user if they've queued hundreds of files.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">35.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Uploading] Frost's PersistentGet FCP parser now supports reading the "DontCompress", "CompatibilityMode", "SplitfileCryptoKey" and "ExpectedHashes" values when talking to the Freenet node. These values are used by several new features.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">36.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Uploading] The Uploads table now has several new columns showing the Compression state, Compatibility Mode, and Crypto Key of all uploads. The values displayed are the <i>actual</i> ones used by the node, not necessarily what you inserted with; i.e. inserting as "COMPAT_CURRENT" would be seen as the real, resulting value when the transfer begins (such as "COMPAT_1468"). This ensures that you get the <i>actual</i> information (instead of the meaningless "COMPAT_CURRENT" value), and that you can therefore come back years later to re-insert the file without having to figure out what some <i>old</i> "COMPAT_CURRENT" <i>used to</i> mean.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">37.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Uploading] The "Copy extended info" right-click menu item now generates a new format, which describes the selected uploads in much more detail (added Compression state, Compatibility Mode and Crypto Key) so that you can easily re-create the same upload settings later.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">38.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>All downloads and uploads via Frost-Next now have full UTF-8 support. This was achieved by making all of Frost's internals decode all received keys and instead use <i>clean</i>, decoded UTF-8 keys (without %20-style character sequences) for <i>all</i> display/interface/internal purposes, and just encoding the keys on the fly whenever talking to the Freenet node. This live-encoding ensures that all special Unicode characters are handled (via %-sequences) regardless of whether the original key was properly escaped or not. This actually makes Frost-Next the <i>only</i> client at the moment that fully handles UTF-8 Unicode filenames and special characters (such as <i>literal</i> "?" and "%" characters in the name), which makes it capable of uploading and downloading <i>any</i> filename (even ones that Freenet's Web GUI can't handle).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">39.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Downloading] Added a workaround for a very serious bug in Freenet: Whenever a client application (such as Frost or Fuqid) opens a connection to the local Freenet node to request the data for a 100% downloaded file, there's a risk that the node will freeze and never respond to us. The only way to fix that bug is to close the connection to the node and re-open it and try again. But before we can know if we've even got a response or not, the read-attempt on the <i>current</i> connection attempt must time out. Frost used to default to a 90 minute read-timeout(!), which meant that whenever Freenet's bug happened, it blocked Frost from saving <i>any</i> finished downloads for <i>90 minutes</i>, and at the end of that extremely long timeout it just marked the file as Failed and aborted it.</p>
+    <p>The new behavior intelligently works around the Freenet bug. First, we connect and give the node <i>only 20 seconds</i> to respond to our request for the file's data. In almost every case, that first request <i>will</i> be answered within less than half a second. If the node freezes or is under very heavy load and can't answer the request right now, we close the connection and attempt again with a 4 minute read-timeout. That second attempt takes care of <i>almost every</i> file that froze or was overloaded during the first attempt (since it's extremely rare to get two freezes in a row). If these four minutes don't manage to get the file either, we break the connection and try <i>one last time</i> with a 20 second read-timeout again. If all three attempts fail (which should practically <i>never</i> be able to happen), you've "only" lost 4 minutes and 40 seconds (instead of 90 minutes as previously), and the download is then aborted and restarted into a "Waiting" state again so that it can be retried later when the node behaves better. With this multi-layered workaround, you'll get to enjoy successful downloads again, where we always do our best to retrieve the file even when the node is overloaded or misbehaving. Enjoy!</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">40.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Uploading] All keys for your uploads now consistently use the clean, decoded versions of the final keys, so that everyone can easily read your uploaded filenames when you share your keys. No more unreadable mess like "%20%28copy%29%20%23%21%5b%27%3b.rar". If you <i>need</i> such URL-encoded keys for some reason, you should use the new "Help &gt; Key conversion utility" to convert the keys for your desired purpose (there are many formats to choose from).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">41.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Downloading] All downloads now calculate a relative path if you set them to a directory within the Frost path, which makes the download-table and the list of recent download directories <i>much</i> easier to read. As an example of a relative path, you'll no longer see "/home/exampleuser/Downloads/frost/downloads/cat pictures"; it will now simply say "downloads/cat pictures". We only show the full path if the destination is outside of the Frost directory. If you're upgrading from an old version of Frost, all of your old paths will be automatically cleaned up and relativized.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">42.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>It is now possible to queue <i>all</i> of your downloads and uploads in a disabled state <i>by default</i>. This allows you to easily bulk-queue hundreds of files and then cherry-pick which ones you want to start by manually enabling or force-starting them. The new option is found in "Preferences &gt; Downloads [or Uploads] &gt; Automatically enable all new queue items".</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">43.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>The "Add new uploads" and "Add new downloads" windows now show the total number of items in their titlebar, such as "Add new downloads (5)" for a window with five items in it. This makes it easier to figure out if you've "got all 100 keys" from a Freesite, for instance.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">44.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Added a new "Restart selected uploads" feature (it didn't exist in the past), and <i>fixed</i> the "Restart selected downloads" feature to use the new, improved code as well.</p>
+    <p>Unlike the old code, the new code <i>actually freaking works</i>, and properly <i>restarts</i> the global-queue item instead of Frost forever being stuck at "Waiting" after "restarting". Furthermore, we now <i>reset</i> the displayed progress status, so that you don't get a weird, ugly "Waiting, 85% 18/21" status mixture of old and new progress.</p>
+    <p>The old code also had an <i>extremely</i> serious race condition, where the restarted items were being re-added by a non-GUI thread, which could cause the <i>entire</i> Frost GUI to crash/hang.</p>
+    <p>All of that is now fixed, so that you can rely <i>one hundred percent</i> on the transfer restart functions <i>without</i> fear.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">45.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Downloading] The "Restart selected downloads" feature now detects if the files already exist on disk, and asks if you really want to restart them. In that case, it <i>deletes</i> the old files from disk. This fixes the bug where restarted downloads reached 100% completion and then froze at "Downloading, 100%" just because legacy Frost was unable to overwrite the existing file on disk. This new warning prompt also helps you detect that you're about to restart downloads that already exist on disk, in which case you may want to click the new option to <i>keep</i> the existing files instead of restarting them.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">46.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>[Downloading] Frost now ignores Freesite links when you queue files (i.e. from messages or the clipboard), so that you can finally queue all files without having to manually read through the list to delete all site addresses. The algorithm that detects site addresses is advanced and accurate, and mostly targets USKs and SSKs, while still allowing you to queue non-webpage files that just <i>happen to be</i> hosted in Freesite containers (i.e. "USK@../blah.csv").</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">47.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Uploading] Frost's previous "Start encoding of selected files" right-click menu item was a <i>completely</i> broken mess. It told Freenet to generate the CHK for the file, but it didn't apply the user's chosen compatibility mode, compression on/off setting, or custom filenames (in case of the user renaming files via the "Add new uploads" dialog), so it <i>always</i> ran the calculation with the wrong on-disk filename, COMPAT_CURRENT and Compress=YES. Furthermore, it often used different MIME-types for the calculation and for the actual insert. All of these problems meant that the calculation was performed with the wrong settings in almost 100% of all cases, which made it <i>almost impossible</i> to pre-generate the correct, final insert key. Basically, if you added a file without compression, with an older compatibility mode, or with a custom filename, or if you were unlucky with the MIME-calculation, then Frost <i>always</i> pre-generated the <b>wrong key</b>.</p>
+    <p>The feature has been totally rewritten. The menu option is now clearly labeled "Pre-calculate CHKs for selected files" and properly uses <i>all</i> of the user's upload-settings for the calculation, which means that you can now rely 100% on the key that it generates. The pre-calculation result will be completely <i>identical</i> to the final key created when the actual insert is complete.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">48.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Uploading] Now has perfect interoperability with Fuqid. Frost <i>used to</i> stupidly attempt to <i>guess</i> the MIME-type ("Content-Type" header) of all of your uploads, and applied its own (often wrong) guess to the insert. This meant that legacy Frost inserted Freenet keys that often <i>differed</i> from the keys you would get from Fuqid or the Web GUI, even when identical compression and compatibility mode settings were used. The behavior has now been brought in line with Fuqid and the Web GUI: We let the Freenet node itself calculate the MIME-type, so that people can effortlessly insert and <i>mutually heal</i> identical keys via both Frost-Next and Fuqid.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">49.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Downloading] The "Download keys from clipboard" function now understands HTML a bit better. If you paste raw HTML, it will no longer give you invalid extracted keys containing parts of the HTML structure (such as "<i>CHK@../image.jpg"&gt;an image&lt;/a&gt;</i>"). Instead, it now properly skips the HTML junk and extracts the real filename within the tag (i.e. "CHK@../image.jpg").</p>
+    <p>However, this improved HTML parsing is only done for "href=" links. It is <i>not</i> done for regular HTML tags, like "&lt;div&gt;CHK@../&lt;/div&gt;", because that would have required that we treat <i>all</i> text as potential HTML and <i>always</i> strip tag-like characters, which would have risked screwing up all non-HTML input (and the vast majority of all input is <i>plaintext</i>). Luckily, most Freesites make their links accessible as plaintext; and if they don't, they usually put their links within either "href=" tags or in &lt;pre&gt; fields with a single link per line, both of which are fully supported now.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">50.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Downloading] Frost had a mishmash of different, very buggy implementations for extracting Freenet keys from text. They all had various bugs. Everything has now been unified into a single, clean, powerful and <i>very fast</i> key parser which ensures that keys are treated identically (and correctly) everywhere in Frost. More importantly: The new key parser <i>actually understands</i> what a valid Freenet key looks like, and how to reject invalid keys (such as nameless or malformed USKs and SSKs), and how to properly extract filenames from KSKs, and so on. The rejection/key parsing now behaves like Freenet itself, which means that you'll never be able to accidentally queue an invalid key anymore.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">51.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>The "Blocks" counters for your uploads and downloads have been completely rewritten and fixed:</p>
+    <ul>
+      <li>They now properly render the status text (such as "97% 5780/5953 [11762]") in every Look and Feel, so that you no longer have to wonder what the bar length means. This was most notably an issue on the Linux GTK theme.</li>
+      <li>It now uses a smaller, non-bold, almost monospaced font, which looks much better and means that more textual information fits on the progress bar without being cut off.</li>
+      <li>The progress bar is no longer blank when you restart Frost with transfers that Finished during the previous session. We don't know their block totals, so we can't show that, but at least we now show "100%" and a full progress bar instead of looking like a blank, unstarted item.</li>
+    </ul>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">52.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>The "State" columns no longer just say "Failed" whenever a transfer has failed. They now show the full reason, such as "Failed: There is not enough disk space to [etc etc].", and if you hover over the column you'll see the whole message in the tooltip. Now you can finally stop going to the Web GUI to see your failure reasons!</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">53.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>The "Failed" reason tooltip intelligently separates the sentences of the failure message into multiple lines, to avoid overly wide tooltips.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">54.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Cleaned up all of Frost's <i>own</i>, internally generated "Failed" reasons, so that they're easier to understand. However, most of the common failure messages come from the Freenet node itself and are simply shown as-is.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">55.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>"Filesharing" is now gone at last. Long live filesharing! It was a bad, legacy Frost "feature" which was intended to make it easier to find files, but it failed in every way. If you are curious about how dangerous and awful Filesharing really was, here are the fun facts: It confused newbies and caused so many questions about "Why are the search / my shared files tabs grayed out? What are the Search preferences in the options for?". <i>Nobody</i> used filesharing. It was poorly thought-out and vulnerable to Denial of Service attacks where it would flood your database with fake junk files until your Frost ran out of memory and crashed. And if you actually enabled the feature, Frost screamed a huge warning at you during every startup, telling you how dangerous it was and suggesting that you disable it again. Well, the filesharing garbage code is now gone! It has been <i>completely</i> disabled internally and all of its tendrils are gone. Countless code locations in over 60 files have been taken care of, so that the filesharing code never runs anymore and so that it can never be enabled by the user, and never appears anywhere in the GUI anymore. Freedom at last.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">56.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>The right-click menus for the upload/download tables have been completely rewritten. They are now consistent, intelligent, better organized, and <i>context-sensitive</i>... Your item selection determines what menu items you see. For instance, if you only select globally queued items, you will only see the options related to that. If you only select a finished item, you won't see the "Set priority" menu, and so on. If you select more than one type of item state, you will see all of their actions even when they aren't applicable to all selected items. But all of the menu items now behave in a consistent way regardless of what your selection is, and only apply their actions to the items that actually support it. This rewrite means that you can finally <i>trust</i> the menu actions to work properly; they used to have countless bugs and inconsistencies, but those are all fixed now.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">57.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Uploading] Made it possible to change the transfer priority of "Waiting" items that had not yet begun uploading. It used to only be possible for in-progress items. This means that you can finally queue lots of uploads and <i>then</i> tweak their priorities <i>before</i> it's their turn to start uploading. This bug didn't exist in the Downloads table, but <i>its</i> priority-code has been cleaned up too.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">58.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Advanced Freenet key de-duplication throughout Frost-Next compares the true, decoded versions of each key and finds any duplicates. For example, "CHK@../foo%20bar.jpg" is the same key as "CHK@../foo bar.jpg", but has simply been encoded. The comparison checks the <i>decoded</i> versions of all keys and therefore properly finds all duplicates even in the previous example, so that you'll never add/queue any duplicates ever again.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">59.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>The localdata/Frost-Downloads.log and localdata/Frost-Uploads.log files have now been improved so that they won't grow to massive sizes over time (they used to become so big that you couldn't edit them in a text editor). We now write to a file named after the current UTC month, such as "localdata/Frost-Downloads_2015-11.log" or "localdata/Frost-Uploads_2015-03.log". This helps with organization and with filesizes, since the main purpose of these logs is to allow you to find uploads/downloads later. Therefore it helps to split them by month to make them more manageable and allowing you to easily delete old logs, etc. Also remember Frost-Next's "Manage downloaded keys" feature, which is similar but a more advanced way of tracking finished downloads.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">60.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Downloading] The "Add new downloads" dialog no longer obnoxiously asks "Redownload? Yes/No" for <i>every</i> key that you've previously downloaded, in an endless stream of questions. It now also has options for "Yes to All" and "No to All". You can finally re-queue your old keys and simply pick "Yes to All" if you are absolutely sure that you want to re-download them. Note that if you re-download keys via the "Manage downloaded keys" window instead, then you won't be asked at all, since we know that you're sure you want to re-download those.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">61.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Downloading] The "Add new downloads" dialog no longer adds a stupid "filename_2.ext" suffix to files that already exist in the download queue. This means that you can finally open the "Add new downloads" queue and see the "<i>Exists</i>" column <i>properly</i> reflect whether the filename exists on disk. In the past, the "2" suffix made the "Exists" feature useless, since you'd <i>never</i> find any filename matches on disk due to that suffix, which in turn lead to you queueing lots of dupes. You now <i>only</i> see the <i>actual</i> filename when queueing.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">62.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Downloading] We now perform intelligent resolution of clashing destination filenames whenever you queue a new download <i>and</i> whenever you start up Frost to resume your old queue. In the past, Frost allowed you to queue multiple files targeted at writing to the exact same filename, which meant that only <i>one</i> of the downloads would be successful. The new behavior intelligently resolves all clashes: If <i>another</i> key in your download queue has <i>the exact same</i> destination filename, <i>or</i> if you start up Frost and it sees that an <i>unfinished</i> download queue item already exists on disk with the target filename (that file could have been added there by something else while Frost was turned off), then we add the <i>next available</i>, non-clashing <i>prefix</i> to the filename. For instance, "(frost_2) filename.ext" or "(frost_3) filename.ext". This means that you are <i>finally</i> able to queue multiple files with <i>identical</i> filenames as long as their <i>download directories</i> differ, and <i>if</i> there's a clash you'll get the automatic "(frost_X)" prefix. The reason that it's a prefix is so that you can easily find it in your file manager and clean up the prefix manually later. It also makes it possible to sort your Downloads table by the "Filename" column, and then using the "Set [prefix/download directory] for selected files" buttons in the Downloads tab toolbar to revise the target folders or prefixes for any (unfinished) clashing files.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">63.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Downloading] The "Add new downloads" dialog now checks and updates the status of the "Exists" column in <i>every</i> situation. It used to only perform the check during the initial add. It now updates whenever the download directory changes, if the file is renamed, if you change the filename prefix, if the window loses and regains focus (such as if you switch to your file-manager to delete the clashing on-disk file, and then back to Frost), as well as when you press the "Ok" button to submit the download-list (it will not let you queue the files until all clashes are resolved). This complete coverage ensures that you can <i>always</i> trust that you will not be downloading any files that already exist on disk. The "Exists" column will always show you the latest state, and the "Remove already exists" button lets you conveniently de-queue all clashing files with one click.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">64.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Downloading] The "Manage downloaded keys" window has been completely rewritten and re-designed from the ground up. The "Remove all from same board" popup menu item no longer deletes items without a board association if you've selected an item without a board. This means there's no more danger; you simply select an item and delete everything from that board, and if you accidentally select a boardless item you won't suddenly lose all other boardless items (which is always the majority of the download log).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">65.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Downloading] The "Manage downloaded keys" window has been completely rewritten and re-designed from the ground up. The "Date" column now uses the same ISO date format as Frost's message list, which is "2015.11.04 23:02:20GMT", so that it's less confusing.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">66.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>The Uploads table and the "Add New Uploads" window now use a more compact and readable value in the "Compatibility Mode" column. The "COMPAT" prefix is hidden, so "COMPAT_1468" is now simply shown as "1468", and so on.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">67.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Completely rewrote the download/upload "Execute program on completion" feature. It now uses brand-spanking-new, extremely robust, asynchronous process launching and properly understands your executable command. You can now use this power-user feature with confidence! Furthermore, the programs are given all of the extended information introduced by Frost-Next, such as the compatibility mode, compression and crypto key of your uploads. See the dedicated "Feature Details: Execute Program on Completion" page for more information.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">68.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Downloading] The prefix and download directory fields on the Downloads tab are now cleaned up and validated after you change them, so that you don't accidentally enter unwanted whitespace, for instance. It also takes care of illegal filesystem characters and other potential issues.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">69.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Downloading] We now always use the Freenet key's filename as the initial name for all downloads. This avoids a spoofing issue where people could create fake message file attachments with fake names and different keys (such as a filename that said "example.jpg" but lead to a ".exe" file). Spoofing is no longer possible.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">70.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>We now defer the generation of the upload/download item tooltips, so that they're only generated when you <i>actually</i> hover over an item. When you've got <i>lots</i> of active transfers that are constantly updating their status, Frost used to waste time and energy generating the tooltip information thousands of times per minute even though you didn't even look at them, so it was worth fixing.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">71.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>The "Remove from global queue" feature no longer sets the priority to 6 ("paused") after removing the item. That part of the implementation made zero sense and made it impossible to restart such de-queued files without having to first tediously set their priority back to a normal value.</p>
+    <p>Instead, we now simply mark the de-queued items as Failed and disable them, so that the user can easily right-click the items and choose "Restart selected [downloads/uploads]" to start the transfers again. Furthermore, we don't mark <i>Finished</i> transfers as Failed if you decide to de-queue them from the global queue. This distinction means that you can let transfers sit as "Finished" in your transfer list, but that you can de-queue them from the global queue so that they don't take up any more hard disk space in your Freenet node.</p>
+    <p>The feature is also useful for other reasons: Removing something from the global queue is an <i>excellent</i> way to <i>completely</i> cancel an ongoing upload or download without deleting it from your file list. You can then simply right-click and restart it later.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">72.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Downloading] The "Download keys from clipboard" and "Download all keys from message" features now <i>skips all duplicate keys</i> in the input and tells you how many duplicates it skipped (so that you don't get confused about why the "Add new downloads" list is shorter than your input list). Those kinds of duplicates are very common in message threads, where people might say things like "Key X doesn't start" in a reply to the main post. Now we only grab a single instance of each <i>unique</i> key.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">73.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Uploading] If you click on the file selection button on the Uploads tab, and you don't select any files, we no longer show an annoying, empty upload-window. The only time you'll see the "Add new uploads" window is if you've selected at least 1 file, just the way it should be!</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">74.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Downloading] The "Change download target directory" menu function of the "Add new downloads" window was using "downloads/" as the default navigation directory every time you used it, which was very tedious when setting the folders of multiple items. It has now been improved so that it uses the directory of the first selected file, if that directory exists; otherwise it falls back to navigating from the default download directory.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">75.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>The "Log successful [downloads/uploads] to localdata/Frost-[Downloads/Uploads].log" features were totally broken. They only saved the keyname with no other information (useless for healing), and they buggily saved it as "CHK@../filename.ext/filename.ext" (included the filename twice). They have now been totally revamped so that they log the completion time and key (for downloads), and the completion time and <i>all insert settings</i> (for uploads). This makes the feature ultra useful for power-uploaders who need to reference their insert settings and keys later, and don't want to have to manually remember to right-click and copy the info from the uploads table.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">76.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Downloading] Thanks to major improvements to the key-tracker, all users have now been migrated to having "Remember which Freenet keys you've already downloaded" enabled by default. This means that the "Remove already downloaded" feature now <i>works</i> in the "Add new downloads" table. You will be able to see when you've already download a certain key, and can choose to not download it again, either via the "Remove already downloaded" button, or by answering the <i>newly added</i> yes/no per-file redownload question whenever you try to queue previously downloaded keys.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">77.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Downloading] You can now hover over the "Download Directory" column to see its value. This is a huge relief, since it used to be a complete <i>hell</i> to figure out what directory path something was in, and you usually had to resize the columns to see everything. Now you simply hover over it to see what path it is, and you can even use the new "Open this download directory" right-click menu feature if you want to go there directly.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">78.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>The downloads and uploads tables now render Finished items with a faded "X" checkmark in the "Enabled" column, and it is no longer possible to try to toggle the enabled-state on/off for Finished or external (global queue) items, since that didn't make any sense.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">79.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Uploading] File upload compression has been deprecated, since it is harmful and pointless. Freenet uses twice as much hard disk space and memory when transferring compressed files, and is <i>much</i> slower at uploading and downloading such files, as well as being harder to heal in the future. Freenet's developers have attempted to phase out compression for these reasons. You should only use compression for text-based file formats. Trying to compress archives, pictures, music or videos won't save any space and will just waste your time.</p>
+    <p>The following are the changes to compression in Frost-Next:</p>
+    <ul>
+      <li>Removed the "Compress uploads" checkbox from the Uploads tab. Fun fact: It actually wasn't hooked up to any code whatsoever, and was pure placebo, since this was yet another one of many places where the old developers had inexplicably forgotten to finish some feature they started.</li>
+      <li>All uploads now default to <i>no compression</i>, but can be changed by the user on a per-file basis.</li>
+      <li>If you try to enable compression for a file, you will get a very stern warning and will have to confirm your choice and that you understand the risks. The warning will appear every time unless you uncheck the "Show this message again?" checkbox.</li>
+      <li>File attachments in messages never use compression and cannot be changed, since most people attach pre-compressed file formats.</li>
+      <li>Uploading of Frost messages always uses compression for the actual text-content of the message itself, since that's exactly what compression is meant for.</li>
+    </ul>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">80.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Uploading] Completely rewrote the handling of missing/modified upload-files. Instead of showing an error message and forcibly <i>deleting</i> the upload from your list, we now just set the item to Failed. You can then right-click the uploads and use the new "Restart selected uploads" feature to try again after you've restored the original file to its proper location.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">81.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>[Uploading] The missing/modified file check is now only performed for uploads that are in a "Waiting" or "Pending Pre-calculation of CHK" state. We do not care if Finished or In Progress files go missing from disk, since we <i>don't need</i> the original files anymore when Freenet has begun uploading them. This change allows you to queue lots of files from a temporary folder, and then simply delete the originals as soon as the uploads have fully begun. To do that, just queue your files, and then wait until they have progress info (the Blocks column shows "0/### blocks" or higher), which means that Freenet has fully received the file. Then you're welcome to delete your temporary originals.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">82.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Uploading] Removed the "Periodically check for and remove non-existent/changed files in upload table" option. It is now always enabled (but its behavior is greatly improved; see other changes). Previously, if you disabled the check and deleted a queued file, Frost would try to upload non-existent files and sent empty data to Freenet.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">83.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Uploading] Frost now verifies that files exist (and are still the same size) at the <i>exact</i> moment that it attempts to start an upload. Previously, it only checked for missing or modified files every 5 minutes, which caused it to upload <i>empty</i> data if the file was deleted in-between the scheduled checks.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">84.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>The "Remove finished" checkboxes no longer remove <i>globally queued</i> items from the uploads/downloads tables. Note that it <i>never</i> worked in the past; it <i>just</i> deleted the finished global entries from Frost's table, but it <i>thankfully</i> didn't actually succeed in de-queueing them from Freenet itself (since that would have screwed up the transfer for the application that <i>actually</i> queued it). Now it doesn't even delete them from the file table, since Frost should <i>not</i> try to remove externally queued files. If you don't want to see global items, you're simply supposed to uncheck "Show global queue". Note that you can <i>still</i> manually de-queue external items via the right-click menu for each item, if you <i>really</i> want to do that.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">85.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>It is now possible to double-click (or press Enter) on uploads/downloads to open them if they exist on disk. This feature used to be broken under modern Linux (such as Ubuntu), due to using ancient file-opening code. Now your files are properly opened at all times, and it of course also works under Windows and OS X. The new code uses a hybrid of raw file opening methods <i>and</i> Java's new, universal file opening functions, which guarantees that it always picks the best solution for your system (and that it will always continue to work in the future).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">86.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Double-clicking on uploads/downloads to open them no longer attempts to open things that don't exist on disk, such as "Global queue" items or unfinished transfers. No more "missing file" errors.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">87.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>The file launcher no longer leaks memory. It used to keep the operating system resources occupied even after the launched files were closed by the user, which meant that it was leaking open file handles (stdin, stdout and stderr), and if you ran too many files it simply wouldn't allow Frost to open any more. It has now been completely rewritten to a brand new method which always closes the files afterwards.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">88.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed a serious bug in the file uploader. The per-file connection uploading mode (used for non-persistent uploading and for "pre-calculate CHK for selected files) used the on-disk filename. The multi-connection persistent mode used the user's provided filename. The latter is correct since it's necessary for the file-renaming features, etc. This "tiny" difference meant that your "Pre-calculate CHK" calculated wrong keys whenever the on-disk filename differed from the upload-filename, and that people using the non-persistent uploading mode couldn't rename their files. It has now been fixed so that Frost always uses the user's chosen filename everywhere.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">89.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Downloading] Frost <i>no longer</i> has a severe freakout when it tries to queue a key that's already in your download queue. It used to <i>abort the whole queueing process</i>, which caused Frost to <i>skip all downloads</i> after it saw the duplicate key. In the past, you could <i>never trust</i> that Frost would queue every file you've told it to queue (especially not if the file links came from message threads, where there's very often duplicate keys, although that's now fixed in Next too by de-duplicating the list). This manifested itself as partial download lists, and a complete inability to queue all files that you wanted. The new, fixed behavior is to simply skip (and count) the duplicates and then display a dialog box which shows you a summary of all the keys that were skipped due to already existing in your download queue. It displays up to 10 duplicate keys per error dialog, and uses multiple dialogs if necessary, so that it doesn't overwhelm the user if they've queued hundreds of files.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">90.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Downloading] Fixed a serious bug in how keys were queued when using "Download all keys from selected message" (and a few other places). It refused to queue multiple keys with the same <i>filename</i> even if they were <i>different keys</i>, so "CHK@123../foo.jpg" and "CHK@456../foo.jpg" were treated as duplicates and only one of them showed up in the "Add new downloads" window.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">91.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Downloading] Fixed the bug where Frost reached "100% Downloaded" but was unable to write the file to disk because a file with that name already existed on disk. If we see a file with the same name and exact filesize on disk, we now assume that the file is already complete and mark it as done. If we see a file with the wrong size, we delete it and overwrite it. That's because Frost-Next has taken every precaution to ensure that you never queue a filename that already exists on disk, so if we see a clashing file during the final write-step we will simply overwrite it.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">92.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Downloading] Fixed a bug in the "Add new downloads: Add prefix to filename" popup menu option. If you hit cancel it used to always remove your current prefix. Now cancel properly cancels and doesn't tamper with your current prefix. If you want to remove your custom prefix, just press OK with an empty string.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">93.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Downloading] When you queued download items, they defaulted to incorrectly having a checkmark in the "DDA (Direct Disk Access)" column, and it used to sit there until the transfers began (at which point they finally realized that you weren't using DDA). We now default that column to what's <i>actually</i> the case: If you have enabled DDA in the settings (not recommended), then we show the direct disk access checkmark, but otherwise we don't show any checkmark.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">94.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Downloading] Totally rewrote the "Download all file keys from current message" and "Download keys from clipboard" functions. They now actually <i>work</i>. In the past, there were many situations where you simply got no result whatsoever, no matter how many times you tried. The reason was that the old code tried to mindlessly decode all "%XX"-style HTML characters without first verifying that the %-sequences were valid, which meant that it crashed on any text containing %-signs that weren't followed by a valid hex-sequence (%00 to %FF). For example, the word sequence "100%." in the text would trigger the bug, and crashed the text-parser so that it didn't produce even a single scanned link. The new scanner intelligently looks for valid %-sequences and <i>only decodes those</i>, which means that you can now <i>trust</i> that it will properly decode <i>any</i> text you throw at it.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">95.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Downloading] If the target download folder no longer exists by the time the download finishes, Frost used to hang at 100% without ever completing the file. It has now been corrected so that it creates the folder again if it's missing. Basically, when you queue an item or change its folder, the folder is created. But it used to fail if you deleted that folder again in the time between queuing and completion. Now it properly creates the folder structure again if required during file writing.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">96.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed a race condition where the user would manually remove a file from the global queue, which marked the Frost transfer as Failed, but then a backlogged "SimpleProgress" FCP message could arrive and push Frost back into forever displaying a "Downloading"/"Uploading" state even though the transfer had been removed and nothing exists in the global queue anymore.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">97.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed a serious race condition in the file downloader and file uploader, where it was possible that restarted items (i.e. via "Restart selected downloads/uploads") were started both by the restart action <i>and</i> by the normal "start any waiting transfers" ticker. That used to cause duplicate items in the Freenet queue, or outright download failures.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">98.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Downloading] If you were using the non-persistent downloading mode (which isn't recommended), then Frost used to <i>always</i> download the files into "downloads/filename.ext" even if you had selected another destination folder. That has now been fixed.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">99.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>The "track downloaded keys" feature no longer <i>super annoyingly</i> re-asks "do you want to re-download this file again?" for <i>every</i> re-downloaded file during <i>every</i> Frost startup. If you queue a file that's been previously downloaded, and you answer Yes to re-downloading it, we now remember that choice during all subsequent startups.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">100.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed the problem where the "Add new downloads" and "Add new uploads" windows would automatically (and randomly) close themselves instantly if you used the file/folder-picker to select a couple of files from your hard disk and pressed Enter in the file-picker. The problem was that the Enter/Escape-presses could sometimes propagate from Java's file-picker to the main window itself, which caused it to close. The solution was to change the Enter/Escape key-bindings in these windows. You now use Ctrl+Enter to commit the work instead, and Ctrl+Escape to abort it. No more need to fear that the window will vanish if you use enter to commit your file-picker selection.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">101.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Downloading] You can no longer nonsensically attempt to change the transfer priority of Finished or Failed download items, since Freenet doesn't support doing that.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">102.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Sorting by the "Enabled" columns now properly sorts finished and external (global queue) items together with the rest of your enabled items. This lets you quickly see a list of all transfers that are enabled or finished, which will be appreciated by power-users of the new "Default downloads/uploads to disabled" feature, which lets you manually manage a big queue and start a few files at a time, etc.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">103.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>The "Blocks" columns used totally broken math to calculate the sort order. We now sort Finished items at the top, then In-Progress items (such as "1% 1/100 [200]"), then items that are currently grabbing their metadata (meaning "~10% 1/10"), and then all remaining items that aren't finished or in progress.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">104.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Improved Frost's ability to de-queue In-Progress items from the global queue, so that items aren't inadvertently marked "Failed: Disappeared from global queue" anymore whenever Frost or the user <i>intentionally</i> removes something from the global queue.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">105.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>The "State" columns now properly sort everything in a logical order, such as Finished items first, then In-Progress, then Waiting, then Failed, etc. It used to just be a haphazard, alphabetical sort.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">106.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed an extremely serious race condition in the Uploads and Downloads tables, which caused externally queued items (from "Show global queue") to be added to the tables on a deferred timer. If the timer took too long to execute (it often did), then any associated "status update" events would be ignored for those items since they weren't yet in the table, and it meant that external uploads/downloads were often stuck in an "in progress..." state and would never update after that.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">107.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed several very serious race conditions in the "Restart selected [downloads/uploads]", "Remove selected [downloads/uploads]" (also bound to Delete key), and "Remove selected files from global queue" features:</p>
+    <ul>
+      <li>If a download had reached 100% and was currently in Frost's queue for being saved to disk, a restart would mean that the old "save to disk request" was stuck in the queue, and if the restarted transfer reached 100% before the old disk-writer "died", the new one wouldn't start a disk-writer of its own. The result was that the transfer froze at 100% without being saved. Likewise, whenever you tried to restart, delete or de-queue a transfer <i>while</i> it was being written to disk, you ended up with partially written files on disk and other issues such as inconsistent/broken download-status.</li>
+      <li>If an upload had begun writing its data to the node's persistent queue, and you restarted or removed it, Frost then "orphaned" that transfer which meant that it stayed in the global queue without being monitored by Frost.</li>
+      <li>All of this is now fixed: You cannot remove or restart an item <i>while</i> it's currently transferring its critical data to/from the node.</li>
+    </ul>
+    <p>This will only really impact people who queue super big uploads and start them and then instantly want to restart them. You won't be able to do that until the current transfer has finished sending the data to the node. But who the heck does that? Who starts and instantly restarts a transfer? Likewise, who lets a download get to 100%, and as soon as the download is finalizing they restart it? So this fix won't be annoying to anyone who uses Frost properly, and it will protect any people who <i>tried</i> to use it improperly, usually by accident.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">108.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Downloading] Fixed a bug when persistent downloads failed. Freenet's global-queue item wasn't being properly de-queued when the failed items went back into a "Waiting" (aka "I want to retry") state, so it was impossible to start (retry) the download again since the global queue identifier was already taken. We now de-queue the item if necessary, so that the next attempt can be started properly.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">109.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Downloading] Fixed the non-persistent queue mode. Downloads forever said "Trying" even while they were being downloaded. Now they say "Trying" until the download begins, and then they say "Downloading" as intended.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">110.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed a resource-leak, where the sockets (connections) used for persistent file uploads/downloads would remain open if there was an error during the file transfer.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">111.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed a severe bug that could easily occur whenever you restarted items in Frost: Sometimes, a pending GUI update was queued for the old item but it couldn't find the old item in the table-data anymore (since it was being restarted), so Frost tried to update an invalid table row. If that bug happened, Frost's download/upload tables glitched out and froze completely and you could not start, manage or see the status of any items without restarting the whole application.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">112.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Downloading] Improved Frost's file-writing: If we don't receive the whole file from the node, we now delete the corrupt, partially-written file from disk. Reasons for this happening were usually that the Freenet node crashed, or that Freenet's persistent (global queue) transfer was deleted <i>while</i> we were receiving its data. This fix ensures that you can now trust that <i>if</i> a file exists on disk, Frost has written 100% of the file's data.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">113.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Rewrote the "Remove selected files" upload/download menu item so that it only deletes Frost's own <i>internally</i> queued items if used via the right-click menu, but it <i>still</i> deletes <i>both</i> internal <i>and external</i> items if used via the keyboard's Delete key instead. This is to reduce the risk of accidentally removing externally queued items that belong to other programs. If you really want to delete those, you now have to explicitly select them and press the Delete key instead.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">114.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>You can no longer toggle the "Enabled" column for externally queued items, since that's an <i>internal</i> Frost flag which never had any effect (or made <i>any</i> sense) for external items. If you want to stall something external, just set them to priority 6 (paused) instead.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">115.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>It is no longer possible to use the "Restart" functions on externally queued items, since it never made any sense to restart something that Frost <i>didn't queue</i> and <i>isn't waiting for</i>. This change means that Frost can no longer <i>accidentally</i> screw up ongoing external transfers, in case you've turned on the "Show global queue" display mode.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">116.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Rewrote the "Copy keys to clipboard / Copy extended information to clipboard" handling to fix subtle bugs and differences between the two copying modes (for instance, the basic keys were calculated differently in the two modes).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">117.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>When your uploads and downloads are loaded from the database at startup, they now properly detect if their last-known state was "In Progress" and don't trigger certain cleanup/reset mechanics if we already expect this transfer to be in progress.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">118.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Frost wasn't properly listening to Freenet's file transfer messages (the global, persistent queue), and it only read the start/stop/progress/failure messages. It has now been corrected so that we properly receive <i>all</i> Freenet status messages as of 2015.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">119.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Downloading] The quickload box on the Downloads tab has been fixed so that it now accepts a single key, instead of treating multiple "lines" as a single, long key. The quickload box is mostly used by developers who want to manually type in single keynames for testing, and most normal people should be using the "Download keys from clipboard" button next to it instead. However, the quickload box <i>does</i> actually support pasting multiple keys as well now, and will automatically transform all newlines to " @SEPARATOR@ ", and you can also do that manually by typing a key and then typing "@separator@" between each key (the spaces and case do not matter).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">120.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Downloading] Fixed many bugs in the Downloads tab features for setting the prefix or download directory:</p>
+    <ul>
+      <li>If you haven't selected any items, it used to cause exceptions when the buttons were clicked.</li>
+      <li>We no longer change the prefix/download directory of <i>Finished</i> items, since that made no sense.</li>
+      <li>We now validate the legality of the filename <i>after</i> the changes are applied, and automatically add or remove the new "(frost_X)" anti-clash prefix as required.</li>
+    </ul>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">121.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Uploading] The "Pre-calculate CHKs for selected files" feature now (correctly) <i>requires</i> that the item is in the "Waiting" state (not yet started). It refuses to calculate keys when the transfer is in any of the other states (such as Failed, Finished or In Progress items), in order to avoid sending the same file to Freenet multiple times.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">122.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Uploading] Removed the "Upload selected files" menu item. It was broken, nonsensical, had absolutely <i>no</i> purpose whatsoever, and <i>just</i> caused various bugs when used. It could only be used on Waiting or Finished items, which made no sense whatsoever. If used on Finished files, it put them back in a "Waiting" state forever because it didn't remove them from the global queue. If used on externally queued files, it put them in a "Waiting" state forever but obviously couldn't start any upload, since it didn't have the source-files. The feature was a total mess, and had no purpose whatsoever. Instead, use the "Start selected uploads" feature, which allows you to instantly start uploading any files that are currently in the Waiting state.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">123.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Uploading] Fixed a bug in the file attachment uploader. It was creating a non-null "dummy" FrostUploadItem, which meant that it used the default upload settings (which it would have gotten <i>anyway</i> if it hadn't provided any dummy item). The fact that it provided an item made it impossible to differentiate <i>real</i> uploads from mere file attachments. We now properly use a <i>null</i> item for file attachments in messages, as was always intended.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">124.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Downloading] Unified the "default download directory" calculation into a single, clean function so that it behaves properly everywhere and even falls back to the default download directory ("downloads/") if the user has provided an illegal path.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">125.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Uploading] The "Execute program on completion" feature used to also run for external (global queue) items. Now it only runs for Frost's own items, as intended.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">126.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Restarted downloads and uploads that had previously finished will now properly run their "Execute program on completion" process again the next time they finish.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">127.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>The downloads table did not properly save the user-configured widths of all columns. That has now been fixed. The bug was also in the message list and uploads table, but didn't affect any serious columns there. All 3 tables have now been rewritten to use a smarter method of saving and loading the user's configured column widths.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">128.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Uploading] The various upload file-pickers used to open on the leftmost screen/monitor (which may not be where you've placed the Frost window in a multi-monitor setup). It's now centered over the active Frost window instead.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">129.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>[Downloading] Frost now checks the download directories of all queued files at startup, and creates them again if they're missing.</p>
+  </div></td>
+</tr>
+</table>
+</body>
+</html>

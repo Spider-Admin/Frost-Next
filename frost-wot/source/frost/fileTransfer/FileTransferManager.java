@@ -74,8 +74,8 @@ public class FileTransferManager implements ExitSavable, AutoSavable {
         final MainFrame mainFrame = MainFrame.getInstance();
         getDownloadManager().addPanelToMainFrame(mainFrame);
         getUploadManager().addPanelToMainFrame(mainFrame);
-        getSearchManager().addPanelToMainFrame(mainFrame);
-        getSharedFilesManager().addPanelToMainFrame(mainFrame);
+//#DIEFILESHARING        getSearchManager().addPanelToMainFrame(mainFrame);
+//#DIEFILESHARING        getSharedFilesManager().addPanelToMainFrame(mainFrame);
     }
 
     /**

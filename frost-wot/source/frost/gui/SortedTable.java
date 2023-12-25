@@ -23,6 +23,7 @@ import java.awt.event.MouseListener;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Iterator;
+import java.util.List;
 
 import javax.swing.JTable;
 import javax.swing.table.TableColumn;
@@ -31,9 +32,13 @@ import javax.swing.table.TableModel;
 
 import frost.gui.model.SortedTableModel;
 import frost.gui.model.TableMember;
+import frost.util.gui.GridJTable;
 
-@SuppressWarnings("serial")
-public class SortedTable<T extends TableMember<T>> extends JTable
+// NOTE: This is one of the three types of sortable tables in Frost:
+// - SortedTable
+// - SortedModelTable: mostly used for uploads/downloads tables and sent/outbox message lists
+// - The board-message lists (they're a treetable and use their own implementation)
+public class SortedTable<T extends TableMember<T>> extends GridJTable
 {
     protected int sortedColumnIndex = 0;
     protected boolean sortedColumnAscending = true;
@@ -43,6 +48,7 @@ public class SortedTable<T extends TableMember<T>> extends JTable
     public SortedTable(SortedTableModel<T> model)
     {
         super(model);
+        setEnforcedShowGrid(true); // GridJTable: always show grid even when L&F changes
 
         model.setParentTable(this);
 
@@ -50,6 +56,26 @@ public class SortedTable<T extends TableMember<T>> extends JTable
         
     }
 
+    /**
+     * Sorts by the given column index and order, and tells the table to remember
+     * the setting, so that further clicks on the table headings will act properly
+     * (such as a subsequent click on the same column inverting the sort order).
+     */
+    public void setSortedColumn( int val, boolean val2 )
+    {
+        if( !(getModel() instanceof SortedTableModel<?> ))
+            return;
+        sortedColumnIndex = val;
+        sortedColumnAscending = val2;
+        sortColumn(sortedColumnIndex, sortedColumnAscending);
+        getModel().tableEntriesChanged();
+    }
+
+    /**
+     * Sorts by a specific column but doesn't remember the settings and doesn't notify the
+     * table model that the entries need to be re-rendered due to the sorting.
+     * Not recommended for external use!
+     */
     public void sortColumn(int col, boolean ascending)
     {
         SortedTableModel<T> model = getModel();
@@ -65,30 +91,26 @@ public class SortedTable<T extends TableMember<T>> extends JTable
         setSelectedItems( list );
     }
 
+    /**
+     * Re-applies the user's current sorting.
+     */
     public void resortTable()
     {
         sortColumn( sortedColumnIndex, sortedColumnAscending );
         getModel().tableEntriesChanged();
     }
 
-    protected void setSelectedItems( ArrayList<T> items )
+    protected void setSelectedItems( List<T> items )
     {
         if( !(getModel() instanceof SortedTableModel<?> ))
             return;
+
+        getSelectionModel().clearSelection();
         SortedTableModel<T> model = getModel();
-        for( int x=0; x<model.getRowCount(); x++ )
-        {
-            T item1 = model.getRow(x);
-
-            Iterator<T> i = items.iterator();
-            while( i.hasNext() )
-            {
-                T item2 = i.next();
-
-                if( item1 == item2 )
-                {
-                    getSelectionModel().addSelectionInterval(x,x);
-                }
+        for( final T itm : items ) {
+            final int rowIdx = model.indexOf(itm);
+            if( rowIdx >= 0 ) {
+                getSelectionModel().addSelectionInterval(rowIdx, rowIdx);
             }
         }
     }
@@ -101,21 +123,15 @@ public class SortedTable<T extends TableMember<T>> extends JTable
             return lst;
 
         SortedTableModel<T> model = (SortedTableModel<T>)getModel();
+        int numberOfRows = getRowCount();
         int selectedRows[] = getSelectedRows();
         for( int x=0; x<selectedRows.length; x++ )
         {
-            lst.add( model.getRow( selectedRows[x] ) );
+            final int rowIdx = selectedRows[x];
+            if( rowIdx >= numberOfRows ) { continue; } // paranoia
+            lst.add( model.getRow( rowIdx ) );
         }
         return lst;
-    }
-
-    public void setSavedSettings( int val, boolean val2 )
-    {
-        if( !(getModel() instanceof SortedTableModel<?> ))
-            return;
-        sortedColumnIndex = val;
-        sortedColumnAscending = val2;
-        sortColumn(sortedColumnIndex, sortedColumnAscending);
     }
 
     /**
@@ -131,7 +147,7 @@ public class SortedTable<T extends TableMember<T>> extends JTable
     protected void initSortHeader() {
         Enumeration<TableColumn> enumeration = getColumnModel().getColumns();
         while (enumeration.hasMoreElements()) {
-            TableColumn column = (TableColumn) enumeration.nextElement();
+            TableColumn column = enumeration.nextElement();
             column.setHeaderRenderer(columnHeadersRenderer);
         }
         getTableHeader().addMouseListener(new HeaderMouseListener());
@@ -166,6 +182,14 @@ public class SortedTable<T extends TableMember<T>> extends JTable
     }
     
 
+    // you can override this to be able to configure the default sort-order of clicked columns,
+    // by checking the column number and returning true for ascending or false for descending.
+    // this is used when the user clicks a different column to sort by something else. the user
+    // expects logical default sorting behaviors, such as sorting dates descending.
+    public boolean getColumnDefaultAscendingState(final int col) {
+        return true;
+    }
+
     class HeaderMouseListener implements MouseListener
     {
         public void mouseReleased(MouseEvent event) {}
@@ -186,11 +210,9 @@ public class SortedTable<T extends TableMember<T>> extends JTable
                 isSortable = true;
             if( isSortable )
             {
-                // toggle ascension, if already sorted
-                if( sortedColumnIndex == modelIndex )
-                {
-                    sortedColumnAscending = !sortedColumnAscending;
-                }
+                // if the user clicks the same column then toggle ascending/descending,
+                // if the user clicks another column then use that column's default order.
+                sortedColumnAscending = ( modelIndex == sortedColumnIndex ? !sortedColumnAscending : getColumnDefaultAscendingState(modelIndex) );
                 sortedColumnIndex = modelIndex;
 
                 sortColumn(modelIndex, sortedColumnAscending);
@@ -236,29 +258,26 @@ public class SortedTable<T extends TableMember<T>> extends JTable
 		}
 	}
 
-	abstract protected class SelectedItemsAction {
-		abstract protected void action(T t);
+    abstract protected class SelectedItemsAction {
+        abstract protected void action(T t);
 
-		public SelectedItemsAction() {
-			iterateSelectedItems();
-		}
-		
-		private void iterateSelectedItems() {
-		
-			final int[] selectedRows = getSelectedRows();
-			if( selectedRows.length > 0 ) {
-				int numberOfRows = getRowCount();
-				SortedTableModel<T> sortedTableModel = getModel();
-				for( int rowIx : selectedRows) {
-					if( rowIx >= numberOfRows ) {
-						continue; // paranoia
-					}
-					
-					action( sortedTableModel.getRow(rowIx));
-				}
-				repaint();
-			}
-		}
-	}
+        public SelectedItemsAction() {
+            iterateSelectedItems();
+        }
+
+        private void iterateSelectedItems() {
+            // we must first make a list of all objects, since modifying them may change the sorting
+            // and row numbers of the subsequent items otherwise, which means we'd target the wrong items.
+            final List<T> selObjects = getListOfSelectedItems();
+            // now just perform the actions on each object and repaint the table (doesn't clear their
+            // selection, so you may want to fix their row selection manually).
+            if( selObjects.size() > 0 ) {
+                for( final T obj : selObjects ) {
+                    action(obj);
+                }
+                repaint();
+            }
+        }
+    }
 }
 

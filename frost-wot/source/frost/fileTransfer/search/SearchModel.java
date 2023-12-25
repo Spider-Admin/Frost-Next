@@ -23,6 +23,7 @@ import java.util.logging.*;
 
 import frost.fileTransfer.*;
 import frost.fileTransfer.download.*;
+import frost.util.Mixed;
 import frost.util.model.*;
 
 public class SearchModel extends SortedModel<FrostSearchItem> {
@@ -48,16 +49,13 @@ public class SearchModel extends SortedModel<FrostSearchItem> {
         for (int i = selectedItems.size() - 1; i >= 0; i--) {
             final FrostFileListFileObject flf = selectedItems.get(i).getFrostFileListFileObject();
             String filename = flf.getDisplayName();
-            // maybe convert html codes (e.g. %2c -> , )
-            if( filename.indexOf("%") > 0 ) {
-                try {
-                    filename = java.net.URLDecoder.decode(filename, "UTF-8");
-                } catch (final java.io.UnsupportedEncodingException ex) {
-                    logger.log(Level.SEVERE, "Decode of HTML code failed", ex);
-                }
-            }
+            // convert any html escape sequences (e.g. "%2c" -> "," and "%40" -> "@" ), to get the real filename
+            // FIXME/TODO: The filesharing feature is removed from Next since it's dangerous and
+            // nobody used it. But if ever re-implemented, we should rawUrlDecode() the KEY too,
+            // so that the keys are consistent with keys added via other methods.
+            filename = Mixed.rawUrlDecode(filename);
             final FrostDownloadItem dlItem = new FrostDownloadItem(flf, filename);
-            downloadModel.addDownloadItem(dlItem);
+            downloadModel.addDownloadItem(dlItem, true); // true = ask to redownload duplicates
             selectedItems.get(i).updateState();
         }
     }

@@ -23,6 +23,7 @@ import java.awt.*;
 import javax.swing.*;
 
 import frost.messaging.frost.*;
+import frost.util.gui.search.TableFindAction;
 import frost.util.gui.translation.*;
 
 @SuppressWarnings("serial")
@@ -103,6 +104,7 @@ public class SentMessagesPanel extends JPanel implements LanguageListener {
         this.add(sentMsgsLabel, BorderLayout.NORTH);
 
         sentMessagesTable = new SentMessagesTable();
+        new TableFindAction().install(sentMessagesTable.getTable());
         sentMessagesTable.getScrollPane().setWheelScrollingEnabled(true);
         this.add(sentMessagesTable.getScrollPane(), BorderLayout.CENTER);
 

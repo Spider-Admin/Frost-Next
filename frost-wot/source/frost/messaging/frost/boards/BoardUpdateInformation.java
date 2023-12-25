@@ -154,9 +154,9 @@ public class BoardUpdateInformation {
     }
 
     public static String getSummaryInfoString(final List<Board> boardList) {
-        final LocalDate localDate = new LocalDate(DateTimeZone.UTC);
-        final long dateMillis = localDate.toDateMidnight(DateTimeZone.UTC).getMillis();
-        final String dirDateString = DateFun.FORMAT_DATE.print(localDate);
+        final DateTime now = new DateTime(DateTimeZone.UTC);
+        final long dateMillis = now.withTimeAtStartOfDay().getMillis();
+        final String dirDateString = DateFun.FORMAT_DATE.print(now);
 
         long sumNodeTimeToday = 0;
         int sumCountTriedIndicesToday = 0;

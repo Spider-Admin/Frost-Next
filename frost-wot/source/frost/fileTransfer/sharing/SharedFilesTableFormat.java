@@ -175,7 +175,7 @@ class SharedFilesTableFormat extends SortedTableFormat<FrostSharedFileItem> impl
         {
             int sortedColumn = Core.frostSettings.getIntValue(CFGKEY_SORTSTATE_SORTEDCOLUMN);
             boolean isSortedAsc = Core.frostSettings.getBoolValue(CFGKEY_SORTSTATE_SORTEDASCENDING);
-            if( sortedColumn > -1 ) {
+            if( sortedColumn > -1 && sortedColumn < modelTable.getTable().getColumnModel().getColumnCount() ) {
                 modelTable.setSortedColumn(sortedColumn, isSortedAsc);
             }
         } else {

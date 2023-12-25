@@ -28,6 +28,8 @@ import frost.storage.perst.filelist.*;
 import frost.util.gui.*;
 import frost.util.gui.translation.*;
 
+//#DIEFILESHARING: This entire panel is related to the filesharing search, and has been disabled.
+//It's not even being added to the Preferences window anymore.
 @SuppressWarnings("serial")
 class SearchPanel extends JPanel {
 
@@ -52,7 +54,7 @@ class SearchPanel extends JPanel {
     private final JTextField videoExtensionTextField = new JTextField();
 
     private final JCheckBox disableFilesharingCheckBox = new JCheckBox();
-    private final JCheckBox ignoreCheckAndBelowCheckBox = new JCheckBox();
+    private final JCheckBox ignoreNEUTRALAndBelowCheckBox = new JCheckBox();
     private final JCheckBox rememberSharedFileDownloadedCheckBox = new JCheckBox();
     private final JButton resetHiddenFilesButton = new JButton();
 
@@ -156,7 +158,7 @@ class SearchPanel extends JPanel {
         constraints.gridy++;
         constraints.gridwidth = 2;
         constraints.gridx = 0;
-        add(ignoreCheckAndBelowCheckBox, constraints);
+        add(ignoreNEUTRALAndBelowCheckBox, constraints);
 
         constraints.gridy++;
         constraints.gridwidth = 2;
@@ -185,14 +187,14 @@ class SearchPanel extends JPanel {
     }
 
     private void resetHiddenFiles() {
-        final int answer = JOptionPane.showConfirmDialog(
-                Core.getInstance().getMainFrame(),
+        final int answer = MiscToolkit.showConfirmDialog(
+                null,
                 language.getString("Options.search.confirmResetHiddenFiles.body"),
                 language.getString("Options.search.confirmResetHiddenFiles.title"),
-                JOptionPane.YES_NO_OPTION,
-                JOptionPane.QUESTION_MESSAGE);
+                MiscToolkit.YES_NO_OPTION,
+                MiscToolkit.QUESTION_MESSAGE);
 
-        if (answer ==JOptionPane.NO_OPTION) {
+        if( answer != MiscToolkit.YES_OPTION ) {
             return;
         }
 
@@ -220,7 +222,7 @@ class SearchPanel extends JPanel {
         archiveExtensionTextField.setText(settings.getValue(SettingsClass.FILEEXTENSION_ARCHIVE));
         maxSearchResultsTextField.setText(Integer.toString(settings.getIntValue(SettingsClass.SEARCH_MAX_RESULTS)));
         disableFilesharingCheckBox.setSelected(settings.getBoolValue(SettingsClass.FILESHARING_DISABLE));
-        ignoreCheckAndBelowCheckBox.setSelected(settings.getBoolValue(SettingsClass.FILESHARING_IGNORE_CHECK_AND_BELOW));
+        ignoreNEUTRALAndBelowCheckBox.setSelected(settings.getBoolValue(SettingsClass.FILESHARING_IGNORE_NEUTRAL_AND_BELOW));
         rememberSharedFileDownloadedCheckBox.setSelected(settings.getBoolValue(SettingsClass.REMEMBER_SHAREDFILE_DOWNLOADED));
     }
 
@@ -238,7 +240,7 @@ class SearchPanel extends JPanel {
         maxSearchResultsLabel.setText(language.getString("Options.search.maximumSearchResults"));
 
         disableFilesharingCheckBox.setText(language.getString("Options.search.disableFilesharing"));
-        ignoreCheckAndBelowCheckBox.setText(language.getString("Options.search.ignoreCheckAndBelow"));
+        ignoreNEUTRALAndBelowCheckBox.setText(language.getString("Options.search.ignoreNEUTRALAndBelow"));
         rememberSharedFileDownloadedCheckBox.setText(language.getString("Options.search.rememberSharedFileDownloaded"));
 
         resetHiddenFilesButton.setText(language.getString("Options.search.resetHiddenFiles") + " (" + FileListStorage.inst().getHiddenFilesCount()+")");
@@ -256,8 +258,9 @@ class SearchPanel extends JPanel {
         settings.setValue(SettingsClass.FILEEXTENSION_ARCHIVE, archiveExtensionTextField.getText().toLowerCase());
         settings.setValue(SettingsClass.SEARCH_MAX_RESULTS, maxSearchResultsTextField.getText());
 
-        settings.setValue(SettingsClass.FILESHARING_DISABLE, disableFilesharingCheckBox.isSelected());
-        settings.setValue(SettingsClass.FILESHARING_IGNORE_CHECK_AND_BELOW, ignoreCheckAndBelowCheckBox.isSelected());
+//#DIEFILESHARING        settings.setValue(SettingsClass.FILESHARING_DISABLE, disableFilesharingCheckBox.isSelected());
+        settings.setValue(SettingsClass.FILESHARING_DISABLE, true);
+        settings.setValue(SettingsClass.FILESHARING_IGNORE_NEUTRAL_AND_BELOW, ignoreNEUTRALAndBelowCheckBox.isSelected());
         settings.setValue(SettingsClass.REMEMBER_SHAREDFILE_DOWNLOADED, rememberSharedFileDownloadedCheckBox.isSelected());
     }
 }

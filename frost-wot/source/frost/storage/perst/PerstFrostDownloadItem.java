@@ -43,6 +43,7 @@ public class PerstFrostDownloadItem extends Persistent {
     public int state;
     public long downloadAddedTime;
     public long downloadStartedTime;
+    public long downloadLastActivityTime;
     public long downloadFinishedTime;
     public int retries;
     public long lastDownloadStopTime;
@@ -54,8 +55,6 @@ public class PerstFrostDownloadItem extends Persistent {
     public boolean isTracked;
     public boolean isCompletionProgRun;
 
-    public int runtimeSecondsWithoutProgress;
-    public int oldDoneBlocks;
     private FreenetPriority priority;
 
     public String associatedBoardName;
@@ -73,6 +72,7 @@ public class PerstFrostDownloadItem extends Persistent {
         state = dlItem.getState();
         downloadAddedTime = dlItem.getDownloadAddedMillis();
         downloadStartedTime = dlItem.getDownloadStartedMillis();
+        downloadLastActivityTime = dlItem.getLastActivityMillis();
         downloadFinishedTime = dlItem.getDownloadFinishedMillis();
         retries = dlItem.getRetries();
         lastDownloadStopTime = dlItem.getLastDownloadStopTime();
@@ -81,8 +81,6 @@ public class PerstFrostDownloadItem extends Persistent {
         isLoggedToFile = dlItem.isLoggedToFile();
         isTracked = dlItem.isTracked();
         isCompletionProgRun = dlItem.isCompletionProgRun();
-        runtimeSecondsWithoutProgress = dlItem.getRuntimeSecondsWithoutProgress();
-        oldDoneBlocks = dlItem.getOldDoneBlocks();
         associatedBoardName = dlItem.getAssociatedBoardName();
         associatedMessageId = dlItem.getAssociatedMessageId();
         priority = dlItem.getPriority();
@@ -107,10 +105,11 @@ public class PerstFrostDownloadItem extends Persistent {
                 downloadDir,
                 (fileSize<=0 ? -1 : fileSize),
                 key,
-                Boolean.valueOf(enabled),
+                enabled,
                 state,
                 downloadAddedTime,
                 downloadStartedTime,
+                downloadLastActivityTime,
                 downloadFinishedTime,
                 retries,
                 lastDownloadStopTime,
@@ -118,8 +117,6 @@ public class PerstFrostDownloadItem extends Persistent {
                 isLoggedToFile,
                 isTracked,
                 isCompletionProgRun,
-                runtimeSecondsWithoutProgress,
-                oldDoneBlocks,
                 associatedBoardName,
                 associatedMessageId,
                 priority

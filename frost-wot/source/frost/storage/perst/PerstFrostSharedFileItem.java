@@ -76,6 +76,7 @@ public class PerstFrostSharedFileItem extends Persistent {
         boolean fileIsOk = true;
         final File file = new File(filePath);
 
+        /* //#DIEFILESHARING: This entire block has been commented out since filesharing is removed in Frost-Next.
         // report modified/missing shared files only if filesharing is enabled
         if( !Core.frostSettings.getBoolValue(SettingsClass.FILESHARING_DISABLE) ) {
             if( !file.isFile() ) {
@@ -85,9 +86,9 @@ public class PerstFrostSharedFileItem extends Persistent {
                         StartupMessage.MessageType.SharedFileNotFound,
                         title,
                         text,
-                        JOptionPane.WARNING_MESSAGE,
+                        MiscToolkit.WARNING_MESSAGE,
                         true);
-                MainFrame.enqueueStartupMessage(sm);
+                Core.enqueueStartupMessage(sm);
                 logger.severe("Shared file does not exist: "+filePath);
                 fileIsOk = false;
             } else if( file.length() != fileSize ) {
@@ -97,9 +98,9 @@ public class PerstFrostSharedFileItem extends Persistent {
                         StartupMessage.MessageType.SharedFileSizeChanged,
                         title,
                         text,
-                        JOptionPane.WARNING_MESSAGE,
+                        MiscToolkit.WARNING_MESSAGE,
                         true);
-                MainFrame.enqueueStartupMessage(sm);
+                Core.enqueueStartupMessage(sm);
                 logger.severe("Size of shared file changed: "+filePath);
                 fileIsOk = false;
             } else if( file.lastModified() != lastModified ) {
@@ -109,13 +110,14 @@ public class PerstFrostSharedFileItem extends Persistent {
                         StartupMessage.MessageType.SharedFileLastModifiedChanged,
                         title,
                         text,
-                        JOptionPane.WARNING_MESSAGE,
+                        MiscToolkit.WARNING_MESSAGE,
                         true);
-                MainFrame.enqueueStartupMessage(sm);
+                Core.enqueueStartupMessage(sm);
                 logger.severe("Last modified date of shared file changed: "+filePath);
                 fileIsOk = false;
             }
         }
+        */
 
 //        // check if we share a file with an old CHK key, if yes, remove the key and reset lastUploaded date
 //        if( FcpHandler.isFreenet07() && FreenetKeys.isOld07ChkKey(key) ) {

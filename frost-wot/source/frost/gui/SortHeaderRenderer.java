@@ -99,8 +99,7 @@ public class SortHeaderRenderer extends DefaultTableCellRenderer
      *
      * @see javax.swing.table.TableCellRenderer#getTableCellRendererComponent(javax.swing.JTable, java.lang.Object, boolean, boolean, int, int)
      */
-    @SuppressWarnings("unchecked")
-	@Override
+    @Override
     public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int col) {
         TableCellRenderer defaultRenderer = table.getTableHeader().getDefaultRenderer();
 

@@ -235,8 +235,8 @@ class MiscPanel extends JPanel {
         enableLoggingCheckBox.setSelected(settings.getBoolValue(SettingsClass.LOG_TO_FILE));
         logFileSizeTextField.setText(Integer.toString(settings.getIntValue(SettingsClass.LOG_FILE_SIZE_LIMIT)));
 
-        logLevelComboBox.setSelectedKey(settings.getDefaultValue(SettingsClass.LOG_LEVEL));
-        logLevelComboBox.setSelectedKey(settings.getValue(SettingsClass.LOG_LEVEL));
+        logLevelComboBox.setSelectedKey(settings.getDefaultValue(SettingsClass.LOG_LEVEL)); // set to default
+        logLevelComboBox.setSelectedKey(settings.getValue(SettingsClass.LOG_LEVEL)); // set to user-value if one exists
 
         splashScreenCheckBox.setSelected(settings.getBoolValue(SettingsClass.DISABLE_SPLASHSCREEN));
         useDDACheckBox.setSelected(settings.getBoolValue(SettingsClass.FCP2_USE_DDA));
@@ -252,10 +252,11 @@ class MiscPanel extends JPanel {
         final String nodes = freenetNodeTextField.getText();
         if( nodes.indexOf(",") > -1 ) {
             if( usePersistenceCheckBox.isSelected() ) {
-                MiscToolkit.showMessage(
+                MiscToolkit.showMessageDialog(
+                        null,
                         "Persistence is not possible with more than 1 node. Persistence disabled.",
-                        JOptionPane.ERROR_MESSAGE,
-                        "Warning: Persistence is not possible");
+                        "Warning: Persistence is not possible",
+                        MiscToolkit.ERROR_MESSAGE);
                 usePersistenceCheckBox.setSelected(false);
             }
         }
@@ -281,7 +282,7 @@ class MiscPanel extends JPanel {
         usePersistenceCheckBox.setText(language.getString("Options.miscellaneous.usePersistence"));
 
         autoSaveIntervalLabel.setText(language.getString("Options.miscellaneous.automaticSavingInterval") +
-                " (60 "+language.getString("Options.common.minutes")+")");
+                " (30 "+language.getString("Options.common.minutes")+")");
         autoSaveLocalIdentitiesCheckBox.setText(language.getString("Options.miscellaneous.autoSaveLocalIdentities"));
         splashScreenCheckBox.setText(language.getString("Options.miscellaneous.disableSplashscreen"));
         showSystrayIconCheckBox.setText(language.getString("Options.miscellaneous.showSysTrayIcon"));

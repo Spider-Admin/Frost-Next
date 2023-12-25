@@ -1,0 +1,149 @@
+<?xml version="1.0"?>
+<UpdateMD5>
+    <Options>
+        <!--
+             Output filename where the .md5 hashes will be stored.
+             You must point Frost-Next's Download Preferences to this file.
+        -->
+        <option name="OutputFile" value="files.md5"/>
+
+        <!--
+             Where to save your previous hash file before starting a new
+             scan. A backup will only happen if your current file (above)
+             exists and is non-empty.
+
+             Note that backups aren't really necessary, since the hasher
+             will save all current work if you terminate it ahead of time
+             (such as via the Ctrl+C keyboard shortcut on most systems).
+             In fact, it's completely safe to use Ctrl+C to abort the current
+             hashing job (and save the current progress). You can then simply
+             start the process again to resume the hashing job later!
+
+             If you want to disable backups completely, you can provide
+             the value "none" instead of a filename here.
+        -->
+        <option name="BackupFile" value="files.md5.bak"/>
+
+        <!--
+             If multiple backups are enabled, each backup will be saved
+             as "{BackupFile}.currenttime".
+             Example: "files.md5.bak.20151113_210328".
+        -->
+        <option name="MultiBackups" value="false"/>
+
+        <!--
+             This option removes all missing files from your .md5 file
+             after completing a scan. Useful if you don't want deleted
+             files to be blocked by Frost-Next. Although you could simply
+             disable the MD5 hash blocking temporarily in Next instead.
+
+             You do NOT have to use this option if you *just* worry about
+             "dupes" in your .md5 file from moved files. If we detect the
+             same hash as something that already exists in your .md5 file,
+             we ALWAYS compare the filenames of all files with the same
+             name and hash (such as "/abc/example.mp4" vs "/xyz/example.mp4"),
+             and if the hash and basic filename ("example.mp4") matches,
+             *AND* the old file is missing from your hard disk, then we
+             will assume that the file has been moved, and will delete
+             the old entry from your .md5 file automatically.
+        -->
+        <option name="PruneMissingFiles" value="true"/>
+
+        <!--
+             Before starting a new scan, this option will remove all excluded
+             files from your current .md5. Excluded files are paths that don't
+             belong in your list of "include" paths, *or* that exist in your
+             list of "exclude" paths. It is recommended to leave this option
+             on, so that your changes to the include/exclude lists are applied
+             to all of your previous hashes.
+        -->
+        <option name="PruneExcludedFiles" value="true"/>
+
+        <!--
+             Sets the minimum filesize to be hashed, in megabytes (MiB).
+             Can be fractional, such as "0.5".
+             If you try to set this to 0, we hash *all* non-empty (>= 1 byte) files.
+
+             However, be warned: Freenet *itself* doesn't contain any MD5 hashes for
+             files that are smaller than 1 MiB, so there's ZERO point in setting this
+             value lower than 1 MiB (if you *just* want to use these hashes for Freenet
+             anti-dupe checking). The option to go lower is *only* provided for people
+             who may want to use the MD5s from this hasher for non-Freenet purposes.
+        -->
+        <option name="MinimumFileSizeMiB" value="2"/>
+
+        <!--
+             If this is enabled, you will see detailed information about what directories
+             are being entered, why certain files in those directories are skipped, etc.
+             Could be helpful for debugging your patterns, but should be disabled
+             in normal cases for faster scanning (printing debug to terminal is slow!).
+        -->
+        <option name="Verbose" value="false"/>
+    </Options>
+    <FileExtensionPatterns>
+        <!--
+             File extension patterns to hash. You should leave this at the
+             defaults to only hash archive and video formats. There is ZERO
+             point in hashing individual images, since they don't get uploaded
+             enough on Freenet to matter. You'll just grow your MD5 file and
+             slow down hashing for no reason at all.
+             Note that you can create unlimited groups of patterns by following
+             the same formats at the predefined groups below.
+             If you want to disable certain patterns, then just comment out
+             their lines as shown in this default set which has disabled
+             all of the audio, documents, executables and images patterns.
+             The file extension patterns are case-insensitive.
+             Also note that any "#" in the pattern means "any number",
+             so "R##" means files ending in r00 to r99 (which is used for
+             many common multipart RAR files).
+        -->
+        <pattern name="archives" value="7Z;CBR;CBZ;R##;RAR;ZIP"/>
+        <!--<pattern name="audio" value="FLAC;M4A;MP3;OGG;WAV;WMA"/>-->
+        <!--<pattern name="documents" value="TXT;RTF;CSV;NFO;LOG;HTM;HTML;XML;PDF;EPUB;DOC;DOCX;ODT"/>-->
+        <!--<pattern name="executables" value="BAT;CMD;EXE;SH;JAR"/>-->
+        <!--<pattern name="images" value="BMP;GIF;JPEG;JPG;PNG;PSD"/>-->
+        <pattern name="videos" value="3GP;ASF;AVI;DIVX;FLV;M4V;MKV;MP4;MPEG;MPG;MOV;OGM;RM;RMVB;TS;VOB;WEBM;WMV"/>
+        <!--<pattern name="yourpattern" value="FOO;BAR"/>-->
+    </FileExtensionPatterns>
+    <Paths>
+        <!--
+             Place all of your disk-paths to scan here.
+             Non-existent paths will be ignored during scanning.
+
+             Type can be either "include" (scan this path and all subfolders),
+             or "exclude" (exclude this path and all subfolders).
+             Paths to exclude must obviously be sub-paths of included paths.
+
+             You are allowed to specify both files and folders here. So you can
+             choose to exclude (or include) specific files. Filename wildcards are
+             not supported, however. This ability to target files is just a small bonus.
+
+             All encountered filesystem symlinks will be followed on Linux/Unix/Mac.
+
+             A few example paths have been commented out, for you to base yours on.
+
+             For those unfamiliar with HTML and XML:
+               "Commented out" means lines that have been surrounded by "<!- ->",
+               and it means that those example lines are completely de-activated.
+               Your own lines must NOT be surrounded by any "<!- ->" comment
+               indicators, or they'll be completely *IGNORED* too!
+               Have a look around the rest of this configuration file, and you'll
+               hopefully see the clear difference in appearance between comments
+               and active options. If you still need help, ask a technical friend.
+
+             That's all! Have fun and enjoy!
+        -->
+        <!-- Linux/Mac examples: -->
+        <!--<path type="include" value="/home/exampleuser/Downloads/includedfile.avi"/>-->
+        <!--<path type="include" value="/home/exampleuser/Downloads/collectionfolder"/>-->
+        <!--<path type="exclude" value="/home/exampleuser/Downloads/collectionfolder/excludedfile.avi"/>-->
+        <!--<path type="exclude" value="/home/exampleuser/Downloads/collectionfolder/some/badfolder"/>-->
+        <!--<path type="include" value="/home/exampleuser/Photos/catphotos"/>-->
+        <!-- Windows examples: -->
+        <!--<path type="include" value="E:\Downloads\includedfile.avi"/>-->
+        <!--<path type="include" value="E:\Downloads\collectionfolder"/>-->
+        <!--<path type="exclude" value="E:\Downloads\collectionfolder\excludedfile.avi"/>-->
+        <!--<path type="exclude" value="E:\Downloads\collectionfolder\some\badfolder"/>-->
+        <!--<path type="include" value="E:\Photos\catphotos"/>-->
+    </Paths>
+</UpdateMD5>

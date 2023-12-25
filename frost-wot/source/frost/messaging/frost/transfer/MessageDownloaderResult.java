@@ -23,7 +23,7 @@ import frost.messaging.frost.*;
 
 /**
  * Contains the result after processing a downloaded message.
- * Either its an error, or a MessageObject with a message state (good,check,...).
+ * Either its an error, or a MessageObject with a message state (FRIEND,NEUTRAL,etc...).
  */
 public class MessageDownloaderResult {
     /**

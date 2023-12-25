@@ -18,6 +18,7 @@
 */
 package frost.messaging.frost;
 
+import java.util.Vector;
 import java.util.logging.*;
 
 import javax.swing.tree.*;
@@ -31,32 +32,32 @@ public abstract class AbstractMessageStatusProvider extends DefaultMutableTreeNo
     private static final Logger logger = Logger.getLogger(AbstractMessageStatusProvider.class.getName());
 
     // the message states
-    private static final int xGOOD     = 1;
-    private static final int xCHECK    = 2;
-    private static final int xBAD      = 3;
-    private static final int xOBSERVE  = 4;
+    private static final int xBAD      = 1;
+    private static final int xNEUTRAL  = 2;
+    private static final int xGOOD     = 3;
+    private static final int xFRIEND   = 4;
     private static final int xTAMPERED = 5;
-    private static final int xOLD      = 6;
+    private static final int xNONE     = 6;
 
     private static String[] messageStateStrings = {
         "*err*",
-        "GOOD",
-        "CHECK",
         "BAD",
-        "OBSERVE",
-        "FAKE",
-        "NONE"
+        "NEUTRAL",
+        "GOOD",
+        "FRIEND",
+        "FAKE", // tampered
+        "NONE" // unsigned
     };
 
     private static final int SIGNATURESTATUS_UNSET    = 0; // status not set
     private static final int SIGNATURESTATUS_TAMPERED = 1; // wrong signature
-    private static final int SIGNATURESTATUS_OLD      = 2; // no signature
+    private static final int SIGNATURESTATUS_NONE     = 2; // no signature
     private static final int SIGNATURESTATUS_VERIFIED = 3; // signature was OK
     private static final int SIGNATURESTATUS_VERIFIED_V1 = 4; // signature was OK
     private static final int SIGNATURESTATUS_VERIFIED_V2 = 5; // signature was OK
 
     private static final String SIGNATURESTATUS_TAMPERED_STR = "TAMPERED"; // wrong signature
-    private static final String SIGNATURESTATUS_OLD_STR      = "OLD";      // no signature
+    private static final String SIGNATURESTATUS_NONE_STR     = "NONE";     // no signature
     private static final String SIGNATURESTATUS_VERIFIED_STR = "VERIFIED"; // signature was OK
 
     private boolean isFromIdentityInitialized = false;
@@ -82,7 +83,7 @@ public abstract class AbstractMessageStatusProvider extends DefaultMutableTreeNo
                         final Identity newFromIdentity = Identity.createIdentityFromExactStrings(getFromName(), getPublicKey());
                         if( !Core.getIdentities().addIdentity(newFromIdentity) ) {
                             logger.severe("Core.getIdentities().addIdentity(owner) returned false for identy: "+newFromIdentity.getUniqueName());
-                            setSignatureStatusOLD();
+                            setSignatureStatusNONE();
                         } else {
                             fromIdentity = newFromIdentity;
                         }
@@ -119,8 +120,8 @@ public abstract class AbstractMessageStatusProvider extends DefaultMutableTreeNo
         if( sigStatusStr.equalsIgnoreCase(SIGNATURESTATUS_VERIFIED_STR) ) {
             setSignatureStatusVERIFIED_V1();
             return true;
-        } else if( sigStatusStr.equalsIgnoreCase(SIGNATURESTATUS_OLD_STR) ) {
-            setSignatureStatusOLD();
+        } else if( sigStatusStr.equalsIgnoreCase(SIGNATURESTATUS_NONE_STR) ) {
+            setSignatureStatusNONE();
             return true;
         } else if( sigStatusStr.equalsIgnoreCase(SIGNATURESTATUS_TAMPERED_STR) ) {
             setSignatureStatusTAMPERED();
@@ -131,31 +132,31 @@ public abstract class AbstractMessageStatusProvider extends DefaultMutableTreeNo
 
     private int getMessageStatus(final Identity fromIdent) {
         if( isSignatureStatusVERIFIED() ) {
-            // get state of user
+            // get state of user (checked in order of popularity, for speed)
             if( fromIdent == null ) {
-                return xOLD;
+                return xNONE;
             }
-            if( fromIdent.isCHECK() ) {
-                return xCHECK;
-            }
-            if( fromIdent.isOBSERVE() ) {
-                return xOBSERVE;
+            if( fromIdent.isNEUTRAL() ) { // the default state is most popular
+                return xNEUTRAL;
             }
             if( fromIdent.isGOOD() ) {
                 return xGOOD;
             }
+            if( fromIdent.isFRIEND() ) {
+                return xFRIEND;
+            }
             if( fromIdent.isBAD() ) {
                 return xBAD;
             }
-        } else if( isSignatureStatusOLD() ) {
+        } else if( isSignatureStatusNONE() ) {
             // no signature
-            return xOLD;
+            return xNONE;
         } else if( isSignatureStatusTAMPERED() ) {
             // invalid signature
             return xTAMPERED;
         }
         // signature status unset
-        return xOLD;
+        return xNONE;
     }
 
     private int getMessageStatus() {
@@ -180,23 +181,23 @@ public abstract class AbstractMessageStatusProvider extends DefaultMutableTreeNo
         }
     }
 
+    public boolean isMessageStatusBAD() {
+        return (getMessageStatus() == xBAD );
+    }
+    public boolean isMessageStatusNEUTRAL() {
+        return (getMessageStatus() == xNEUTRAL );
+    }
     public boolean isMessageStatusGOOD() {
         return (getMessageStatus() == xGOOD );
     }
-    public boolean isMessageStatusOBSERVE() {
-        return (getMessageStatus() == xOBSERVE );
-    }
-    public boolean isMessageStatusCHECK() {
-        return (getMessageStatus() == xCHECK );
-    }
-    public boolean isMessageStatusBAD() {
-        return (getMessageStatus() == xBAD );
+    public boolean isMessageStatusFRIEND() {
+        return (getMessageStatus() == xFRIEND );
     }
     public boolean isMessageStatusTAMPERED() {
         return (getMessageStatus() == xTAMPERED );
     }
-    public boolean isMessageStatusOLD() {
-        return (getMessageStatus() == xOLD );
+    public boolean isMessageStatusNONE() {
+        return (getMessageStatus() == xNONE );
     }
 
     public boolean isSignatureStatusVERIFIED() {
@@ -226,8 +227,8 @@ public abstract class AbstractMessageStatusProvider extends DefaultMutableTreeNo
     public boolean isSignatureStatusVERIFIED_V2() {
         return (getSignatureStatus() == SIGNATURESTATUS_VERIFIED_V2);
     }
-    public boolean isSignatureStatusOLD() {
-        return (getSignatureStatus() == SIGNATURESTATUS_OLD);
+    public boolean isSignatureStatusNONE() {
+        return (getSignatureStatus() == SIGNATURESTATUS_NONE);
     }
     public boolean isSignatureStatusTAMPERED() {
         return (getSignatureStatus() == SIGNATURESTATUS_TAMPERED);
@@ -239,8 +240,8 @@ public abstract class AbstractMessageStatusProvider extends DefaultMutableTreeNo
     public void setSignatureStatusVERIFIED_V2() {
         signatureStatus = SIGNATURESTATUS_VERIFIED_V2;
     }
-    public void setSignatureStatusOLD() {
-        signatureStatus = SIGNATURESTATUS_OLD;
+    public void setSignatureStatusNONE() {
+        signatureStatus = SIGNATURESTATUS_NONE;
     }
     public void setSignatureStatusTAMPERED() {
         signatureStatus = SIGNATURESTATUS_TAMPERED;

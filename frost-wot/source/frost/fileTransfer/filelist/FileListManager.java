@@ -197,20 +197,20 @@ public class FileListManager {
             return false;
         }
         
-        final boolean fileListAntiSpamMode = Core.frostSettings.getBoolValue(SettingsClass.FILESHARING_IGNORE_CHECK_AND_BELOW);
+        final boolean fileListAntiSpamMode = Core.frostSettings.getBoolValue(SettingsClass.FILESHARING_IGNORE_NEUTRAL_AND_BELOW);
 
         Identity localOwner;
         synchronized( Core.getIdentities().getLockObject() ) {
             localOwner = Core.getIdentities().getIdentity(content.getReceivedOwner().getUniqueName());
             
             if (fileListAntiSpamMode) {
-                // anti-spam mode. Ignore file lists from CHECK, BAD and just newly received identities
+                // anti-spam mode. Ignore file lists from NEUTRAL, BAD and just newly received identities
                 if (localOwner == null
-                        || localOwner.isCHECK()
+                        || localOwner.isNEUTRAL()
                         || localOwner.isBAD())
                 {
-                    // only GOOD and OBSERVE allowed
-                    // we intentionally don't update timestamp of CHECK or BAD identities to avoid DOS of our database
+                    // only FRIEND and GOOD allowed
+                    // we intentionally don't update timestamp of NEUTRAL or BAD identities to avoid DOS of our database
                     return false;
                     
                 } else {
@@ -220,7 +220,7 @@ public class FileListManager {
                 }
                 
             } else {
-                // normal mode: add all newly received identities with CHECK and add their file lists
+                // normal mode: add all newly received identities with NEUTRAL and add their file lists
                 if( localOwner == null ) {
                     // new identity, add. Validated inside FileListFile.readFileListFile()
                     localOwner = content.getReceivedOwner();

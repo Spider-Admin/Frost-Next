@@ -38,6 +38,12 @@ public class FrostUnsentMessageObject extends FrostMessageObject {
 
     private MessageThread currentUploadThread = null; // is set during upload of message
 
+    // keeps track of which attachment is currently being uploaded; null if nothing
+    // always becomes the name of the file being uploaded at start of upload, and is
+    // set back to null as soon as the attachment upload finishes/fails. so its value
+    // can always be trusted to be correct.
+    private String uploadingAttachmentName = null;
+
     public FrostUnsentMessageObject() {
         super();
     }
@@ -76,6 +82,16 @@ public class FrostUnsentMessageObject extends FrostMessageObject {
     public void setCurrentUploadThread(final MessageThread currentUploadThread) {
         this.currentUploadThread = currentUploadThread;
         // update unsend message in unsend messages table
+        MainFrame.getInstance().getFrostMessageTab().getUnsentMessagesPanel().updateUnsentMessage(this);
+    }
+
+    public String getUploadingAttachmentName() {
+        return this.uploadingAttachmentName;
+    }
+
+    public void setUploadingAttachmentName(final String uploadingAttachmentName) {
+        this.uploadingAttachmentName = uploadingAttachmentName;
+        // update the unsent message's status in the Outgoing table
         MainFrame.getInstance().getFrostMessageTab().getUnsentMessagesPanel().updateUnsentMessage(this);
     }
 

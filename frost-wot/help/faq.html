@@ -1,99 +1,127 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
-<HTML>
-  <HEAD>
-    <META http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <META http-equiv="Content-Style-Type" content="text/css">
-    <LINK rel="stylesheet" href="style.css" type="text/css">
-    <TITLE>FROST FAQ</TITLE>
-  </HEAD>
-  <BODY>
-<H2>FROST FAQ</H2>
-<P>This is just a collection of hints, some are useful, others not...</P>
-
-<H3>What do those characters in the status bar mean?</H3>
-<code>TOFUP: 0U / 0W / 0A   TOFDN: 0B / 0T</code>
-<P>TOFUP: Text Over Freenet UPloads. U is the count of running message uploads. W is the count of messages waiting for upload. A is the count of attachments waiting for upload.</P>
-<P>TOFDN: Text Over Freenet DowNloads. B is the count of currently updating boards. T is the count of threads running to update the boards.</P>
-<P>(This is also described in the tooltip of the status bar entries)</P>
-
-<H3>Searching for files:</H3>
-<P>To search for files select the 'Search' tab in the main view. You can choose between 2 search modes, the simple mode and the advanced mode.
-Toggle between the modes by pressing the leftmost button ('&gt;&gt;' or '&lt;&lt;').</P>
-<P><B>Text fields</B></P>
-<P>In any textbox (in simple and advanced mode) you can enter a list of words like '<CODE>discussion gpl</CODE>'. This are the search words. To specify words that must not occur you can add the word <B>NOT</B> at the end of the search words and specify the not words: '<CODE>discussion gpl NOT porn mp3</CODE>' (remember NOT must be written in uppercase). To search for the word NOT or to specify words containing blanks surround them with double quotes: <CODE>&quot;some text&quot;</CODE>. The complete search is done using lowercase text comparision.</P>
-<P>If you leave a text field empty then all files are displayed. Don't enter an asterisk to search for all files, only if you want to search for an asterisk in the comment or keywords.</P>
-<P><B>Simple mode</B></P>
-<P>Enter your search text into the text field and press enter or click the search button to start the search. Select the checkbox (CHK key) to display only files that already have a CHK key. Files without a CHK key are requested by the uploader and could take some more time.</P>
-<P>The search will find a file if each of the words you specified is found in the <I>filename, comment or keyword</I> field. If a NOT word is found in any of those fields the file is not displayed in the search results.</P>
-<P><B>Advanced mode</B></P>
-<P>Quite similar to the simple mode, but allows you to enter search words and NOT words for each of the fields <I>filename, comment, keywords, owner</I> selectively.
-A file is found if any of the search words are found in the appropriate field. If a NOT word is found in a field the file is not shown in the search results.</P>
-
-<H3>Shortkeys:</H3>
-
-<P>In message table:</P>
-<PRE>- 'n' selects next unread message in Board
-- 'g' changes sender of the selected message to state GOOD
-- 'o' changes sender of the selected message to state OBSERVE
-- 'c' changes sender of the selected message to state CHECK
-- 'b' changes sender of the selected message to state BAD
-- 's' toggles the STARRED state of the selected message
-- 'f' toggles the FLAGGED state of the selected message
-- 'j' toggles the JUNK state of the selected message
-- DELETE or BACKSPACE key deletes the selected message
-- ENTER key opens the message in a new message viewer window
-- CURSOR RIGHT/LEFT expands or collapses the tree
-- F5 starts an updates of the current board</PRE>
-
-<P>General:</P>
-<P>CTRL-i activates the case-insensitive incremental search, CTRL-SHIFT-i the case-sensitive incremental search.
-The search works in most tables, trees and text fields.</P>
-<P>While in search mode press the down/up arrow key to jump to the next/previous match.</P>
-
-<H3>Command line options:</H3>
-<PRE>-?   Display all command line options
--lf  Use specific Java look and feel manager:
-       javax.swing.plaf.metal.MetalLookAndFeel
-       com.sun.java.swing.plaf.windows.WindowsLookAndFeel
-       com.sun.java.swing.plaf.motif.MotifLookAndFeel
-       javax.swing.plaf.mac.MacLookAndFeel
--offline  Starts Frost in offline mode</PRE>
-<P>for example turning on motif laf: frost -lf com.sun.java.swing.plaf.motif.MotifLookAndFeel</P>
-
-<H3>Some FAQ's... (the old faq.txt file)</H3>
-
-<P><B>Q: How do I add new boards?</B></P>
-<P>A: Select folder that should contain the new board. Right click on the tree structure. Select 'Add new board / folder'. Rename 'New folder' by selecting it and pressing F2 or double klick it. You can also press the 'Add board' icon in the icon bar.</P>
-
-<P><B>Q: Why Frost?</B></P>
-<P>A: Why not?</P>
-
-<P><B>Q: Cut and Paste does not work in Linux.</B></P>
-<P>A: Try using CTRL+C (Copy), CTRL+V (Paste) and CTRL+X (Cut), or use the context menu if available.</P>
-
-<P><B>Q: Can I shut down Frost after uploading my files?</B></P>
-<P>A: Yes</P>
-
-<P><B>Q: Why is everything so slow?</B></P>
-<P>A: Because Freenet is so slow, and Frost is a Freenet client. Uploads will probably get faster with more Freenet users.</P>
-
-<P><B>Q: I don't like the way replies are handled in Frost. Can you use ">" to indent old text?</B></P>
-<P>A: Hehe, no way.</P>
-
-<P><B>Q: What Datastore size should I use for my Freenet Node?</B></P>
-<P>A: The larger the better. At least the size of the largest file you want to download. For example if you want to download large movies, 10Gb is a good size.</P>
-
-<P><B>Q: I can't get a specific file, but I really need it!</B></P>
-<P>A: First try asking (nicely) on the board the file was uploaded to! Get someone to re-insert the file.</P>
-<P>A2: If no-one responds, and the file has a "From:" put a message up on the board "public" with "(name), re-insert request" as the subject and explain your desire for said file.</P>
-<P>A3: Post on the board 'unsuccessful'. This is the freenet board where people post the keys to files they cannot reach.</P>
-<P>If none of this works, your best bet is to keep asking on different (related) boards.</P>
-
-<P><B>Q: Why can I see not very many messages?</B></P>
-<P>A: Frost by default only downloads messages for 5 days into the past. If you want to see more past messages increase "Number of days to download backwards" in Preferences->News(1) (I suggest increasing it to 15). Make sure that  this is less than "Number of days to display".</P>
-
-<P><B>Q: How do I get access to the XYZ board?</B></P>
-<P>A: Just add it as a "New Board". If it is the same name as a public board someone else has created then this will work!</P>
-
-</BODY>
-</HTML>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="Content-Style-Type" content="text/css">
+    <link rel="stylesheet" href="style.css" type="text/css">
+    <title>FAQ (Frost-Next)</title>
+  </head>
+<body>
+<h1>FAQ (Frost-Next)</h1>
+<p><a href="index.html">Back to Help Index</a></p>
+<h2># What is Frost?</h2>
+<p>Frost is a messaging and file transfer application for Freenet. You need a working Freenet node to be able to use Frost.</p>
+<h2># How do I find files to download?</h2>
+<p>Look on the various Frost boards, and on Freenet's Freesites.</p>
+<h2># What is a board?</h2>
+<p>A board is a place where people can communicate about some topic of interest and share file links with each other.</p>
+<h2># What are public and private boards?</h2>
+<p>Boards can be public, which means that anyone can post. Or they can be protected with a public and private key. If you <i>only</i> give out the <i>public</i> key for a protected board, then people can only <i>read</i> the board and can't post anything. The <i>private</i> key is needed for posting messages. That type of arrangement is mostly used for announcement-only boards.</p>
+<p>Sometimes people give out both the public and private keys. The idea is that if someone decides to spam the board, you can "just" change the public + private keys while still keeping the same board name. The downside is of course that changing the key means that you can't retrieve any old messages from that board (that were posted with the previous key). Spam on Frost is uncommon, and using keys for your boards is only recommended if you want read-only announcement boards.</p>
+<h2># How do I let others know about my board?</h2>
+<p>You can attach the board to a message and post it on another board. Frost will ask you if you want to give out the writing key. Please only post your board in boards related to the discussion subject.</p>
+<p>However, ask yourself if you actually <i>need</i> the new board and if <i>other people</i> would even <i>want</i> it. Frost-Next's built-in collection of <i>all</i> active Frost boards covers almost <i>every</i> discussion subject imaginable. People hate new boards (since they just add clutter), and you need a <i>really</i> good reason for the creation of yet another board.</p>
+<p>Most subjects should be discussed on the open net instead, which has the advantage that regular web forums are much more appropriate for most conversations.</p>
+<p>If you, <i>against all odds</i>, truly have a <i>great</i> idea for a new board, then make sure that you give it a good name that is short and descriptive and clearly tells people what the board is about. Then start posting messages to it so that others won't just be greeted by an empty board. If you <i>really</i> think Frost needs yet another board, then it's up to you to <i>prove</i> why it's needed.</p>
+<h2># How do I let others know about my Freesite?</h2>
+<p>Make a post about it on the "sites" board.</p>
+<h2># What are those numbers in the progress bar of file transfers?</h2>
+<p>Freenet splits bigger files into smaller chunks (blocks) and adds extra blocks to make sure the file has redundancy in case of missing data. When you see for example "10% 1/10 [20]" it means there are 20 blocks total, you need to get 10 blocks to finish the download, and have already downloaded 1 block.</p>
+<h2># Why do my uploads and downloads stay at/near 100% for a long time?</h2>
+<p>In the case of downloads, Freenet must "assemble" and decrypt the file before it finishes. That's why it says "Downloading, 100%" for a long time until it finally becomes "Finished, 100%". Very big files can take a <i>very</i> long time (sometimes up to an hour) to assemble and decrypt.</p>
+<p>Sometimes, the rounding used by the percentage calculation may say "100%" even though you don't actually have all blocks of the file. Check the block counter. If it says "100% 9999/10000 [20000]" for example, then it shows that you're actually missing blocks even though it's "practically 100%". If Freenet can't find the final blocks, you can't finish the download. In that case, you'll have to ask someone to heal the file by re-uploading it.</p>
+<p>Your uploads may also seem to freeze at/near 100%. That's because Freenet must insert the metadata at the end. The final metadata block can often take 15-60 minutes to upload, depending on network conditions, or even worse if you've got lots of other traffic going on simultaneously.</p>
+<p>The key point here is: Be patient. You're on Freenet, where patience isn't just a virtue; it's <i>necessary</i>.</p>
+<h2># Why can't I delete all of my queued Downloads or Uploads?</h2>
+<p>If you try to delete a file transfer while its <i>critical data transfer</i> is ongoing, Next won't let you do it. This is to prevent <i>orphaning</i> files on disk or in the Freenet transfer queue, which was a <i>very serious</i> problem in old versions of Frost. Next <i>only</i> prevents you from deleting files if you're trying to delete them at the <i>exact</i> moment that they're being sent to the node (uploads that are starting) or they're being written to disk (downloads that have reached 100%).</p>
+<p>Just wait a moment and delete the queue items when their critical data transfer is <i>complete</i>. In the case of downloads, you'll pretty much never run into this since you probably won't be trying to delete them at the exact moment that they hit 100% and start writing to disk. As for uploads, you'll <i>only</i> run into this if you're indecisive and queue things and then instantly try to delete them <i>while</i> they're being sent to your Freenet node. Solution? Don't be indecisive about your uploads. Be <i>sure</i> about your new uploads and only hit Okay to queue them when you're <i>sure</i> that you want to send those files to the node.</p>
+<h2># How do I download file links I found on a Freesite?</h2>
+<p>Copy the keys into your clipboard. Then go to the "Downloads" tab in Frost and press the "Download keys from clipboard" button in the toolbar.</p>
+<h2># How do I upload files with Frost?</h2>
+<p>Go to the "Uploads tab" and press the "Add files..." button. In the window that opens up, you can choose various options on a per-file basis. Then just press Ok to queue the files. Wait until they've finished uploading, when the State says "Finished" and the whole row turns green. At that point, you simply have to right-click on the files and select one of the options to copy the keys. Those are the keys that you can share with others.</p>
+<p>Caution: Once you've uploaded something to Freenet, there is no way to remove it. The best you can hope for is that no one downloads it. If you don't spread the key, no one will know about your upload.</p>
+<h2># What does the file transfer priority do?</h2>
+<p>Absolutely nothing, <i>if</i> you only have a <i>single</i> file in your queue. The priority tells your Freenet node how to <i>distribute</i> the <i>available</i> node-bandwidth between <i>multiple</i> simultaneous file transfers. Lower numbers mean more priority (0 is most important, and 6 is paused). So if you have <i>2 or more</i> files running <i>simultaneously</i>, then the one with the most priority gets the most bandwidth.</p>
+<p>Some people wrongly assume that the "0" (maximum) priority setting is less anonymous by somehow "flooding the network", but that's not true at all. Your transfer-bandwidth is <i>identical</i> no matter what priority you use. The priority just decides "how much of the pie" that a <i>particular</i> file transfer gets.</p>
+<p>Furthermore, there's also the "6" (lowest) priority, which tells the node to pause the transfer completely. In the case of downloads, they may still progress a little bit as related blocks are routed through your node, but it won't request them itself anymore.</p>
+<h2># Is there any difference between Frost-Next and Fuqid for file transfers?</h2>
+<p>None <i>whatsoever</i>. They both use the <i>exact</i> same file transfer method with the <i>exact</i> same reliability, and Next supports <i>all</i> important upload and download features in the Freenet protocol, as well as having advanced features like hash blocklisting for downloads and countless innovative features that aren't in Fuqid. Both applications create mutually healable keys, given identical upload settings. Use whichever application you prefer.</p>
+<p>However, if you are asking about the <i>old</i>, dead, legacy Frost (<b>-not- Frost-Next</b>), then the answer is that it's a piece of garbage and that Fuqid <i>was</i> miles ahead of it. Nobody should <i>ever</i> use the <i>old</i> Frost for <i>anything</i>.</p>
+<h2># What are the differences between the various Freenet compatibility modes?</h2>
+<p>You should always use "COMPAT_CURRENT" for new inserts. The old modes simply help you heal keys that were inserted via earlier, less efficient Freenet versions. For those interested in the details, the differences are as follows:</p>
+<ul>
+  <li>COMPAT_1250_EXACT = Inserts exactly as all Freenet versions before 1250: Segments of exactly 128 data, 128 check, check = data. This mode really should have been called something like "COMPAT_BEFORE_1250" to be clearer. The "EXACT" in the name simply refers to the exact segment splitting used by pre-1250 nodes.</li>
+  <li>COMPAT_1250 = Freenet 1250 (Jun, 2010): Segments up to 128 data, 128 check, check &lt;= data. Actually uses 1251's "even segment splitting" improvements, but doesn't add an extra block to smaller segments (which would have caused pre-1250 nodes to crash). This meant that COMPAT_1250 inserts could still be downloaded by older nodes.</li>
+  <li>COMPAT_1251 = Freenet 1251/2/3 (Jun, 2010): Basic even splitting, 1 extra check block if data blocks &lt; 128, max 131 data blocks. These changes broke compatibility with pre-1250 nodes.</li>
+  <li>COMPAT_1255 = Freenet 1255 (Jul, 2010): Second stage of even splitting, a whole bunch of segments lose one block rather than the last segment losing lots of blocks. Major changes to the metadata format.</li>
+  <li>COMPAT_1416 = Freenet 1416 (Sep, 2012): New CHK encryption, which significantly improved security by making it harder to identify CHKs that belong to the same splitfile.</li>
+  <li>COMPAT_1468 = Freenet 1468 (Jul, 2015): Fills in topDontCompress and topCompatibilityMode on splitfiles.</li>
+  <li>COMPAT_CURRENT = Tells your Freenet node to pick the latest mode.</li>
+</ul>
+<h2># What is the purpose of the Signature column for messages?</h2>
+<p>It shows the trust state for the sender. The trust state for each person is configurable by you, and is intended to help you manage other people's identities. It also helps you detect impersonations, since all identities are marked as NEUTRAL by default.</p>
+<ul>
+  <li>FRIEND. This state is for people you want to be able to select as recipients for new private messages, i.e. your "buddy list"; that's literally the <i>only</i> reason to use this over GOOD. Note that you can still <i>reply</i> to incoming private messages <i>regardless</i> of the sender's state!</li>
+  <li>GOOD. Someone you've seen for a while and seen that they're not a spammer/asshole. You should mark <i>most</i> people with this state after they've been around for a while.</li>
+  <li>NEUTRAL. This is the default state, and means that you haven't got a positive or negative opinion of this person yet.</li>
+  <li>BAD. Means that the person is a spammer or just a general asshole.</li>
+  <li>NONE. This means that the sender didn't use an encrypted (signed) identity, and didn't dare to stand behind their words. Many of these posts are spammers and very rude assholes, and some long-time regulars even go as far as to hide all unsigned messages via Frost's preferences. People are free to post without a signature, just as other people are free to block those posts.</li>
+</ul>
+<p>The trust states are not enforced in any way, and only FRIEND has a special meaning (giving you that person in your recipient list for private messages). Assigning correct states helps you quickly see what type of person sent the message, and you can even use the trust states to do things like hiding posts from BAD users (see the "News (2)" Frost preferences), or to only search for messages from GOOD or FRIEND, etc.</p>
+<h2># What is the red and blue dot next to certain nicknames?</h2>
+<p>They indicate how many messages <i>you</i> have seen from that person. Red means that they are very new (1-10 messages) and should be viewed with suspicion. Blue means that they are still pretty new (11-20 messages). The purpose is to help you detect new users. You can also hover over their nicknames for a tooltip showing exactly how many messages you have seen from that person.</p>
+<h2># I found a way to spam Frost. Am I cool now?</h2>
+<p>Its cool that you're "digging below the surface" and studying Freenet and Frost, but if you use that knowledge to screw other people, you're not cool at all.</p>
+<h2># How can I protect myself against spam?</h2>
+<p>Never respond to spam messages (don't feed the troll). Ignore them, delete them and mark the spammer BAD whenever they've used an identity. Or simply choose not to show unsigned messages at all.</p>
+<h2># What do those characters in the status bar mean?</h2>
+<p>Example: "TOFUP: 0U / 0W / 0A TOFDN: 0B / 0T".</p>
+<p>TOFUP: Text Over Freenet UPloads. U is the count of running message uploads. W is the count of messages waiting for upload. A is the count of attachments waiting for upload.</p>
+<p>TOFDN: Text Over Freenet DowNloads. B is the count of currently updating boards. T is the count of threads running to update the boards.</p>
+<h2># Can I shut down Frost after uploading my files and messages?</h2>
+<p>Yes. They are stored in Freenet at that point. However, your files will expire from Freenet (being pushed out by more active data) if they aren't downloaded in a long time. At that point, you or someone else will have to re-insert them with the same upload settings again to "heal" them.</p>
+<h2># Why is everything so slow?</h2>
+<p>Because Freenet is slow, and Frost is a Freenet client. It will always be slower than the normal internet due to the nature of its routing, but it does get better with time. Your node needs to become known on the network to get more peers, which in turn improves your speeds. Devoting a large datastore and bandwidth to your Freenet node also helps performance.</p>
+<h2># Why don't my messages appear?</h2>
+<p>They are uploaded the next time that the board refreshes. Until then, they sit in the "[Outbox]". If you've enabled Frost-Next's quick uploading of messages (it's enabled by default), they are sent as soon as you press Send in the message composer. However, in <i>either</i> case <i>you</i> won't <i>see</i> your own sent messages in the board until the <i>next</i> board update <i>after</i> the upload is completed, but <i>other</i> people will see your messages as soon as their own boards refresh. Most people run a 45-minute interval board update, so you can expect answers within a few hours, <i>if</i> people have an answer to your message. Being nice and not lazy helps your chances of getting a reply.</p>
+<h2># How does the board refresh schedule work?</h2>
+<p>Every 45 minutes (can be changed), Frost runs an automatic board update which downloads all new messages from today. If it has been more than 12 hours since its last "all days backwards" scan, it runs an "all days" scan <i>instead</i>. This means that if you run Frost 24/7, it will be performing "all days backwards" scans twice a day. By default, the "all days backwards" scan is configured to grab the past 30 days of messages. For this reason, people who run Frost <i>constantly</i> might want to change their "Number of days to download backwards" to a more personalized value such as 2-7 days. The default value is only meant for people who don't run Frost all the time.</p>
+<h2># How can I download very old messages from boards?</h2>
+<p>By default, Frost-Next downloads the last 30 days of messages. If you want more, you should increase the "Number of days to download backwards" in Preferences &gt; News (1). A common suggestion is to download 700 days of messages the first time you use Frost. That will however take a very long time; often several days.</p>
+<p>If you want to take that advice, then set the "days backwards" to 700, <i>uncheck</i> the "Automatic board update" option, <i>check</i> the "Always download all days backwards" option, and then close the preferences. Now right-click on all of your boards and choose "Refresh board" to force them to start the "all days" update. Then just wait... You can see the current progress for the selected board in Frost-Next's status bar, showing which day it's working on and how many days in total you're downloading. The more active a board is, the longer it takes to download each individual day since there are more messages to get.</p>
+<p>When you've got the messages, set the options back to more reasonable values, by re-enabling the automatic board update, disabling the "always download all days backwards", and setting the number of days to download to 30 (or even less; if your Frost client is running 24/7, I recommend somewhere between 2-7 days).</p>
+<h2># What is that Index column in the boards?</h2>
+<p>It's the <i>exact</i> order in which messages were inserted. When your Frost sends a new message, it starts with Index 0 of the current day, and then looks for the lowest empty Index slot and puts your message there. That's how we are able to download board messages: We look for all messages for each day, starting from Index 0 and going upwards until no more messages are found.</p>
+<h2># How do I add the boards that people are talking about?</h2>
+<p>All active Frost boards from the past decade are already in Frost-Next's default board list. Click the "Globe" icon on the toolbar to view the known boards manager, and press the "Import Defaults" button if you haven't already imported the board list. From there, you can select interesting boards and right-click them to add them to your subscriptions.</p>
+<p>If the board isn't in the known list, you can instead add it by pressing the "New board" button on Frost's main toolbar, and just typing in the board name. If it's the <i>exact</i> same name as a <i>public</i> board, then this will work too.</p>
+<p>Sometimes people attach boards to messages; in that case, the board will appear at the bottom of the message in the attachment area, where you can easily add it to your subscriptions.</p>
+<h2># How do I undelete board messages I've previously deleted?</h2>
+<p>If you've already switched away from the board, you'll first have to go to Preferences &gt; Messages and enable "Show deleted messages" to be able to see them again. Then select the relevant board.</p>
+<p>When you see your deleted messages (the ones with the line through the name), just select them and right-click and choose "Undelete message".</p>
+<h2># Why should I create an identity?</h2>
+<p>Identities are extremely secure since they're just a random cryptographic key. They allow others to see that you aren't a spammer, and to add you to their FRIEND-list so that they can send you private messages. Furthermore, they prevent impersonation since only one person can have <i>your</i> specific cryptographic key. If someone tries to impersonate you, they'll get a different key which means a different string after the "@" symbol in the name, such as "Real@1234" vs "Real@fake". The people who have marked the <i>real</i> person as any of the non-NEUTRAL trust states (meaning FRIEND, GOOD or BAD) will instantly see that the impersonator is just that - an impersonator, since they'll show up with the default "NEUTRAL" state instead.</p>
+<h2># How do I send private messages on Frost?</h2>
+<p>Your recipient needs to have a Frost identity. First mark the recipient as FRIEND (not necessary if you're <i>replying</i> to a private message <i>they</i> sent to you). Then select the board you want to post the private message on and create a new message as usual. Enable the "Encrypt for" checkbox and select their ID from the dropdown. Then simply send the message.</p>
+<h2># How do I keep my identity if I want to reinstall Frost later?</h2>
+<p>Go into the "Manage own identities" window and export your identities to an XML file. You can then simply import it later. There's also a "Manage identities" window for other people's identities, where you can also export/import identities if you want to maintain your carefully configured trust-states for each user.</p>
+<h2># Why is the "delete" button grayed out in the "Manage identities" window?</h2>
+<p>The reason that the "Manage identities" window's "Delete" button is grayed out is that you can only delete identities with 0 messages, and if anyone in selection has more than that it gets grayed out. It's better to use the "Cleanup" button to automatically delete all users with 0 messages.</p>
+<h2># How do I keep all board messages if I want to reinstall Frost later?</h2>
+<p>The "store" folder contains all databases. Just move those to the new installation.</p>
+<h2># What is the Frost database format, and why isn't it SQL?</h2>
+<p>Frost uses an "object database" called Perst (by McObject). It stores raw Java objects, so it cannot be read with something like a SQL viewer. It must basically be read by Frost itself, because the objects it stores are Frost classes/objects. Think of Frost's database like a "raw, binary RAM dump". Furthermore, Perst uses "lazy/sparse" updating of data (to avoid needless disk writes), which means that even <i>if</i> you manage to write some sort of parser, you won't be able to trust that the data on disk is actually how <i>Frost</i> will interpret it. So forget about parsing it.</p>
+<p>The reason we're not using SQL is simple: SQL is about 30x slower than Perst, since a SQL database is a "general purpose database" which has <i>huge</i> overhead for performing queries and extracting/parsing data into the data-types we need. By contrast, an "object database" like Perst can <i>instantly</i> provide us the objects we need, directly into memory.</p>
+<p>If you just want to be able to extract messages from boards, then you're <i>much</i> better served by learning about the KSK system which Frost uses to upload and download messages. That's how the "Permafrost" long-term message storage system works.</p>
+<p>If you want to extract a few <i>individual</i> messages, I suggest that you just copy-paste their text, or press Frost's "Save message to disk" main-toolbar button to save them as XML files.</p>
+<h2># List of Java-related Bugs that aren't Frost's fault.</h2>
+<p>These are several bugs that exist in Java itself, and therefore cannot be fixed by Frost-Next.</p>
+<ul>
+  <li>When you close Frost, Java might clear your current clipboard contents. That's just how Java works. So be sure to save any important clipboard contents before closing <i>any</i> Java application such as Frost.</li>
+  <li>Java <i>sometimes</i> has trouble rendering tooltips in a multi-monitor setup if the application (Frost) isn't on the primary screen. If you don't see any tooltips when hovering over messages or file transfers, you should try moving Frost to the main screen instead. This bug has been known in Java for over a decade.</li>
+  <li>There is a somewhat rare bug where Java might stop responding to keyboard input whenever something requests "keyboard focus" in the user interface. The only solution is to restart the Java application (Frost) so that the keyboard input works again. This bug was verified to be caused by Java by creating a tiny Java test-application which used <i>no</i> Frost code, and was still able to trigger the bug consistently.</li>
+</ul>
+<p>For the last bug, the consequences are quite serious, since you won't be able to write new messages or control Frost with your keyboard until you restart the application. The two primary areas in Frost that request keyboard focus are the Ctrl+F (Universal Search) shortcut, which pops up a search box that requests keyboard focus so that you can type in it, as well as the "Create new folder" feature of Java's file/folder-picker. The latter is mostly used when you want to make a new subfolder for a specific group of downloads.</p>
+<p>As a workaround for Java's "keyboard focus" bug, I suggest that you use Frost-Next's "File &gt; Open download directory" menu item to go directly to your downloads folder via your regular file explorer. Then just create the new folder using <i>that</i> explorer instead, and then tell Frost to save the files into your pre-created folder, so that you never risk triggering the Java bug.</p>
+</body>
+</html>

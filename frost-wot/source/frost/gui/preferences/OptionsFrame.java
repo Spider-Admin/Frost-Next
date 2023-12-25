@@ -72,10 +72,9 @@ public class OptionsFrame extends JDialog implements ListSelectionListener {
 
     // this vars hold some settings from start of dialog to the end.
     // then its checked if the settings are changed by user
-    private boolean checkHideBadMessages;
-    private boolean checkHideCheckMessages;
-    private boolean checkHideObserveMessages;
-    private boolean checkHideJunkMessages;
+    private boolean checkHideBADMessages;
+    private boolean checkHideNEUTRALMessages;
+    private boolean checkHideGOODMessages;
     private String checkMaxMessageDisplay;
     private String checkMaxMessageDownload;
     private boolean checkSignedOnly;
@@ -102,7 +101,7 @@ public class OptionsFrame extends JDialog implements ListSelectionListener {
     private News2Panel news2Panel = null;
     private JunkPanel junkPanel = null;
     private ExpirationPanel expirationPanel = null;
-    private JList optionsGroupsList = null;
+    private JList<ListBoxData> optionsGroupsList = null;
     private JPanel optionsGroupsPanel = null;
     private SearchPanel searchPanel = null;
 
@@ -250,6 +249,12 @@ public class OptionsFrame extends JDialog implements ListSelectionListener {
         return downloadPanel;
     }
 
+    public void threadUpdateBlockHashState() {
+        if( downloadPanel != null ) {
+            downloadPanel.showBlockHashPopulatingState();
+        }
+    }
+
     private MiscPanel getMiscPanel() {
         if (miscPanel == null) {
             miscPanel = new MiscPanel(frostSettings);
@@ -303,9 +308,9 @@ public class OptionsFrame extends JDialog implements ListSelectionListener {
             listData.add( new ListBoxData("    "+language.getString("Options.boardTree")+" ", getDisplayBoardTreePanel()));
             listData.add( new ListBoxData("    "+language.getString("Options.messages")+" ", getDisplayMessagesPanel()));
             listData.add( new ListBoxData(" "+language.getString("Options.expiration")+" ", getExpirationPanel()));
-            listData.add( new ListBoxData(" "+language.getString("Options.search")+" ", getSearchPanel()));
+//#DIEFILESHARING            listData.add( new ListBoxData(" "+language.getString("Options.search")+" ", getSearchPanel()));
             listData.add( new ListBoxData(" "+language.getString("Options.miscellaneous")+" ", getMiscPanel()));
-            optionsGroupsList = new JList(listData);
+            optionsGroupsList = new JList<ListBoxData>(listData);
             optionsGroupsList.setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
             optionsGroupsList.addListSelectionListener(this);
 
@@ -461,13 +466,12 @@ public class OptionsFrame extends JDialog implements ListSelectionListener {
             logger.log(Level.SEVERE, "Error while saving the settings.", se);
         }
 
-        // now check if some settings changed
+        // now check if some settings changed which require a graphical board reload
         if( !checkMaxMessageDisplay.equals(frostSettings.getValue(SettingsClass.MAX_MESSAGE_DISPLAY))
             || checkSignedOnly != frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_UNSIGNED)
-            || checkHideBadMessages != frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_BAD)
-            || checkHideCheckMessages != frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_CHECK)
-            || checkHideObserveMessages != frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_OBSERVE)
-            || checkHideJunkMessages != frostSettings.getBoolValue(SettingsClass.JUNK_HIDE_JUNK_MESSAGES)
+            || checkHideBADMessages != frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_BAD)
+            || checkHideNEUTRALMessages != frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_NEUTRAL)
+            || checkHideGOODMessages != frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_GOOD)
             || checkBlock != frostSettings.getBoolValue(SettingsClass.MESSAGE_BLOCK_SUBJECT_ENABLED)
             || checkBlockBody != frostSettings.getBoolValue(SettingsClass.MESSAGE_BLOCK_BODY_ENABLED)
             || checkShowDeletedMessages != frostSettings.getBoolValue(SettingsClass.SHOW_DELETED_MESSAGES)
@@ -476,7 +480,7 @@ public class OptionsFrame extends JDialog implements ListSelectionListener {
             || checkIndicateLowReceivedMessages != frostSettings.getBoolValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES)
           )
         {
-            // at least one setting changed, reload messages
+            // at least one visual setting changed, reload messages
             shouldReloadMessages = true;
         }
 
@@ -502,10 +506,9 @@ public class OptionsFrame extends JDialog implements ListSelectionListener {
         checkMaxMessageDisplay = frostSettings.getValue(SettingsClass.MAX_MESSAGE_DISPLAY);
         checkMaxMessageDownload = frostSettings.getValue(SettingsClass.MAX_MESSAGE_DOWNLOAD);
         checkSignedOnly = frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_UNSIGNED);
-        checkHideBadMessages = frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_BAD);
-        checkHideCheckMessages = frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_CHECK);
-        checkHideObserveMessages = frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_OBSERVE);
-        checkHideJunkMessages = frostSettings.getBoolValue(SettingsClass.JUNK_HIDE_JUNK_MESSAGES);
+        checkHideBADMessages = frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_BAD);
+        checkHideNEUTRALMessages = frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_NEUTRAL);
+        checkHideGOODMessages = frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_GOOD);
         checkBlock = frostSettings.getBoolValue(SettingsClass.MESSAGE_BLOCK_SUBJECT_ENABLED);
         checkBlockBody = frostSettings.getBoolValue(SettingsClass.MESSAGE_BLOCK_BODY_ENABLED);
         checkShowDeletedMessages = frostSettings.getBoolValue(SettingsClass.SHOW_DELETED_MESSAGES);
@@ -521,7 +524,7 @@ public class OptionsFrame extends JDialog implements ListSelectionListener {
     /**
      * Is called after the dialog is hidden.
      * This method should return true if:
-     *  - signedOnly, hideCheck or hideBad where changed by user
+     *  - signedOnly, or hide certain trust states where changed by user
      *  - a block settings was changed by user
      * If it returns true, the messages table should be reloaded.
      * @return

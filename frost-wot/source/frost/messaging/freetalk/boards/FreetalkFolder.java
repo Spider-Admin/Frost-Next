@@ -20,6 +20,8 @@ package frost.messaging.freetalk.boards;
 
 import java.util.*;
 
+import frost.util.VectorComparator;
+
 /**
  * Represents a folder in the board tree.
  */
@@ -34,8 +36,11 @@ public class FreetalkFolder extends AbstractFreetalkNode {
         nameLowerCase = name.toLowerCase();
     }
 
+    @SuppressWarnings("unchecked")
     public void sortChildren() {
-        Collections.sort(children);
+        // NOTE: the underlying model unchangeably uses a plain untyped Vector<Object>, but vectors
+        // implement the "List" interface, so we simply force a cast and sort using our own comparator
+        Collections.sort((List<AbstractFreetalkNode>)children, new VectorComparator<AbstractFreetalkNode>(false));
     }
 
     @Override

@@ -162,20 +162,20 @@ public class LocalIdentity extends Identity {
     }
 
     @Override
-    public boolean isGOOD() {
-        return true;
-    }
-    @Override
-    public boolean isCHECK() {
-        return false;
-    }
-    @Override
-    public boolean isOBSERVE() {
-        return false;
-    }
-    @Override
     public boolean isBAD() {
         return false;
+    }
+    @Override
+    public boolean isNEUTRAL() {
+        return false;
+    }
+    @Override
+    public boolean isGOOD() {
+        return false;
+    }
+    @Override
+    public boolean isFRIEND() {
+        return true;
     }
 
     public long getLastFilesSharedMillis() {

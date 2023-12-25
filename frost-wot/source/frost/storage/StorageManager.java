@@ -81,7 +81,7 @@ public class StorageManager extends Timer {
 				}
 			}
 
-            final String goodbyeMsg = "Frost shutdown completed.";
+            final String goodbyeMsg = "Frost-Next shutdown completed.";
 			logger.severe(goodbyeMsg);
 			System.out.println(goodbyeMsg);
 

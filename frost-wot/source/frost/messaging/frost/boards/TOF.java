@@ -37,6 +37,7 @@ import frost.storage.*;
 import frost.storage.perst.messages.*;
 import frost.util.*;
 import frost.util.gui.*;
+import frost.util.gui.SmartSelection;
 import frost.util.gui.translation.*;
 
 /**
@@ -52,14 +53,17 @@ public class TOF implements PropertyChangeListener {
 
     private static final Language language = Language.getInstance();
 
-    private UpdateTofFilesThread updateThread = null;
-    private UpdateTofFilesThread nextUpdateThread = null;
+    // these two are != null whenever a "load messages into tree" thread is running
+    private volatile UpdateTofFilesThread updateThread = null;
+    private volatile UpdateTofFilesThread nextUpdateThread = null;
+    // this is true whenever the GUI is working on rendering the newly added treetable rows
+    private volatile boolean isRedrawingGui = false;
 
     private final TofTreeModel tofTreeModel;
 
     private static boolean initialized = false;
 
-    private boolean hideJunkMessages;
+    private boolean showJunkMessages;
 
     /**
      * The unique instance of this class.
@@ -82,8 +86,8 @@ public class TOF implements PropertyChangeListener {
     private TOF(final TofTreeModel tofTreeModel) {
         super();
         this.tofTreeModel = tofTreeModel;
-        hideJunkMessages = Core.frostSettings.getBoolValue(SettingsClass.JUNK_HIDE_JUNK_MESSAGES);
-        Core.frostSettings.addPropertyChangeListener(SettingsClass.JUNK_HIDE_JUNK_MESSAGES, this);
+        showJunkMessages = Core.frostSettings.getBoolValue(SettingsClass.SHOW_JUNK_MESSAGES);
+        Core.frostSettings.addPropertyChangeListener(SettingsClass.SHOW_JUNK_MESSAGES, this);
     }
 
     /**
@@ -115,7 +119,7 @@ public class TOF implements PropertyChangeListener {
                         language.getString("TOF.markAllReadConfirmation.board.title"),
                         JOptionPane.YES_NO_OPTION,
                         JOptionPane.WARNING_MESSAGE,
-                        SettingsClass.CONFIRM_MARK_ALL_MSGS_READ,
+                        SettingsClass.CONFIRM_MARK_ALL_MSGS_READ, // will automatically choose "yes" if this is false
                         language.getString("Common.suppressConfirmationCheckbox") );
                 if( answer != JOptionPane.YES_OPTION) {
                     return;
@@ -130,7 +134,7 @@ public class TOF implements PropertyChangeListener {
                         language.getString("TOF.markAllReadConfirmation.folder.title"),
                         JOptionPane.YES_NO_OPTION,
                         JOptionPane.WARNING_MESSAGE,
-                        SettingsClass.CONFIRM_MARK_ALL_MSGS_READ,
+                        SettingsClass.CONFIRM_MARK_ALL_MSGS_READ, // will automatically choose "yes" if this is false
                         language.getString("Common.suppressConfirmationCheckbox") );
                 if( answer != JOptionPane.YES_OPTION) {
                     return;
@@ -158,14 +162,13 @@ public class TOF implements PropertyChangeListener {
         MessageStorage.inst().setAllMessagesRead(board);
 
         // if this board is currently shown, update messages in table
-        final DefaultMutableTreeNode rootNode = (DefaultMutableTreeNode)
-            MainFrame.getInstance().getMessagePanel().getMessageTable().getTree().getModel().getRoot();
+        final DefaultMutableTreeNode rootNode = (DefaultMutableTreeNode) MainFrame.getInstance().getMessageTreeModel().getRoot();
 
         SwingUtilities.invokeLater( new Runnable() {
             public void run() {
                 if( MainFrame.getInstance().getFrostMessageTab().getTofTreeModel().getSelectedNode() == board ) {
-                    for(final Enumeration<FrostMessageObject> e = rootNode.depthFirstEnumeration(); e.hasMoreElements(); ) {
-                        final FrostMessageObject frostMessageObject = e.nextElement();
+                    for(final Enumeration e = rootNode.depthFirstEnumeration(); e.hasMoreElements(); ) {
+                        final FrostMessageObject frostMessageObject = (FrostMessageObject)e.nextElement();
                         // this cast can only fail, if something other fails..
                         if( frostMessageObject instanceof FrostMessageObject ) {
                             if( frostMessageObject.isNew() ) {
@@ -236,7 +239,7 @@ public class TOF implements PropertyChangeListener {
                     if( !Core.getIdentities().addIdentity(owner) ) {
                         logger.severe("Core.getIdentities().addIdentity(owner) returned false for identy: "+owner.getUniqueName());
                         currentMsg.setPublicKey(null);
-                        currentMsg.setSignatureStatusOLD();
+                        currentMsg.setSignatureStatusNONE();
                         owner = null;
                     }
                 } else {
@@ -310,7 +313,7 @@ public class TOF implements PropertyChangeListener {
     private void processNewMessage(final FrostMessageObject currentMsg, final Board board, final boolean isBlocked) {
 
         // check if msg would be displayed (maxMessageDays)
-        final DateTime min = new LocalDate(DateTimeZone.UTC).minusDays(board.getMaxMessageDisplay()).toDateTimeAtMidnight();
+        final DateTime min = new DateTime(DateTimeZone.UTC).minusDays(board.getMaxMessageDisplay()).withTimeAtStartOfDay();
         final DateTime msgDate = new DateTime(currentMsg.getDateAndTime(), DateTimeZone.UTC);
 
         if( msgDate.getMillis() > min.getMillis() ) {
@@ -329,7 +332,7 @@ public class TOF implements PropertyChangeListener {
         // check if message is blocked
         if( isBlocked ) {
 //            // add this msg if it replaces a dummy!
-//            // DISCUSSION: better not, if a new GOOD msg arrives later in reply to this BAD, the BAD is not loaded and
+//            // DISCUSSION: better not, if a new FRIEND msg arrives later in reply to this BAD, the BAD is not loaded and
 //            // dummy is created. this differes from behaviour of clean load from database
 //            if( message.getMessageId() != null ) {
 //                SwingUtilities.invokeLater( new Runnable() {
@@ -399,65 +402,70 @@ public class TOF implements PropertyChangeListener {
 
     private void addNewMessageToModel(FrostMessageObject newMessage, final Board board) {
 
-        // if msg has no msgid, add to root
-        // else check if there is a dummy msg with this msgid, if yes replace dummy with this msg
-        // if there is no dummy find direct parent of this msg and add to it.
-        // if there is no direct parent, add dummy parents until first existing parent in list
-
         final FrostMessageObject rootNode = (FrostMessageObject)MainFrame.getInstance().getMessageTreeModel().getRoot();
         final MessageTreeTable treeTable = MainFrame.getInstance().getMessageTreeTable();
         final boolean expandUnread = Core.frostSettings.getBoolValue(SettingsClass.MSGTABLE_SHOW_COLLAPSED_THREADS) && Core.frostSettings.getBoolValue(SettingsClass.MSGTABLE_EXPAND_UNREAD_THREADS);
 
         final boolean showThreads = Core.frostSettings.getBoolValue(SettingsClass.SHOW_THREADS);
 
+        // if threading is disabled, if the message has no id, or if the message isn't
+        // in reply to anything (it's the start of a thread), then add it directly to the root node
         if( showThreads == false ||
-            newMessage.getMessageId() == null ||
-            newMessage.getInReplyToList().size() == 0
-          )
-        {
+                newMessage.getMessageId() == null ||
+                newMessage.getInReplyToList().size() == 0 ) {
             rootNode.add(newMessage, false);
             return;
         }
 
+        // check if there is a dummy message with this messageid, and if so replace it with the real message contents
         if( tryToFillDummyMsg(newMessage) == true ) {
             // dummy msg filled
             return;
         }
 
+        // try to find the direct parent of this message somewhere in the board tree,
+        // and construct a message tree of dummy parents until we find the first existing parent in the list
+        // NOTE: the scan is done backwards, up the tree, from the current message (added first)
+        // through all the dummies (if needed), all the way to the actual parent (where we attach the dummy-tree+msg if parent is found)...
         final LinkedList<String> msgParents = new LinkedList<String>(newMessage.getInReplyToList());
-
-        // find direct parent
         while( msgParents.size() > 0 ) {
-
             final String directParentId = msgParents.removeLast();
-            
+
+            // check all messages in the tree, depth-first, to see if they're the current parent we're looking for
             final Enumeration<FrostMessageObject> messageObjectEnumeration = rootNode.depthFirstEnumeration();
-            while(messageObjectEnumeration.hasMoreElements()){
+            while( messageObjectEnumeration.hasMoreElements() ) {
                 final FrostMessageObject frostMessageObject = messageObjectEnumeration.nextElement();
-                
+
+                // we found an existing parent message node (either a real one or a dummy), so simply add our
+                // current "(possible dummies)->message" tree to that parent and stop looking for further parents
                 if( frostMessageObject.getMessageId() != null &&
-                    frostMessageObject.getMessageId().equals(directParentId)
-                  )
-                {
+                        frostMessageObject.getMessageId().equals(directParentId) ) {
                     frostMessageObject.add(newMessage, false);
-                    if (expandUnread) {
-                    	treeTable.expandFirework(newMessage);
+                    if( expandUnread ) {
+                        treeTable.expandFirework(newMessage);
                     }
                     return;
                 }
             }
 
+            // we did not find the current parent we wanted, so let's create a dummy message for it instead,
+            // and then add the real message/tree as a child of that dummy message; we then point newMessage
+            // to the dummy message instead, so that we end up building a message tree of nested virtual messages
+            // as we move up this hierarchy. NOTE: they won't be added to the actual tree here, and silent = true
+            // which means that the table won't be notified of any insert event by the "add()", since we're
+            // building a virtual, dummy message tree at the moment which isn't yet attached to the table...
             final FrostMessageObject dummyMsg = new FrostMessageObject(directParentId, board, null);
             dummyMsg.add(newMessage, true);
 
             newMessage = dummyMsg;
         }
 
-        // no parent found, add tree with dummy msgs
+        // no parent found was anywhere in the hierarchy (not even a dummy one), so insert a brand new
+        // tree of all the dummy "in reply to" messages, with the real message at the bottom
         rootNode.add(newMessage, false);
-		if (expandUnread) {
-			treeTable.expandFirework(newMessage);
-		}
+        if (expandUnread) {
+            treeTable.expandFirework(newMessage);
+        }
     }
 
     /**
@@ -487,6 +495,15 @@ public class TOF implements PropertyChangeListener {
         nextUpdateThread = new UpdateTofFilesThread(board, daysToRead, prevSelectedMsgId);
         MainFrame.getInstance().activateGlassPane();
         nextUpdateThread.start();
+    }
+
+    public boolean isLoadingMessages() {
+        // returns true if there is a current or waiting "load board messages" thread, *or* if
+        // the GUI is working on rendering (repainting) after having added a new chunk of messages.
+        // the threads themselves finish almost instantly, but the redrawing of the GUI is what
+        // takes a while. the GUI is white/blank and frozen (not responding to events) while it's
+        // redrawing, so that's the state we're really interested in watching out for!
+        return ( (updateThread != null || nextUpdateThread != null || isRedrawingGui) ? true : false );
     }
 
     private class UpdateTofFilesThread extends Thread {
@@ -591,7 +608,7 @@ public class TOF implements PropertyChangeListener {
                 }
 
                 // for threads, check msgrefs and load all existing msgs pointed to by refs
-                final boolean showDeletedMessages = Core.frostSettings.getBoolValue("showDeletedMessages");
+                final boolean showDeletedMessages = Core.frostSettings.getBoolValue(SettingsClass.SHOW_DELETED_MESSAGES);
                 LinkedList<FrostMessageObject> newLoadedMsgs = new LinkedList<FrostMessageObject>();
                 LinkedList<FrostMessageObject> newLoadedMsgs2 = new LinkedList<FrostMessageObject>();
 
@@ -780,7 +797,10 @@ public class TOF implements PropertyChangeListener {
          */
         private void loadMessages(final MessageCallback callback) {
 
-            final boolean showDeletedMessages = Core.frostSettings.getBoolValue("showDeletedMessages");
+            // NOTE: these flags define what message-iterators to use when loading from the database
+            // (all, unread, flagged or starred). we do *not* implement "hide junk" checking here,
+            // since that's a job for the board-loading to determine later!
+            final boolean showDeletedMessages = Core.frostSettings.getBoolValue(SettingsClass.SHOW_DELETED_MESSAGES);
             final boolean showUnreadOnly = Core.frostSettings.getBoolValue(SettingsClass.SHOW_UNREAD_ONLY);
             final boolean showFlaggedOnly = Core.frostSettings.getBoolValue(SettingsClass.SHOW_FLAGGED_ONLY);
             final boolean showStarredOnly = Core.frostSettings.getBoolValue(SettingsClass.SHOW_STARRED_ONLY);
@@ -810,14 +830,19 @@ public class TOF implements PropertyChangeListener {
                 // wait for running thread to finish
                 Mixed.wait(150);
                 if( nextUpdateThread != this ) {
-                    // leave, there is a newer thread than we waiting
+                    // leave, there is a newer thread than us waiting
+                    // NOTE: this usually means the user has changed to a different board while
+                    // we were waiting for the previous update to finish, thus invalidating this
+                    // thread, since there's a newer job.
                     return;
                 }
             }
+
             // paranoia: are WE the next thread?
             if( nextUpdateThread != this ) {
                 return;
             } else {
+                nextUpdateThread = null; // unset us from "next" since we're starting the job!
                 updateThread = this;
             }
 
@@ -828,20 +853,22 @@ public class TOF implements PropertyChangeListener {
             // update SortStateBean
             MessageTreeTableSortStateBean.setThreaded(loadThreads);
 
+            final long l1 = System.currentTimeMillis();
             try {
                 if( loadThreads  ) {
                     final ThreadedMessageRetrieval tmr = new ThreadedMessageRetrieval(rootNode);
-                    final long l1 = System.currentTimeMillis();
                     loadMessages(tmr);
                     final long l2 = System.currentTimeMillis();
                     tmr.buildThreads();
                     final long l3 = System.currentTimeMillis();
                     // TODO: debug output only!
-                    System.out.println("loading board "+board.getName()+": load="+(l2-l1)+", build+subretrieve="+(l3-l2));
+                    System.out.println("loading board "+board.getName()+" (threaded): diskFetch="+(l2-l1)+"ms, buildThreads+subRetrieve="+(l3-l2)+"ms");
                 } else {
                     // load flat
                     final FlatMessageRetrieval ffr = new FlatMessageRetrieval(rootNode);
                     loadMessages(ffr);
+                    final long l2 = System.currentTimeMillis();
+                    System.out.println("loading board "+board.getName()+" (non-threaded): diskFetch="+(l2-l1)+"ms");
                 }
 
                 // finally mark 'new', but blocked messages as unread
@@ -877,17 +904,24 @@ public class TOF implements PropertyChangeListener {
                 final int newMessageCount = newMessageCountWork;
                 final boolean newHasFlagged = hasFlaggedWork;
                 final boolean newHasStarred = hasStarredWork;
+                isRedrawingGui = true; // means that the messages have not yet been visibly loaded into the GUI
                 SwingUtilities.invokeLater( new Runnable() {
                     public void run() {
+                        final long l2 = System.currentTimeMillis();
                         innerTargetBoard.setUnreadMessageCount(newMessageCount);
                         innerTargetBoard.setFlaggedMessages(newHasFlagged);
                         innerTargetBoard.setStarredMessages(newHasStarred);
                         setNewRootNode(innerTargetBoard, rootNode, previousSelectedMsgId);
+                        isRedrawingGui = false; // the messages have been loaded into the GUI and are now visible
+                        final long l3 = System.currentTimeMillis();
+                        System.out.println("finished loading board "+board.getName()+": guiRenderTime="+(l3-l2)+"ms, totalTime="+(l3-l1)+"ms");
                     }
                 });
             } else if( nextUpdateThread == null ) {
+                // if there are no more "update threads" queued while we were finishing this update, then re-activate the main window
                 MainFrame.getInstance().deactivateGlassPane();
             }
+            // unset us as "updatethread" since we're done with the job!
             updateThread = null;
         }
 
@@ -900,54 +934,59 @@ public class TOF implements PropertyChangeListener {
             {
                 final MessageTreeTable treeTable = MainFrame.getInstance().getMessageTreeTable();
 
+                // give the treetable a new root node (fires "treeStructureChanged" which in turn fires
+                // "tableDataChanged". this event just takes ~5ms even for big boards.
                 treeTable.setNewRootNode(rootNode);
-                if( !Core.frostSettings.getBoolValue(SettingsClass.MSGTABLE_SHOW_COLLAPSED_THREADS) ) {
+                // now expand either all nodes, or the root-level children; this is the thing that's
+                // insanely slow, but uses Kitty's TreeTable performance trick to be super fast. ;-)
+                if( ! Core.frostSettings.getBoolValue(SettingsClass.MSGTABLE_SHOW_COLLAPSED_THREADS) ) {
+                    // normal mode: all threads and all replies are expanded
                     treeTable.expandAll(true);
                 } else {
-                	if( Core.frostSettings.getBoolValue(SettingsClass.MSGTABLE_EXPAND_ROOT_CHILDREN) ) {
-                		treeTable.expandRootChildren();
-                	}
+                    // collapsed mode: pre-expand replies (optional) and/or expand unread parts of threads (optional)
+                    final boolean preExpandReplies = Core.frostSettings.getBoolValue(SettingsClass.MSGTABLE_EXPAND_ROOT_CHILDREN);
+                    final boolean expandUnreadThreads = Core.frostSettings.getBoolValue(SettingsClass.MSGTABLE_EXPAND_UNREAD_THREADS);
+                    treeTable.expandRootChildren(preExpandReplies, expandUnreadThreads);
                 }
 
                 MainFrame.getInstance().updateTofTree(innerTargetBoard);
                 MainFrame.getInstance().updateMessageCountLabels(innerTargetBoard);
 
-                if( previousSelectedMsgId != null ) {
-                	// select messageId
-                	final Enumeration<FrostMessageObject> messageObjectEnumeration = rootNode.depthFirstEnumeration();
-                    while(messageObjectEnumeration.hasMoreElements()){
-                        final FrostMessageObject frostMessageObject = messageObjectEnumeration.nextElement();
-                        
-                        if( frostMessageObject.getMessageId() != null && frostMessageObject.getMessageId().equals(previousSelectedMsgId) ) {
-                        	treeTable.expandFirework(frostMessageObject);
+                MainFrame.getInstance().deactivateGlassPane();
 
-                            int row = treeTable.getRowForNode(frostMessageObject);
-                            if( row > -1 ) {
-                                treeTable.getSelectionModel().setSelectionInterval(row, row);
-                                // scroll to selected row
-                                if( (row+1) < treeTable.getRowCount() ) {
-                                    row++;
+                // do last: if the user had selected a message before the reload, we'll want to re-select
+                // it as soon as the JTree<->JTable re-syncing activity has settled down. by queueing
+                // an invokeLater job, we'll be sure that all of the insert/expand events have finished
+                // by the time that we fire. that's because the insert/expandThread calls above also fire
+                // invokeLater jobs, so we'll be adding ourselves to the *end* of that queue.
+                if( previousSelectedMsgId != null ) {
+                    // check if a message with the same messageId exists within the new node tree
+                    final Enumeration<FrostMessageObject> messageObjectEnumeration = rootNode.depthFirstEnumeration();
+                    while( messageObjectEnumeration.hasMoreElements() ){
+                        final FrostMessageObject frostMessageObject = messageObjectEnumeration.nextElement();
+
+                        if( frostMessageObject != null && frostMessageObject.getMessageId() != null && frostMessageObject.getMessageId().equals(previousSelectedMsgId) ) {
+                            treeTable.expandFirework(frostMessageObject);
+
+                            // invokeLater the row-finding, selection and scrolling jobs
+                            // to make sure that the TreeTable will be ready when we query it...
+                            SwingUtilities.invokeLater(new Runnable() {
+                                @Override
+                                public void run() {
+                                    // if the message is at row "-1" it means the message is no longer visible
+                                    int treeRowIdx = treeTable.getRowForNode(frostMessageObject);
+                                    if( treeRowIdx >= 0 ) {
+                                        treeTable.getSelectionModel().setSelectionInterval(treeRowIdx, treeRowIdx);
+                                        // perform an intelligent scroll to the selected row + 3,
+                                        // which still ensures the target row is always in view
+                                        SmartSelection.applySmartScroll(treeTable, treeRowIdx, 3);
+                                    }
                                 }
-                                final Rectangle r = treeTable.getCellRect(row, 0, true);
-                                treeTable.scrollRectToVisible(r);
-                            }
+                            });
                             break;
                         }
                     }
                 }
-
-                if( Core.frostSettings.getBoolValue(SettingsClass.MSGTABLE_SHOW_COLLAPSED_THREADS) && Core.frostSettings.getBoolValue(SettingsClass.MSGTABLE_EXPAND_UNREAD_THREADS) ) {
-                	final Enumeration<FrostMessageObject> messageObjectEnumeration = rootNode.depthFirstEnumeration();
-                    while(messageObjectEnumeration.hasMoreElements()){
-                        final FrostMessageObject frostMessageObject = messageObjectEnumeration.nextElement();
-                        
-                        if( frostMessageObject.isNew() ) {
-                        	treeTable.expandFirework(frostMessageObject);
-                        }
-                    }
-                }
-
-                MainFrame.getInstance().deactivateGlassPane();
             }
         }
     }
@@ -966,7 +1005,7 @@ public class TOF implements PropertyChangeListener {
     }
 
     /**
-     * Returns true if the message should not be displayed
+     * Returns true if the message should be hidden (aka not displayed).
      * @return true if message is blocked, else false
      */
     public boolean isBlocked(
@@ -976,26 +1015,26 @@ public class TOF implements PropertyChangeListener {
             final boolean blockMsgBody,
             final boolean blockMsgBoardname)
     {
-        if( hideJunkMessages && message.isJunk() ) {
+        if( !showJunkMessages && message.isJunk() ) {
             return true;
         }
-        if (board.getShowSignedOnly()
-            && (message.isMessageStatusOLD() || message.isMessageStatusTAMPERED()) )
+        if (board.getHideUnsigned()
+            && (message.isMessageStatusNONE() || message.isMessageStatusTAMPERED()) )
         {
             return true;
         }
-        if (board.getHideBad() && message.isMessageStatusBAD()) {
+        if (board.getHideBAD() && message.isMessageStatusBAD()) {
             return true;
         }
-        if (board.getHideCheck() && message.isMessageStatusCHECK()) {
+        if (board.getHideNEUTRAL() && message.isMessageStatusNEUTRAL()) {
             return true;
         }
-        if (board.getHideObserve() && message.isMessageStatusOBSERVE()) {
+        if (board.getHideGOOD() && message.isMessageStatusGOOD()) {
             return true;
         }
 
-        // check for block words, don't check OBSERVE and GOOD
-        if (!message.isMessageStatusOBSERVE() && !message.isMessageStatusGOOD()) {
+        // check for block words, don't check GOOD and FRIEND
+        if (!message.isMessageStatusGOOD() && !message.isMessageStatusFRIEND()) {
 
             if (board.getHideMessageCount() > 0 && !message.isMessageFromME()) {
                 /* blahwad  bot blaster */
@@ -1059,7 +1098,7 @@ public class TOF implements PropertyChangeListener {
      * Maybe add the attached board to list of known boards.
      */
     private void processAttachedBoards(final FrostMessageObject currentMsg) {
-        if( currentMsg.isMessageStatusOLD() &&
+        if( currentMsg.isMessageStatusNONE() &&
             Core.frostSettings.getBoolValue(SettingsClass.KNOWNBOARDS_BLOCK_FROM_UNSIGNED) == true )
         {
             logger.info("Boards from unsigned message blocked");
@@ -1067,18 +1106,18 @@ public class TOF implements PropertyChangeListener {
                    Core.frostSettings.getBoolValue(SettingsClass.KNOWNBOARDS_BLOCK_FROM_BAD) == true )
         {
             logger.info("Boards from BAD message blocked");
-        } else if( currentMsg.isMessageStatusCHECK() &&
-                   Core.frostSettings.getBoolValue(SettingsClass.KNOWNBOARDS_BLOCK_FROM_CHECK) == true )
+        } else if( currentMsg.isMessageStatusNEUTRAL() &&
+                   Core.frostSettings.getBoolValue(SettingsClass.KNOWNBOARDS_BLOCK_FROM_NEUTRAL) == true )
         {
-            logger.info("Boards from CHECK message blocked");
-        } else if( currentMsg.isMessageStatusOBSERVE() &&
-                   Core.frostSettings.getBoolValue(SettingsClass.KNOWNBOARDS_BLOCK_FROM_OBSERVE) == true )
+            logger.info("Boards from NEUTRAL message blocked");
+        } else if( currentMsg.isMessageStatusGOOD() &&
+                   Core.frostSettings.getBoolValue(SettingsClass.KNOWNBOARDS_BLOCK_FROM_GOOD) == true )
         {
-            logger.info("Boards from OBSERVE message blocked");
+            logger.info("Boards from GOOD message blocked");
         } else if( currentMsg.isMessageStatusTAMPERED() ) {
             logger.info("Boards from TAMPERED message blocked");
         } else {
-            // either GOOD user or not blocked by user
+            // either FRIEND user or not blocked by user
             final LinkedList<Board> addBoards = new LinkedList<Board>();
             for(final Iterator<BoardAttachment> i = currentMsg.getAttachmentsOfTypeBoard().iterator(); i.hasNext(); ) {
                 addBoards.add(i.next().getBoardObj());
@@ -1155,8 +1194,8 @@ public class TOF implements PropertyChangeListener {
     }
 
     public void propertyChange(final PropertyChangeEvent evt) {
-        if (evt.getPropertyName().equals(SettingsClass.JUNK_HIDE_JUNK_MESSAGES)) {
-            hideJunkMessages = Core.frostSettings.getBoolValue(SettingsClass.JUNK_HIDE_JUNK_MESSAGES);
+        if( evt.getPropertyName().equals(SettingsClass.SHOW_JUNK_MESSAGES) ) {
+            showJunkMessages = Core.frostSettings.getBoolValue(SettingsClass.SHOW_JUNK_MESSAGES);
         }
     }
 }

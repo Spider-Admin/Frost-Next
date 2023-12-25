@@ -51,9 +51,11 @@ public class GenerateChkThread extends Thread {
         String chkkey = null;
         
         // yes, this destroys any upload progress, but we come only here if
-        // chkKey == null, so the file should'nt be uploaded until now
+        // chkKey == null, so the file shouldn't have begun uploading yet
         try {
-            chkkey = FcpHandler.inst().generateCHK(uploadItem.getFile());
+            // tell Freenet (via FCP) to encode but not upload the file, and wait for the result
+            // uses the file's chosen compatibility mode (such as "COMPAT_1468") and compress=true/false settings
+            chkkey = FcpHandler.inst().generateCHK(uploadItem);
         } catch (Throwable t) {
             logger.log(Level.SEVERE, "Encoding failed", t);
             uploadItem.setState(FrostUploadItem.STATE_WAITING);

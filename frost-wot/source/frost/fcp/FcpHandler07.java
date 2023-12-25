@@ -162,13 +162,13 @@ public class FcpHandler07 extends FcpHandler {
     }
 
     @Override
-    public String generateCHK(final File file) throws IOException, ConnectException {
+    public String generateCHK(final FrostUploadItem ulItem) throws IOException, ConnectException {
 
         final FcpConnection connection = FcpFactory.getFcpConnectionInstance();
         if (connection == null) {
             return null;
         }
-        final String chkkey = connection.generateCHK(file);
+        final String chkkey = connection.generateCHK(ulItem);
         connection.close();
         return chkkey;
     }

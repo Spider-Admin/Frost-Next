@@ -21,8 +21,11 @@ package frost.fileTransfer.sharing;
 import java.beans.*;
 import java.util.*;
 
+import javax.swing.JTable;
+
 import frost.*;
 import frost.storage.*;
+import frost.util.gui.SmartSelection;
 
 public class SharedFilesManager implements PropertyChangeListener, ExitSavable {
 
@@ -44,9 +47,11 @@ public class SharedFilesManager implements PropertyChangeListener, ExitSavable {
     }
 
     public void addPanelToMainFrame(final MainFrame mainFrame) {
+        /* //#DIEFILESHARING: This entire block has been commented out since filesharing is removed in Frost-Next.
         mainFrame.addPanel("MainFrame.tabbedPane.sharing", getPanel());
         Core.frostSettings.addPropertyChangeListener(SettingsClass.FILESHARING_DISABLE, this);
         updateFileSharingStatus();
+        */
     }
 
     public void selectTab() {
@@ -63,23 +68,29 @@ public class SharedFilesManager implements PropertyChangeListener, ExitSavable {
     }
 
     public void selectModelItem(final FrostSharedFileItem sfItem) {
-        final int row = model.indexOf(sfItem);
-        if( row > -1 ) {
-            panel.getModelTable().getTable().getSelectionModel().setSelectionInterval(row, row);
-            panel.getModelTable().getTable().scrollRectToVisible(panel.getModelTable().getTable().getCellRect(row, 0, true));
+        final int rowIdx = model.indexOf(sfItem);
+        if( rowIdx >= 0 ) {
+            final JTable table = panel.getModelTable().getTable();
+            table.getSelectionModel().setSelectionInterval(rowIdx, rowIdx);
+            // perform an intelligent scroll to the selected row + 3, which still ensures the target row is always in view
+            SmartSelection.applySmartScroll(table, rowIdx, 3);
         }
     }
 
     public void propertyChange(final PropertyChangeEvent evt) {
+        /* //#DIEFILESHARING: This entire block has been commented out since filesharing is removed in Frost-Next.
         if (evt.getPropertyName().equals(SettingsClass.FILESHARING_DISABLE)) {
             updateFileSharingStatus();
         }
+        */
     }
 
+    /* //#DIEFILESHARING: This entire block has been commented out since filesharing is removed in Frost-Next.
     private void updateFileSharingStatus() {
         boolean disableFileSharing = Core.frostSettings.getBoolValue(SettingsClass.FILESHARING_DISABLE);
         MainFrame.getInstance().setPanelEnabled("MainFrame.tabbedPane.sharing", !disableFileSharing);
     }
+    */
 
     public List<FrostSharedFileItem> getSharedFileItemList() {
         return getModel().getItems();

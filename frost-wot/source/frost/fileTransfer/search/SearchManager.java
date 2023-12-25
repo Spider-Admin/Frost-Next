@@ -35,9 +35,11 @@ public class SearchManager implements PropertyChangeListener {
     }
     
     public void addPanelToMainFrame(MainFrame mainFrame) {
+        /* //#DIEFILESHARING: This entire block has been commented out since filesharing is removed in Frost-Next.
         mainFrame.addPanel("MainFrame.tabbedPane.search", getPanel());
         Core.frostSettings.addPropertyChangeListener(SettingsClass.FILESHARING_DISABLE, this);
         updateDownloadStatus();
+        */
     }
 
     public SearchPanel getPanel() {
@@ -49,13 +51,17 @@ public class SearchManager implements PropertyChangeListener {
     }
 
     public void propertyChange(PropertyChangeEvent evt) {
+        /* //#DIEFILESHARING: This entire block has been commented out since filesharing is removed in Frost-Next.
         if (evt.getPropertyName().equals(SettingsClass.FILESHARING_DISABLE)) {
             updateDownloadStatus();
         }
+        */
     }
 
+    /* //#DIEFILESHARING: This entire block has been commented out since filesharing is removed in Frost-Next.
     private void updateDownloadStatus() {
         boolean disableFileSharing = Core.frostSettings.getBoolValue(SettingsClass.FILESHARING_DISABLE);
         MainFrame.getInstance().setPanelEnabled("MainFrame.tabbedPane.search", !disableFileSharing);
     }
+    */
 }

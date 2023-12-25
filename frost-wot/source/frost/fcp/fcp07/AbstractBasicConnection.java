@@ -112,15 +112,19 @@ public abstract class AbstractBasicConnection {
             fcpSocket.getFcpOut().flush();
 
             // send file
-            final BufferedInputStream fileInput = new BufferedInputStream(new FileInputStream(sourceFile));
-            while( true ) {
-                final int d = fileInput.read();
-                if( d < 0 ) {
-                    break; // EOF
+            try (
+                // NOTE: Java 7+ try-with-resources (autocloseable)
+                final FileInputStream fileInputStream = new FileInputStream(sourceFile);
+                final BufferedInputStream fileInput = new BufferedInputStream(fileInputStream);
+            ) {
+                while( true ) {
+                    final int d = fileInput.read();
+                    if( d < 0 ) {
+                        break; // EOF
+                    }
+                    fcpSocket.getFcpRawOut().write(d);
                 }
-                fcpSocket.getFcpRawOut().write(d);
             }
-            fileInput.close();
             fcpSocket.getFcpRawOut().flush();
 
             if(doLogging) {

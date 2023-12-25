@@ -124,7 +124,7 @@ public class FrostMessageTab implements LanguageListener {
 
             int dividerLoc = Core.frostSettings.getIntValue("MainFrame.treeAndTabbedPaneSplitpaneDividerLocation");
             if( dividerLoc < 10 ) {
-                dividerLoc = 160;
+                dividerLoc = 210;
             }
             treeAndTabbedPaneSplitpane.setDividerLocation(dividerLoc);
 
@@ -135,7 +135,8 @@ public class FrostMessageTab implements LanguageListener {
             tabPanel = p;
 
             // add menu items to News menu
-            tofDisplayBoardInfoMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/information.png", 16, 16));
+            tofDisplayBoardInfoMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/board-information.png", 16, 16));
+            tofDisplayBoardUpdateInformationMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/dialog-information.png", 16, 16));
             tofDisplayKnownBoards.setIcon(MiscToolkit.getScaledImage("/data/toolbar/internet-web-browser.png", 16, 16));
             tofSearchMessages.setIcon(MiscToolkit.getScaledImage("/data/toolbar/edit-find.png", 16, 16));
 
@@ -198,9 +199,14 @@ public class FrostMessageTab implements LanguageListener {
 
     public void postInitialize() {
         // select saved board (NOTE: this loads the message list!)
-        if (tofTree.getRowCount() > Core.frostSettings.getIntValue(SettingsClass.BOARDLIST_LAST_SELECTED_BOARD)) {
-            tofTree.setSelectionRow(Core.frostSettings.getIntValue(SettingsClass.BOARDLIST_LAST_SELECTED_BOARD));
-        }
+        // perform the switch in the GUI thread to avoid rendering issues
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                if (tofTree.getRowCount() > Core.frostSettings.getIntValue(SettingsClass.BOARDLIST_LAST_SELECTED_BOARD)) {
+                    tofTree.setSelectionRow(Core.frostSettings.getIntValue(SettingsClass.BOARDLIST_LAST_SELECTED_BOARD));
+                }
+            }
+        });
     }
 
     public void setKeyActionForNewsTab(final Action action, final String actionName, final KeyStroke keyStroke) {
@@ -347,7 +353,7 @@ public class FrostMessageTab implements LanguageListener {
             configBoardButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/document-properties.png"));
             renameFolderButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/edit-select-all.png"));
             removeBoardButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/user-trash.png"));
-            boardInfoButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/information.png"));
+            boardInfoButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/board-information.png"));
             knownBoardsButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/internet-web-browser.png"));
             searchMessagesButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/edit-find.png"));
 
@@ -503,9 +509,12 @@ public class FrostMessageTab implements LanguageListener {
     }
 
     /**
-     * Updates the whole tofTree. Tries to
+     * Updates the whole tofTree. Reloads the entire board and all of its messages using
+	 * the current message display/hiding preferences.
+	 * @param {boolean} reselectCurrentMessageFallback - true to save the ID of the current msg and
+	 * try to reselect it. but note that this variable is only checked if forceSelectMessageId is null.
      */
-    public void boardTree_actionPerformed(final boolean reload) {
+    public void boardTree_actionPerformed(final boolean reselectCurrentMessageFallback) {
 
         final int i[] = tofTree.getSelectionRows();
         if (i != null && i.length > 0) {
@@ -531,7 +540,7 @@ public class FrostMessageTab implements LanguageListener {
             if( forceSelectMessageId != null ) {
                 previousMessageId = forceSelectMessageId;
                 forceSelectMessageId = null;
-            } else if( reload ) {
+            } else if( reselectCurrentMessageFallback ) {
                 final int[] rows = getMessagePanel().getMessageTable().getSelectedRows();
                 if( rows != null && rows.length > 0 ) {
                     FrostMessageObject previousMessage = (FrostMessageObject) getMessagePanel().getMessageTableModel().getRow(rows[0]);
@@ -611,7 +620,7 @@ public class FrostMessageTab implements LanguageListener {
         }
         String newname = null;
         do {
-            newname = JOptionPane.showInputDialog(
+            newname = MiscToolkit.showInputDialog(
                     mainFrame,
                     language.getString("MainFrame.dialog.renameFolder")+":\n",
                     selected.getName());

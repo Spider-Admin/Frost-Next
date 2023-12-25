@@ -1,237 +1,133 @@
 /*
- * Copyright 1997-1999 Sun Microsystems, Inc. All Rights Reserved.
- *
- * Redistribution and use in source and binary forms, with or
- * without modification, are permitted provided that the following
- * conditions are met:
- *
- * - Redistributions of source code must retain the above copyright
- *   notice, this list of conditions and the following disclaimer.
- *
- * - Redistribution in binary form must reproduce the above
- *   copyright notice, this list of conditions and the following
- *   disclaimer in the documentation and/or other materials
- *   provided with the distribution.
- *
- * Neither the name of Sun Microsystems, Inc. or the names of
- * contributors may be used to endorse or promote products derived
- * from this software without specific prior written permission.
- *
- * This software is provided "AS IS," without a warranty of any
- * kind. ALL EXPRESS OR IMPLIED CONDITIONS, REPRESENTATIONS AND
- * WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT, ARE HEREBY
- * EXCLUDED. SUN AND ITS LICENSORS SHALL NOT BE LIABLE FOR ANY
- * DAMAGES OR LIABILITIES SUFFERED BY LICENSEE AS A RESULT OF OR
- * RELATING TO USE, MODIFICATION OR DISTRIBUTION OF THIS SOFTWARE OR
- * ITS DERIVATIVES. IN NO EVENT WILL SUN OR ITS LICENSORS BE LIABLE
- * FOR ANY LOST REVENUE, PROFIT OR DATA, OR FOR DIRECT, INDIRECT,
- * SPECIAL, CONSEQUENTIAL, INCIDENTAL OR PUNITIVE DAMAGES, HOWEVER
- * CAUSED AND REGARDLESS OF THE THEORY OF LIABILITY, ARISING OUT OF
- * THE USE OF OR INABILITY TO USE THIS SOFTWARE, EVEN IF SUN HAS
- * BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- *
- * You acknowledge that this software is not designed, licensed or
- * intended for use in the design, construction, operation or
- * maintenance of any nuclear facility.
- */
+ FreetalkTreeTableModelAdapter.java / Frost-Next
+ Copyright (C) 2015  "The Kitty@++U6QppAbIb1UBjFBRtcIBZg6NU"
+
+ This program is free software; you can redistribute it and/or
+ modify it under the terms of the GNU General Public License as
+ published by the Free Software Foundation; either version 2 of
+ the License, or (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+*/
 
 package frost.messaging.freetalk.gui.messagetreetable;
 
-import java.util.*;
+import javax.swing.JTree;
+import javax.swing.SwingUtilities;
+import javax.swing.event.TreeExpansionEvent;
+import javax.swing.event.TreeExpansionListener;
+import javax.swing.event.TreeWillExpandListener;
+import javax.swing.event.TreeModelEvent;
+import javax.swing.event.TreeModelListener;
+import javax.swing.table.AbstractTableModel;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.ExpandVetoException;
+import javax.swing.tree.TreePath;
 
-import javax.swing.*;
-import javax.swing.event.*;
-import javax.swing.table.*;
-import javax.swing.tree.*;
+import frost.messaging.frost.gui.messagetreetable.MessageTreeTableSmartUtils;
 
-/**
- * This wrapper class takes a TreeTableModel and implements the table model interface. The implementation is trivial,
- * with all of the event dispatching support provided by the superclass: the AbstractTableModel.
- *
- * @version 1.2 10/27/98
- *
- * @author Philip Milne
- * @author Scott Violet
- */
-public class FreetalkTreeTableModelAdapter extends AbstractTableModel {
-
+// --------------------------------------------------------------------------------
+// This class has been completely stripped of all comments, since it is an exact
+// duplicate of the code used for the non-Freetalk adapter. The only thing that
+// differs is the word "Freetalk" being added to some of the variable types here!
+// Frost was unfortunately written in a way where code-duplication is a fact of life.
+//
+// See "messaging/frost/gui/messagetreetable/TreeTableModelAdapter.java" for very
+// detailed comments and full information about what's going on here.
+// --------------------------------------------------------------------------------
+@SuppressWarnings("serial")
+public class FreetalkTreeTableModelAdapter extends AbstractTableModel
+{
     final JTree tree;
     final FreetalkMessageTreeTable treeTable;
     final FreetalkTreeTableModel treeTableModel;
 
-    private int collapsedToRow = -1;
+    final Listener listener;
+    volatile boolean isListenerActive = false;
 
-    public FreetalkTreeTableModelAdapter(final FreetalkTreeTableModel treeTableModel, final JTree tree, final FreetalkMessageTreeTable tt) {
+    public FreetalkTreeTableModelAdapter(
+            final FreetalkTreeTableModel treeTableModel,
+            final JTree tree,
+            final FreetalkMessageTreeTable tt)
+    {
         this.tree = tree;
         this.treeTable = tt;
         this.treeTableModel = treeTableModel;
 
-        tree.addTreeWillExpandListener(new TreeWillExpandListener() {
+        listener = new Listener();
 
-            public void treeWillExpand(final TreeExpansionEvent event) throws ExpandVetoException {
-            }
+        // install the listener as soon as this adapter is created
+        addListener();
+    }
 
-            // remember child rows to fire a tableRowDeleted event later in collapse listener
-            public void treeWillCollapse(final TreeExpansionEvent event) throws ExpandVetoException {
-                final DefaultMutableTreeNode collapsedNode = (DefaultMutableTreeNode) event.getPath().getLastPathComponent();
-                // X new rows are below the expanded node
-                final int nodeRow = treeTable.getRowForNode(collapsedNode);
-                final int fromRow = nodeRow + 1;
-                int toRow = nodeRow;
-                if( collapsedNode.getChildCount() > 0 ) {
-                    toRow += collapsedNode.getChildCount();
-                }
+    public boolean hasListener()
+    {
+        return isListenerActive;
+    }
 
-                final Enumeration<TreePath> e = treeTable.getTree().getExpandedDescendants(event.getPath());
-                // count children of this tree, and children of all expanded sub-children
-                while( e.hasMoreElements() ) {
-                    final DefaultMutableTreeNode n = (DefaultMutableTreeNode)e.nextElement().getLastPathComponent();
-                    toRow += n.getChildCount();
-                }
-                if( toRow < fromRow ) {
-                    toRow = fromRow;
-                }
-                collapsedToRow = toRow;
-            }
-        });
+    public void addListener()
+    {
+        if( !isListenerActive ) {
+            // Install a TreeWillExpandListener and a TreeExpansionListener which updates the JTable whenever JTree paths expand or collapse.
+            tree.addTreeWillExpandListener(listener);
+            tree.addTreeExpansionListener(listener);
 
-        tree.addTreeExpansionListener(new TreeExpansionListener() {
+            // Install a TreeModelListener which updates the JTable whenever the JTree gets new nodes or modifies existing nodes.
+            treeTableModel.addTreeModelListener(listener);
 
-            public void treeExpanded(final TreeExpansionEvent event) {
-                final DefaultMutableTreeNode expandedNode = (DefaultMutableTreeNode)event.getPath().getLastPathComponent();
-                // X new rows are below the expanded node
-                final int nodeRow = treeTable.getRowForNode(expandedNode);
-                final int fromRow = nodeRow + 1;
-                int toRow = nodeRow;
-                if( expandedNode.getChildCount() > 0 ) {
-                    toRow += expandedNode.getChildCount();
-                }
-                // check if new children are expanded too
-                final Enumeration<TreePath> e = treeTable.getTree().getExpandedDescendants(event.getPath());
-                // count children of this tree, and children of all expanded sub-children
-                while(e.hasMoreElements()) {
-                    final DefaultMutableTreeNode n = (DefaultMutableTreeNode)(e.nextElement()).getLastPathComponent();
-                    toRow += n.getChildCount();
-                }
-                if( toRow < fromRow ) {
-                    toRow = fromRow;
-                }
-//                System.out.println("treeExpanded, fromRow="+fromRow+", toRow="+toRow);
-                fireTableRowsInserted(fromRow, toRow);
-            }
+            isListenerActive = true;
+        }
+    }
 
-            // fire table event, use toRow computed in treeWillCollpaseListener
-            public void treeCollapsed(final TreeExpansionEvent event) {
-//                System.out.println("treeCollapsed");
-                final DefaultMutableTreeNode collapsedNode = (DefaultMutableTreeNode)event.getPath().getLastPathComponent();
-                final int nodeRow = treeTable.getRowForNode(collapsedNode);
-                final int fromRow = nodeRow + 1;
-                final int toRow = collapsedToRow;
-                fireTableRowsDeleted(fromRow, toRow);
-            }
-        });
-
-        // Installs a TreeModelListener that can update the table when
-        // the tree changes. We use delayedFireTableDataChanged as we can
-        // not be guaranteed the tree will have finished processing
-        // the event before us.
-        treeTableModel.addTreeModelListener(new TreeModelListener() {
-
-            public void treeNodesChanged(final TreeModelEvent e) {
-                final DefaultMutableTreeNode node = (DefaultMutableTreeNode)e.getTreePath().getLastPathComponent();
-                final int[] childIndices = e.getChildIndices();
-                // we always insert only one child at a time
-                if( childIndices.length != 1 ) {
-                    System.out.println("****** FIXME1: more than 1 child: "+childIndices.length+" ********");
-                }
-                // update the row for this node
-                final DefaultMutableTreeNode childNode = (DefaultMutableTreeNode)node.getChildAt(childIndices[0]);
-                final int row = treeTable.getRowForNode(childNode);
-                SwingUtilities.invokeLater(new Runnable() {
-                    public void run() {
-//                        System.out.println("treeNodesChanged: "+row);
-                        fireTableRowsUpdated(row, row);
-                    }
-                });
-            }
-
-            public void treeNodesInserted(final TreeModelEvent e) {
-                final DefaultMutableTreeNode node = (DefaultMutableTreeNode)e.getTreePath().getLastPathComponent();
-                final int[] childIndices = e.getChildIndices();
-                // we always insert only one child at a time
-                if( childIndices.length != 1 ) {
-                    System.out.println("****** FIXME2: more than 1 child: "+childIndices.length+" ********");
-                }
-                // compute row that was inserted
-//                System.out.println("a="+MainFrame.getInstance().getMessageTreeTable().getRowForNode(node));
-//                System.out.println("b="+childIndices[0]);
-//                System.out.println("c="+node);
-                // FIXME: fails again: 1st child of a thread selected, new message arrived and replaced the selected
-                //        message! new message was shown in preview and marked unread!
-                final int offset = 0;
-//                if( childIndices[0] == 0 ) {
-//                    offset = 0;
-//                } else {
-//                    offset = 1;
-//                }
-                final int row = treeTable.getRowForNode(node) + offset + childIndices[0];
-//                final int row = MainFrame.getInstance().getMessageTreeTable().getRowForNode(node) + 1 + childIndices[0];
-                SwingUtilities.invokeLater(new Runnable() {
-                    public void run() {
-//                        System.out.println("treeNodesInserted: "+row);
-                        fireTableRowsInserted(row, row);
-                    }
-                });
-            }
-
-            public void treeNodesRemoved(final TreeModelEvent e) {
-                System.out.println("treeNodesRemoved");
-                final DefaultMutableTreeNode node = (DefaultMutableTreeNode)e.getTreePath().getLastPathComponent();
-                final int[] childIndices = e.getChildIndices();
-                // we always remove only one child at a time
-                if( childIndices.length != 1 ) {
-                    System.out.println("****** FIXME3: more than 1 child: "+childIndices.length+" ********");
-                }
-                // ATTN: will getRowForNode work if node was already removed from tree?
-                //  -> we currently don't remove nodes from tree anywhere in Frost
-                final DefaultMutableTreeNode childNode = (DefaultMutableTreeNode)node.getChildAt(childIndices[0]);
-                final int row = treeTable.getRowForNode(childNode);
-                SwingUtilities.invokeLater(new Runnable() {
-                    public void run() {
-                        fireTableRowsDeleted(row, row);
-                    }
-                });
-            }
-
-            public void treeStructureChanged(final TreeModelEvent e) {
-//                delayedFireTableDataChanged();
-                fireTableDataChanged();
-            }
-        });
+    public void removeListener()
+    {
+        if( isListenerActive ) {
+            tree.removeTreeWillExpandListener(listener);
+            tree.removeTreeExpansionListener(listener);
+            treeTableModel.removeTreeModelListener(listener);
+            isListenerActive = false;
+        }
     }
 
     // Wrappers, implementing TableModel interface.
 
-    public int getColumnCount() {
+    @Override
+    public int getColumnCount()
+    {
         return treeTableModel.getColumnCount();
     }
 
     @Override
-    public String getColumnName(final int column) {
+    public String getColumnName(
+            final int column)
+    {
         return treeTableModel.getColumnName(column);
     }
 
     @Override
-    public Class<?> getColumnClass(final int column) {
+    public Class<?> getColumnClass(
+            final int column)
+    {
         return treeTableModel.getColumnClass(column);
     }
 
-    public int getRowCount() {
+    @Override
+    public int getRowCount()
+    {
         return tree.getRowCount();
     }
 
-    protected Object nodeForRow(final int row) {
+    // not in supertype, so no override
+    protected Object nodeForRow(
+            final int row)
+    {
         final TreePath treePath = tree.getPathForRow(row);
         if( treePath != null ) {
             return treePath.getLastPathComponent();
@@ -240,33 +136,203 @@ public class FreetalkTreeTableModelAdapter extends AbstractTableModel {
         }
     }
 
-    public Object getValueAt(final int row, final int column) {
+    @Override
+    public Object getValueAt(
+            final int row,
+            final int column)
+    {
         return treeTableModel.getValueAt(nodeForRow(row), column);
     }
 
-    public Object getRow(final int row) {
+    // not in supertype, so no override
+    public Object getRow(
+            final int row)
+    {
         return nodeForRow(row);
     }
 
     @Override
-    public boolean isCellEditable(final int row, final int column) {
+    public boolean isCellEditable(
+            final int row,
+            final int column)
+    {
         return treeTableModel.isCellEditable(nodeForRow(row), column);
     }
 
     @Override
-    public void setValueAt(final Object value, final int row, final int column) {
+    public void setValueAt(
+            final Object value,
+            final int row,
+            final int column)
+    {
         treeTableModel.setValueAt(value, nodeForRow(row), column);
     }
 
-//    /**
-//     * Invokes fireTableDataChanged after all the pending events have been processed. SwingUtilities.invokeLater is used
-//     * to handle this.
-//     */
-//    protected void delayedFireTableDataChanged() {
-//        SwingUtilities.invokeLater(new Runnable() {
-//            public void run() {
-//                fireTableDataChanged();
-//            }
-//        });
-//    }
+    /**
+    * This is a listener which passes tree modification events between the JTree and
+    * JTable of Frost's TreeTable implementation, so that they both stay in sync.
+    */
+    private class Listener
+            implements TreeWillExpandListener, TreeExpansionListener, TreeModelListener
+    {
+        private int collapsedVisibleDescendantsCount = -1;
+
+        public Listener() {}
+
+        @Override
+        public void treeWillCollapse(
+                final TreeExpansionEvent e)
+        throws ExpandVetoException
+        {
+            final TreePath collapsedPath = e.getPath();
+            if( collapsedPath == null ) { collapsedVisibleDescendantsCount = -1; return; }
+            final DefaultMutableTreeNode collapsedNode = (DefaultMutableTreeNode)collapsedPath.getLastPathComponent();
+            if( collapsedNode == null ) { collapsedVisibleDescendantsCount = -1; return; }
+
+            final int collapsedRow = tree.getRowForPath(collapsedPath);
+            if( collapsedRow < 0 && !collapsedNode.isRoot() ) {
+                return;
+            }
+
+            collapsedVisibleDescendantsCount = MessageTreeTableSmartUtils.getVisibleDescendantsCount(tree, collapsedPath);
+//                System.out.println("treeWillCollapse, collapsedRow="+collapsedRow+(collapsedRow < 0 ? " (root)" : ""));
+//                System.out.println("treeWillCollapse->visibleDescendants: "+collapsedVisibleDescendantsCount);
+        }
+
+        @Override
+        public void treeWillExpand(
+                final TreeExpansionEvent e)
+        throws ExpandVetoException
+        {
+        }
+
+        @Override
+        public void treeCollapsed(
+                final TreeExpansionEvent e)
+        {
+            if( collapsedVisibleDescendantsCount <= 0 ) {
+                return;
+            }
+
+            final TreePath collapsedPath = e.getPath();
+            if( collapsedPath == null ) { return; }
+            final DefaultMutableTreeNode collapsedNode = (DefaultMutableTreeNode)collapsedPath.getLastPathComponent();
+            if( collapsedNode == null ) { return; }
+
+            final int collapsedRow = tree.getRowForPath(collapsedPath);
+            if( collapsedRow < 0 && !collapsedNode.isRoot() ) {
+                return;
+            }
+
+            final int deleteFromRow = collapsedRow + 1;
+            final int deleteToRow = deleteFromRow + (collapsedVisibleDescendantsCount - 1);
+
+//                System.out.println("treeCollapsed, collapsedRow="+collapsedRow+(collapsedRow < 0 ? " (root)" : "")+", deleteFromRow="+deleteFromRow+", deleteToRow="+deleteToRow);
+//                System.out.println("treeCollapsed->visibleDescendants: "+collapsedVisibleDescendantsCount);
+            fireTableRowsDeleted(deleteFromRow, deleteToRow);
+        }
+
+        @Override
+        public void treeExpanded(
+                final TreeExpansionEvent e)
+        {
+            final TreePath expandedPath = e.getPath();
+            if( expandedPath == null ) { return; }
+            final DefaultMutableTreeNode expandedNode = (DefaultMutableTreeNode)expandedPath.getLastPathComponent();
+            if( expandedNode == null ) { return; }
+
+            if( expandedNode.getChildCount() <= 0 ) {
+                return;
+            }
+
+            final int visibleDescendantsCount = MessageTreeTableSmartUtils.getVisibleDescendantsCount(tree, expandedPath);
+
+            if( visibleDescendantsCount <= 0 ) {
+                return;
+            }
+
+            SwingUtilities.invokeLater(new Runnable() {
+                public void run() {
+                    final int expandedRow = tree.getRowForPath(expandedPath);
+                    if( expandedRow < 0 && !expandedNode.isRoot() ) {
+                        return;
+                    }
+
+                    final int insertFromRow = expandedRow + 1;
+                    final int insertToRow = insertFromRow + (visibleDescendantsCount - 1);
+
+//                        System.out.println("treeExpanded, expandedRow="+expandedRow+(expandedRow < 0 ? " (root)" : "")+", insertFromRow="+insertFromRow+", insertToRow="+insertToRow);
+//                        System.out.println("treeExpanded->visibleDescendants: "+visibleDescendantsCount);
+                    MessageTreeTableSmartUtils.smartFireTreeTableRowsInserted(treeTable, FreetalkTreeTableModelAdapter.this, insertFromRow, insertToRow);
+                }
+            });
+        }
+
+        @Override
+        public void treeNodesChanged(
+                final TreeModelEvent e)
+        {
+            SwingUtilities.invokeLater(new Runnable() {
+                public void run() {
+                    final Object[] changedNodes = e.getChildren();
+                    if( changedNodes == null ) { return; }
+                    for( int i=0; i<changedNodes.length; ++i ) {
+                        final DefaultMutableTreeNode thisNode = (DefaultMutableTreeNode)changedNodes[i];
+                        if( thisNode == null ) { continue; }
+                        final TreePath thisPath = new TreePath(thisNode.getPath());
+
+                        int changedRow = tree.getRowForPath(thisPath);
+                        if( changedRow < 0 ) {
+                            return;
+                        }
+
+//                            System.out.println("treeNodesChanged, changedRow="+changedRow);
+                        fireTableRowsUpdated(changedRow, changedRow);
+                    }
+                }
+            });
+        }
+
+        @Override
+        public void treeNodesInserted(
+                final TreeModelEvent e)
+        {
+            SwingUtilities.invokeLater(new Runnable() {
+                public void run() {
+                    final Object[] insertedNodes = e.getChildren();
+                    if( insertedNodes == null ) { return; }
+                    for( int i=0; i<insertedNodes.length; ++i ) {
+                        final DefaultMutableTreeNode thisNode = (DefaultMutableTreeNode)insertedNodes[i];
+                        if( thisNode == null ) { continue; }
+                        final TreePath thisPath = new TreePath(thisNode.getPath());
+
+                        int insertFromRow = tree.getRowForPath(thisPath);
+                        if( insertFromRow < 0 ) {
+                            return;
+                        }
+
+//                            System.out.println("treeNodesInserted, insertFromRow="+insertFromRow+", insertToRow="+insertFromRow+" (visibleDescendants ignored)");
+                        MessageTreeTableSmartUtils.smartFireTreeTableRowsInserted(treeTable, FreetalkTreeTableModelAdapter.this, insertFromRow, insertFromRow);
+                    }
+                }
+            });
+        }
+
+        @Override
+        public void treeNodesRemoved(
+                final TreeModelEvent e)
+        {
+            System.out.println("**** DEVELOPER WARNING: YOU ARE TRYING TO DELETE NODES FROM A JTREE. YOU WILL HAVE TO MANUALLY CHECK IF TREENODESREMOVED() WORKS PROPERLY.");
+//                System.out.println("treeNodesRemoved");
+            fireTableDataChanged();
+        }
+
+        @Override
+        public void treeStructureChanged(
+                final TreeModelEvent e)
+        {
+//                System.out.println("treeStructureChanged");
+            fireTableDataChanged();
+        }
+    }
 }

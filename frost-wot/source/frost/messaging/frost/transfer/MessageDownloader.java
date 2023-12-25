@@ -159,8 +159,8 @@ public class MessageDownloader {
                     return new MessageDownloaderResult(MessageDownloaderResult.INVALID_MSG);
                 }
 
-                // check and maybe add msg to gui, set to unsigned
-                currentMsg.setSignatureStatusOLD();
+                // check and maybe add msg to gui, set to unsigned (NONE)
+                currentMsg.setSignatureStatusNONE();
 
                 return new MessageDownloaderResult(currentMsg);
             }

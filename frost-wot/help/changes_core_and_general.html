@@ -1,0 +1,188 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="Content-Style-Type" content="text/css">
+    <link rel="stylesheet" href="style.css" type="text/css">
+    <title>Changes: Core and General (Frost-Next)</title>
+  </head>
+<body>
+<h1>Changes: Core and General (Frost-Next)</h1>
+<p><a href="index.html">Back to Help Index</a></p>
+<table class="cltable" cellspacing="0" cellpadding="0">
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">1.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>We now validate whether legacy Frost users have properly upgraded to Next, by making sure that they're <i>actually</i> running the latest versions of the required libraries. If they've been impatient and made a mistake, they are referred to UPGRADING.txt for upgrade instructions.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">2.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>If you are upgrading from a legacy version of Frost, it detects that you're upgrading and <i>automatically</i> migrates your settings to <i>all</i> of the <i>important</i> new defaults, and converts all of your databases to the new format. It also deletes all of the ancient frost.ini settings that no longer exist in Next. This migration only happens on the first launch, and is intended to make the upgrade experience smooth and consistent for everybody. Note that you cannot downgrade to an older Frost version after your databases have been converted to the new format, but who would be insane enough to want to <i>downgrade</i> to the old, extremely buggy Frost mess?</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">3.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>We now require Java 1.8+ with JavaFX 2.1+ (which is the Java version from April 27th, 2012), due to the nearly 500 security vulnerabilities fixed since Java 1.6 and 1.7, as well as countless new Java features that were <i>vital</i> for cleanly implementing many of the modern Frost-Next features. The popular, open-source OpenJDK should also be fully supported as long as your version of it contains JavaFX.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">4.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Intelligent application launcher which detects if you're running an old version of Java and tells you how to upgrade to Java 1.8 or later.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">5.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Added Oracle to the list of supported Java vendors, to avoid vendor-warning at Frost startup. They purchased Java from Sun in 2010.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">6.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Increased the size of all database memory buffers. Among other things, this improves Frost's performance when searching for messages and when switching back and forth between different boards, since more of the previous board's messages will still be in memory when you switch back to it, and it won't have to read from the hard disk as much.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">7.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Tightened the database backup interval from once per hour to twice per hour (every 30 minutes). This backs up your board list, own identities, and your file transfer queue. If your computer ever crashes, you won't lose as much data anymore since it's now backing up more frequently.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">8.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>No more "### INFO - Unhandled msg: ExpectedDataLength" and similar spam in the console logs. We now handle <i>all</i> Freenet status messages as of late 2015, and we instruct the node to only send us the messages that we know about, so that this problem will never return in the future.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">9.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Frost's "process launcher" code has been completely scrapped and rewritten. It now uses clean, modern code which is capable of opening files with their associated applications and launching executables (for the user's "run program at download/upload completion" feature). One of the most serious issues in the old code was that it didn't consume the output of the program it launched, which meant that the operating system buffers would fill up and crash the program. But that was <i>if</i> the old code even succeeded in launching the program in the first place, which it totally failed to do on modern Linux distributions. The new code fixes all of that and is future-proof.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">10.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Fixed several important bugs related to double-clicking on frost.jar: On some systems, the "current working dir" when double clicking doesn't match the frost.jar folder, which meant that it could not open help.zip (so the help menu didn't work), and it could not load the default list of auto-subscribed boards (the list to the left in the GUI). Those were critical files that frost <i>needs</i> access to; everything else is either readme.txt-style files or a few launch scripts or folders and files that are auto-created at startup. New code now allows Frost to locate those files even when it has been launched via double-clicking. It still isn't recommended to double-click since there's no guarantee where Frost will be storing its databases and configurations when you do that, but at least it now behaves much better.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">11.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Increased Frost's default maximum memory limit from 192 MiB to 384 MiB, to help with loading large boards. This only applies if you start Frost via frost.bat or frost.sh (which is what you're supposed to be using).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">12.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>The release-zip built by ant now contains a top-level folder for the first time, which makes it easier for people to extract Frost-Next than ever before.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">13.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed lots of tiny memory leaks (~100 of them) all over Frost wherever it was reading/writing files or network sockets. It wasn't always closing the files or sockets after it was done with the work. It was mostly happening if there was a problem/exception which skipped the normal cleanup code, but in almost 30% of the cases it simply wasn't closing them <i>at all</i> even if there was no error. These memory leak fixes make Frost more stable and saves memory.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">14.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed multiple security issues in Frost's HTML safety checks.</p>
+    <ul>
+      <li>Frost loads its help-pages from help.zip and scans them for external web links and refuses to load the help.zip if it contains any web links. But it only scanned ".htm" and ".html" files; it didn't scan any other extension cases like ".HTML", so someone could craft a malicious help.zip with an evil ".HTML" file and bundle it with the real Frost. This allowed attackers to sneak in web links to external sites/files into the help, in order to catch the IPs of people using Frost. That has now been fixed, so that it checks all html files regardless of file extension case.</li>
+      <li>It didn't check for malicious https links. It only checked for http, ftp and nntp. <i>All</i> external web links are now detected.</li>
+      <li>The HTML integrity checker incorrectly re-used the previous state of the previous scan, so if multiple files were checked (not just help.zip), and scan1 was secure but scan2 was insecure, it would wrongly return "secure" for both.</li>
+    </ul>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">15.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed a bug in frost.sh (the Unix/Linux/Mac launcher script), which had trouble if there were multiple spaces in a row in the path to frost.jar. Also rewrote the symbolic link resolution parser in the script, so that it always works.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">16.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>The "frost.sh" and "frost-debug.sh" scripts (and all other .sh shell scripts) are now executable by default, so that you no longer have to fix that manually every time you install Frost.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">17.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>The various Windows ".bat" launchers are now completely reliable. They now set the correct working directory for Frost and its utilities, so that you are able to right-click and use "Run as Administrator", or even execute the batch file from a different folder without any issues.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">18.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Robust operating system detection code which triggers necessary workarounds for various Operating System-specific bugs in Java itself, such as the very serious bug known as "JDK-4715154" (which made it impossible to delete files on Windows, but has now got a workaround in Next).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_developer">DEVELOPER</div><div class="clindex">19.</div></td>
+  <td class="cldesc"><div class="cldesc_developer">
+    <p>Advanced, new build script which grabs all dependencies, prepares application resources, generates beautiful in-app documentation, and builds Frost-Next.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_developer">DEVELOPER</div><div class="clindex">20.</div></td>
+  <td class="cldesc"><div class="cldesc_developer">
+    <p>Made it possible to compile using Java 8 by fixing all of the clashes with Java's new, built-in libraries.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_developer">DEVELOPER</div><div class="clindex">21.</div></td>
+  <td class="cldesc"><div class="cldesc_developer">
+    <p>Enabled strict error checking in the Java compiler and painstakingly rewrote <i>all</i> of the <i>thousands</i> of syntax errors and ambiguous lines of code, so that it now compiles cleanly with zero compiler warnings anymore.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_developer">DEVELOPER</div><div class="clindex">22.</div></td>
+  <td class="cldesc"><div class="cldesc_developer">
+    <p>New ant build.xml file which streamlines the compilation process and supports compiling all new features.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_developer">DEVELOPER</div><div class="clindex">23.</div></td>
+  <td class="cldesc"><div class="cldesc_developer">
+    <p>Updated HOWTO-BUILD.txt to explain the build process, but most people will of course be compiling via build.sh and won't even see it.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_developer">DEVELOPER</div><div class="clindex">24.</div></td>
+  <td class="cldesc"><div class="cldesc_developer">
+    <p>Updated all third party libraries to their latest versions, for increased stability and performance.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_developer">DEVELOPER</div><div class="clindex">25.</div></td>
+  <td class="cldesc"><div class="cldesc_developer">
+    <p>Migrated to the latest Joda Time library, which entailed rewriting all TimeOfDay objects to DateTime instead and switching "toDateMidnight()" to "withTimeAtStartOfDay()". This solved 40+ compiler warnings due to the deprecation of Joda's buggy, <i>old</i> method of calculating the midnight timestamp.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_developer">DEVELOPER</div><div class="clindex">26.</div></td>
+  <td class="cldesc"><div class="cldesc_developer">
+    <p>We now show Frost's maximum memory limit as a human-readable value in the terminal at startup, such as "MaxMemory: 179306496 (171.00 MiB)".</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_developer">DEVELOPER</div><div class="clindex">27.</div></td>
+  <td class="cldesc"><div class="cldesc_developer">
+    <p>Removed all old documentation cruft (old, weird, rambling Frost text documents in German that were over a decade out of date).</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_developer">DEVELOPER</div><div class="clindex">28.</div></td>
+  <td class="cldesc"><div class="cldesc_developer">
+    <p>No more version numbers. Frost-Next is the next and final generation. The old, legacy Frost has been dead for half a decade, and the old developers have shown that they're <i>completely incapable</i> of producing bug-free code. Next takes care of <i>all</i> of the <i>hundreds</i> of <i>very serious</i> bugs that they left behind, and adds all of the features that people have been dreaming of over the years. Next is <i>one</i> release: Frost-Next. That's it. You're welcome.</p>
+  </div></td>
+</tr>
+</table>
+</body>
+</html>

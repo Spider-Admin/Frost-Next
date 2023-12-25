@@ -26,6 +26,7 @@ import frost.*;
 import frost.fcp.fcp07.*;
 import frost.fcp.fcp07.freetalk.FcpFreetalkConnection.*;
 import frost.messaging.freetalk.*;
+import frost.util.gui.MiscToolkit;
 
 /**
  * Callback for PutMessage command.
@@ -60,11 +61,11 @@ public class PutMessageCallback implements FreetalkNodeMessageCallback {
         final String errorDesc = nodeMsg.getStringValue("Replies.ErrorDescription");
 
         if (!msgEnqueued) {
-            JOptionPane.showMessageDialog(
+            MiscToolkit.showMessageDialog(
                     mainFrame,
                     "Error Description: "+errorDesc,
                     "Error sending message to Freetalk",
-                    JOptionPane.ERROR_MESSAGE);
+                    MiscToolkit.ERROR_MESSAGE);
         }
     }
 }

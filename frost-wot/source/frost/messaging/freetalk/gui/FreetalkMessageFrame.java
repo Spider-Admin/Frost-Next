@@ -21,12 +21,15 @@ package frost.messaging.freetalk.gui;
 import java.awt.*;
 import java.awt.datatransfer.*;
 import java.awt.event.*;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import java.io.*;
 import java.util.*;
 import java.util.List;
 import java.util.logging.*;
 
 import javax.swing.*;
+import javax.swing.KeyStroke;
 import javax.swing.event.*;
 import javax.swing.text.*;
 
@@ -43,6 +46,10 @@ import frost.messaging.freetalk.identities.*;
 import frost.messaging.frost.boards.*;
 import frost.util.*;
 import frost.util.gui.*;
+import frost.util.gui.CompoundUndoManager;
+import frost.util.gui.SmartFileFilters;
+import frost.util.gui.search.FindAction;
+import frost.util.gui.search.TextComponentFindAction;
 import frost.util.gui.textpane.*;
 import frost.util.gui.translation.*;
 
@@ -72,14 +79,14 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
     private JSkinnablePopupMenu attFilesPopupMenu;
     private MessageBodyPopupMenu messageBodyPopupMenu;
 
-    private final JButton Bsend = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/mail-forward.png"));
-    private final JButton Bcancel = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/user-trash.png"));
+    private final JButton Bsend = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/mail-send.png"));
+    private final JButton Bcancel = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/mail-discard.png"));
     private final JButton BattachFile = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/mail-attachment.png"));
 //    private final JButton BattachBoard = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/internet-group-chat.png"));
 
 //    private final JCheckBox sign = new JCheckBox();
 //    private final JCheckBox encrypt = new JCheckBox();
-//    private JComboBox buddies;
+//    private JComboBox<Identity> buddies;
 
     private final JLabel Lboard = new JLabel();
     private final JLabel Lfrom = new JLabel();
@@ -94,9 +101,11 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
     private String oldSender = null;
     private String currentSignature = null;
 
+    private CompoundUndoManager undoManager = null;
+
     private FreetalkMessage repliedMessage = null;
 
-    private JComboBox ownIdentitiesComboBox = null;
+    private JComboBox<Object> ownIdentitiesComboBox = null;
 
     private static int openInstanceCount = 0;
 
@@ -118,12 +127,15 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
             frostSettings.setValue(SettingsClass.MESSAGE_BODY_FONT_NAME, "Monospaced");
             tofFont = new Font("Monospaced", fontStyle, fontSize);
         }
+        messageTextArea.setForeground(Color.BLACK);
         messageTextArea.setFont(tofFont);
         messageTextArea.setAntiAliasEnabled(frostSettings.getBoolValue(SettingsClass.MESSAGE_BODY_ANTIALIAS));
         final ImmutableAreasDocument messageDocument = new ImmutableAreasDocument();
         headerArea = new ImmutableArea(messageDocument);
         messageDocument.addImmutableArea(headerArea); // user must not change the header of the message
         messageTextArea.setDocument(messageDocument);
+        final FindAction findAction = new TextComponentFindAction();
+        findAction.install(messageTextArea);
 //        textHighlighter = new TextHighlighter(Color.LIGHT_GRAY);
         addWindowListener(new WindowAdapter() {
             @Override
@@ -138,16 +150,62 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
         setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
     }
 
+    /**
+     * Returns true if the user has written some non-whitespace content in the message or edited
+     * their signature area. Otherwise false.
+     */
+    private boolean hasUserEdit() {
+        boolean hasUserEdit = false;
+        try {
+            // first get all text after the header area, including all empty newlines
+            final Document doc = messageTextArea.getDocument();
+            final int offset = headerArea.getEndPos();
+            final int length = doc.getLength() - offset;
+            String userText = doc.getText(offset, length);
+
+            // now remove the user's signature if they have one and it *hasn't* been manually edited
+            if( currentSignature != null ) {
+                final int sigLength = currentSignature.length();
+                final int sigStartOffset = userText.length() - sigLength;
+                final int sigEndOffset = sigStartOffset + sigLength;
+                if( sigStartOffset >= 0 && sigEndOffset <= userText.length() ) {
+                    final String checkSignature = userText.substring(sigStartOffset, sigEndOffset);
+                    if( checkSignature.equals(currentSignature) ) {
+                        // found an unedited signature at the end of the document; so just remove it
+                        userText = userText.substring(0, sigStartOffset); // grabs to endIndex - 1
+                    }
+                }
+            }
+
+            // lastly, trim the remaining user-written text to see if there's any non-whitespace content
+            userText = userText.trim();
+            if( ! userText.isEmpty() ) {
+                hasUserEdit = true;
+            }
+        } catch( final Exception e ) {}
+        return hasUserEdit;
+    }
+
     private void windowIsClosing() {
-        final String title = language.getString("MessageFrame.discardMessage.title");
-        final String text = language.getString("MessageFrame.discardMessage.text");
-        final int answer = JOptionPane.showConfirmDialog(
-                this,
-                text,
-                title,
-                JOptionPane.YES_NO_OPTION,
-                JOptionPane.WARNING_MESSAGE);
-        if( answer == JOptionPane.YES_OPTION ) {
+        boolean discardMessage = false;
+        // determine if the user has edited the document, and don't prompt them to confirm
+        // closing an unedited message, since there's no work to be lost by doing that
+        if( ! hasUserEdit() ) {
+            // they haven't edited the document, so just discard it without confirmation
+            discardMessage = true;
+        } else {
+            // ask them to confirm throwing away their edited, unsent message
+            final int answer = MiscToolkit.showConfirmDialog(
+                    this,
+                    language.getString("MessageFrame.discardMessage.text"),
+                    language.getString("MessageFrame.discardMessage.title"),
+                    MiscToolkit.YES_NO_OPTION,
+                    MiscToolkit.WARNING_MESSAGE);
+            if( answer == MiscToolkit.YES_OPTION ) {
+                discardMessage = true;
+            }
+        }
+        if( discardMessage ) {
             dispose();
         }
     }
@@ -179,11 +237,11 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
 //
 //            if (privKey != null) {
 //                final int answer =
-//                    JOptionPane.showConfirmDialog(this,
+//                    MiscToolkit.showConfirmDialog(this,
 //                        language.formatMessage("MessageFrame.attachBoard.sendPrivateKeyConfirmationDialog.body", chosedBoard.getName()),
 //                        language.getString("MessageFrame.attachBoard.sendPrivateKeyConfirmationDialog.title"),
-//                        JOptionPane.YES_NO_OPTION);
-//                if (answer == JOptionPane.NO_OPTION) {
+//                        MiscToolkit.YES_NO_OPTION);
+//                if( answer != MiscToolkit.YES_OPTION ) {
 //                    privKey = null; // don't provide privkey
 //                }
 //            }
@@ -197,12 +255,18 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
 //    }
 
     private void attachFile_actionPerformed(final ActionEvent e) {
-        final String lastUsedDirectory = frostSettings.getValue(SettingsClass.DIR_LAST_USED);
-        final JFileChooser fc = new JFileChooser(lastUsedDirectory);
+        final JFileChooser fc = new JFileChooser(frostSettings.getValue(SettingsClass.DIR_LAST_USED));
         fc.setDialogTitle(language.getString("MessageFrame.fileChooser.title"));
-        fc.setFileHidingEnabled(false);
-        fc.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
-        fc.setMultiSelectionEnabled(true);
+        fc.setFileHidingEnabled(true); // hide hidden files
+        fc.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES); // accept both files and directories
+        fc.setMultiSelectionEnabled(true); // accept multiple files
+        SmartFileFilters.installDefaultFilters(fc, language); // install all common file filters
+        // let the L&F decide the dialog width (so that all labels fit), but we'll still set a minimum
+        // height and width so that the user never gets a cramped dialog
+        final Dimension fcSize = fc.getPreferredSize();
+        if( fcSize.width < 650 ) { fcSize.width = 650; }
+        if( fcSize.height < 450 ) { fcSize.height = 450; }
+        fc.setPreferredSize(fcSize);
 
         final int returnVal = fc.showOpenDialog(FreetalkMessageFrame.this);
         if( returnVal == JFileChooser.APPROVE_OPTION ) {
@@ -241,7 +305,7 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
             newText += "\n\n";
         }
 
-        if (frostSettings.getBoolValue("useAltEdit")) {
+        if (frostSettings.getBoolValue(SettingsClass.ALTERNATE_EDITOR_ENABLED)) {
             // build our transfer object that the parser will provide us in its callback
             final TransferObject to = new TransferObject();
             to.newBoard = newBoard;
@@ -326,8 +390,8 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
 
 //        sign.setEnabled(false);
 //
-//        final ImageIcon signedIcon = MiscToolkit.loadImageIcon("/data/signed.gif");
-//        final ImageIcon unsignedIcon = MiscToolkit.loadImageIcon("/data/unsigned.gif");
+//        final ImageIcon signedIcon = MiscToolkit.loadImageIcon("/data/toolbar/message-signed.png");
+//        final ImageIcon unsignedIcon = MiscToolkit.loadImageIcon("/data/toolbar/message-unsigned.png");
 //        sign.setDisabledSelectedIcon(signedIcon);
 //        sign.setDisabledIcon(unsignedIcon);
 //        sign.setSelectedIcon(signedIcon);
@@ -411,7 +475,7 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
 //            // maybe append a signature
 //            final LocalIdentity li = (LocalIdentity)getOwnIdentitiesComboBox().getSelectedItem();
 //            if( li.getSignature() != null ) {
-//                currentSignature = "\n-- \n" + li.getSignature();
+//                currentSignature = "\n--\n" + li.getSignature();
 //                newText += currentSignature;
 //            }
 //        }
@@ -432,6 +496,20 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
         messageTextArea.requestFocusInWindow();
         messageTextArea.getCaret().setDot(caretPos);
         messageTextArea.getCaret().setVisible(true);
+
+        // attach the undo/redo handler (we have to do this last so that none of our internal editing above gets recorded)
+        undoManager = new CompoundUndoManager(messageTextArea);
+        messageTextArea.getActionMap().put("Undo", undoManager.getUndoAction());
+        messageTextArea.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_MASK, true), "Undo"); // ctrl + z
+        messageTextArea.getActionMap().put("Redo", undoManager.getRedoAction());
+        messageTextArea.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_MASK | InputEvent.SHIFT_MASK, true), "Redo"); // ctrl + shift + z
+        messageTextArea.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_Y, InputEvent.CTRL_MASK, true), "Redo"); // ctrl + y
+    }
+
+    private void resetUndoManager() {
+        if( undoManager != null ) {
+            undoManager.discardAllEdits();
+        }
     }
 
     public void composeNewMessage(final FreetalkBoard newBoard, final String newSubject, final String newText) {
@@ -468,7 +546,7 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
 
     private MessageBodyPopupMenu getMessageBodyPopupMenu() {
         if (messageBodyPopupMenu == null) {
-            messageBodyPopupMenu = new MessageBodyPopupMenu(messageTextArea);
+            messageBodyPopupMenu = new MessageBodyPopupMenu(messageTextArea, undoManager);
         }
         return messageBodyPopupMenu;
     }
@@ -489,7 +567,7 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
             filesTable.addMouseListener(listener);
 
 // FIXME: option to show own identities in list, or to hide them
-//            final List<Identity> budList = Core.getIdentities().getAllGOODIdentities();
+//            final List<Identity> budList = Core.getIdentities().getAllFRIENDIdentities();
 //            Identity id = null;
 //            if( repliedMessage != null ) {
 //                id = repliedMessage.getAuthor();
@@ -497,16 +575,16 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
 //            if( budList.size() > 0 || id != null ) {
 //                Collections.sort( budList, new BuddyComparator() );
 //                if( id != null ) {
-//                    if( id.isGOOD() == true ) {
+//                    if( id.isFRIEND() == true ) {
 //                        budList.remove(id); // remove before put to top of list
 //                    }
 //                    // add id to top of list in case the user enables 'encrypt'
 //                    budList.add(0, id);
 //                }
-//                buddies = new JComboBox(new Vector<Identity>(budList));
+//                buddies = new JComboBox<Identity>(new Vector<Identity>(budList));
 //                buddies.setSelectedItem(budList.get(0));
 //            } else {
-//                buddies = new JComboBox();
+//                buddies = new JComboBox<Identity>();
 //            }
 //            buddies.setMaximumSize(new Dimension(300, 25)); // dirty fix for overlength combobox on linux
 
@@ -541,7 +619,9 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
             });
             Bcancel.addActionListener(new java.awt.event.ActionListener() {
                 public void actionPerformed(final ActionEvent e) {
-                    windowIsClosing();
+                    // create an event which acts exactly as if the user pressed the X, to close the window and dispose() it
+                    final WindowEvent closingEvent = new WindowEvent(FreetalkMessageFrame.this, WindowEvent.WINDOW_CLOSING);
+                    Toolkit.getDefaultToolkit().getSystemEventQueue().postEvent(closingEvent);
                 }
             });
             BattachFile.addActionListener(new java.awt.event.ActionListener() {
@@ -693,6 +773,17 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
 
             initPopupMenu();
 
+            // keyboard shortcuts for compose window (reacts regardless of which component in the window is focused)
+            panelMain.getActionMap().put("CloseAction", new javax.swing.AbstractAction() {
+                public void actionPerformed(final ActionEvent event) {
+                    // create an event which acts exactly as if the user pressed the X, to close the window and dispose() it
+                    // NOTE: if they've written something, they will be asked whether to discard unsaved work
+                    final WindowEvent closingEvent = new WindowEvent(FreetalkMessageFrame.this, WindowEvent.WINDOW_CLOSING);
+                    Toolkit.getDefaultToolkit().getSystemEventQueue().postEvent(closingEvent);
+                }
+            });
+            panelMain.getInputMap(JPanel.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_W, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask(), true), "CloseAction"); // ctrl + w on Windows/Linux, cmd + w on Mac
+
             pack();
 
             // window is now packed to needed size. Check if packed width is smaller than
@@ -764,7 +855,7 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
 //    }
 
     protected void removeSelectedItemsFromTable( final JTable tbl ) {
-        final SortedTableModel m = (SortedTableModel)tbl.getModel();
+        final SortedTableModel<? extends TableMember<?>> m = (SortedTableModel<? extends TableMember<?>>)tbl.getModel();
         final int[] sel = tbl.getSelectedRows();
         for(int x=sel.length-1; x>=0; x--)
         {
@@ -815,39 +906,39 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
         subjectTextField.setText(subject); // if a pbl occurs show the subject we checked
         final String text = messageTextArea.getText().trim();
 
-        if( subject.equals("No subject") ) {
-            final int n = JOptionPane.showConfirmDialog( this,
-                                language.getString("MessageFrame.defaultSubjectWarning.text"),
-                                language.getString("MessageFrame.defaultSubjectWarning.title"),
-                                JOptionPane.YES_NO_OPTION,
-                                JOptionPane.QUESTION_MESSAGE);
-            if( n == JOptionPane.YES_OPTION ) {
-                return;
-            }
+        if( subject.equalsIgnoreCase("No subject") || subject.equalsIgnoreCase("Re: No subject") ) {
+            // we do not allow "No subject" posts; warn the user and return them to the compose window
+            MiscToolkit.showMessageDialog( this,
+                    language.getString("MessageFrame.defaultSubjectWarning.text"),
+                    language.getString("MessageFrame.defaultSubjectWarning.title"),
+                    MiscToolkit.WARNING_MESSAGE);
+            subjectTextField.requestFocusInWindow();
+            return;
         }
 
         if( subject.length() == 0) {
-            JOptionPane.showMessageDialog( this,
+            MiscToolkit.showMessageDialog( this,
                                 language.getString("MessageFrame.noSubjectError.text"),
                                 language.getString("MessageFrame.noSubjectError.title"),
-                                JOptionPane.ERROR);
+                                MiscToolkit.ERROR_MESSAGE);
+            subjectTextField.requestFocusInWindow();
             return;
         }
         if( from.length() == 0) {
-            JOptionPane.showMessageDialog( this,
+            MiscToolkit.showMessageDialog( this,
                                 language.getString("MessageFrame.noSenderError.text"),
                                 language.getString("MessageFrame.noSenderError.title"),
-                                JOptionPane.ERROR);
+                                MiscToolkit.ERROR_MESSAGE);
+            getOwnIdentitiesComboBox().requestFocusInWindow();
             return;
         }
 
-        final int idLinePos = headerArea.getStartPos();
-        final int idLineLen = headerArea.getEndPos() - headerArea.getStartPos();
-        if( text.length() == headerArea.getEndPos() ) {
-            JOptionPane.showMessageDialog( this,
+        if( ! hasUserEdit() ) { // must have at least 1 non-whitespace edit in their msg area
+            MiscToolkit.showMessageDialog( this,
                     language.getString("MessageFrame.noContentError.text"),
                     language.getString("MessageFrame.noContentError.title"),
-                    JOptionPane.ERROR_MESSAGE);
+                    MiscToolkit.ERROR_MESSAGE);
+            messageTextArea.requestFocusInWindow();
             return;
         }
 
@@ -858,6 +949,8 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
         }
         frostSettings.setValue("freetalkAddress."+board.getName(), from);
 
+        final int idLinePos = headerArea.getStartPos();
+        final int idLineLen = headerArea.getEndPos() - headerArea.getStartPos();
 //        final FrostUnsentMessageObject newMessage = new FrostUnsentMessageObject();
 //        newMessage.setMessageId(Mixed.createUniqueId()); // new message, create a new unique msg id
 //        newMessage.setInReplyTo(repliedMsgId);
@@ -894,10 +987,10 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
 //        if( encrypt.isSelected() ) {
 //            recipient = (Identity)buddies.getSelectedItem();
 //            if( recipient == null ) {
-//                JOptionPane.showMessageDialog( this,
+//                MiscToolkit.showMessageDialog( this,
 //                        language.getString("MessageFrame.encryptErrorNoRecipient.body"),
 //                        language.getString("MessageFrame.encryptErrorNoRecipient.title"),
-//                        JOptionPane.ERROR);
+//                        MiscToolkit.ERROR_MESSAGE);
 //                return;
 //            }
 //            newMessage.setRecipientName(recipient.getUniqueName());
@@ -944,34 +1037,34 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
     }
 
     private void senderChanged(final FreetalkOwnIdentity selectedId) {
-
-//        boolean isSigned;
-//        if( selectedId == null ) {
-//            isSigned = false;
-//        } else {
-//            isSigned = true;
-//        }
-
-//        sign.setSelected(isSigned);
+//        try {
+//            boolean isSigned = ( selectedId != null );
+//            sign.setSelected(isSigned);
 //
-//        if (isSigned) {
-//            if( buddies.getItemCount() > 0 ) {
-//                encrypt.setEnabled(true);
-//                if( encrypt.isSelected() ) {
-//                    buddies.setEnabled(true);
-//                } else {
-//                    buddies.setEnabled(false);
+//            if( isSigned ) {
+//                if( buddies.getItemCount() > 0 ) {
+//                    encrypt.setEnabled(true);
+//                    if( encrypt.isSelected() ) {
+//                        buddies.setEnabled(true);
+//                    } else {
+//                        buddies.setEnabled(false);
+//                    }
 //                }
-//            }
 //
-//            removeSignatureFromText(currentSignature); // remove signature if existing
-//            currentSignature = addSignatureToText(selectedId.getSignature()); // add new signature if not existing
-//        } else {
-//            encrypt.setSelected(false);
-//            encrypt.setEnabled(false);
-//            buddies.setEnabled(false);
-//            removeSignatureFromText(currentSignature); // remove signature if existing
-//            currentSignature = null;
+//                removeSignatureFromText(currentSignature); // remove signature if existing
+//                currentSignature = addSignatureToText(selectedId.getSignature()); // add new signature if not existing
+//            } else {
+//                encrypt.setSelected(false);
+//                encrypt.setEnabled(false);
+//                buddies.setEnabled(false);
+//                removeSignatureFromText(currentSignature); // remove signature if existing
+//                currentSignature = null;
+//            }
+//        } finally {
+//            // throw away entire undo-history to prevent user from undoing the changes to the
+//            // signature from switching identity. it's unfortunately the only way to solve this
+//            // since we cannot update the otherwise-invalid offsets of previous edits.
+//            resetUndoManager();
 //        }
     }
 
@@ -979,7 +1072,7 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
         if( sig == null ) {
             return null;
         }
-        final String newSig = "\n-- \n" + sig;
+        final String newSig = "\n--\n" + sig;
         if (!messageTextArea.getText().endsWith(newSig)) {
             try {
                 messageTextArea.getDocument().insertString(messageTextArea.getText().length(), newSig, null);
@@ -1028,6 +1121,11 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
 //            textHighlighter.highlight(messageTextArea, headerArea.getStartPos(), headerArea.getEndPos()-headerArea.getStartPos(), true);
         } catch (final BadLocationException exception) {
             logger.log(Level.SEVERE, "Error while updating the message header", exception);
+        } finally {
+            // throw away entire undo-history to prevent user from undoing the changes to the
+            // header-area from switching identity. it's unfortunately the only way to solve this
+            // since we cannot update the otherwise-invalid offsets of previous edits.
+            resetUndoManager();
         }
 //        String s= messageTextArea.getText().substring(headerArea.getStartPos(), headerArea.getEndPos());
 //        System.out.println("DBG: "+headerArea.getStartPos()+" ; "+headerArea.getEndPos()+": '"+s+"'");
@@ -1051,9 +1149,9 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
         }
     }
 
-    private JComboBox getOwnIdentitiesComboBox() {
+    private JComboBox<Object> getOwnIdentitiesComboBox() {
         if( ownIdentitiesComboBox == null ) {
-            ownIdentitiesComboBox = new JComboBox();
+            ownIdentitiesComboBox = new JComboBox<Object>();
             // sort own unique names
             final TreeMap<String,FreetalkOwnIdentity> sortedIds = new TreeMap<String,FreetalkOwnIdentity>();
             for (final Object element : FreetalkManager.getInstance().getOwnIdentities()) {
@@ -1140,15 +1238,22 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
         private Clipboard clipboard;
 
         private final JTextComponent sourceTextComponent;
+        private final CompoundUndoManager sourceUndoManager;
 
+        private JMenuItem undoItem;
+        private JMenuItem redoItem;
         private final JMenuItem cutItem = new JMenuItem();
         private final JMenuItem copyItem = new JMenuItem();
         private final JMenuItem pasteItem = new JMenuItem();
-        private final JMenuItem cancelItem = new JMenuItem();
 
-        public MessageBodyPopupMenu(final JTextComponent sourceTextComponent) {
+        public MessageBodyPopupMenu(final JTextComponent sourceTextComponent, final CompoundUndoManager sourceUndoManager) {
             super();
             this.sourceTextComponent = sourceTextComponent;
+            this.sourceUndoManager = sourceUndoManager;
+            if( sourceUndoManager != null ) {
+                this.undoItem = new JMenuItem(sourceUndoManager.getUndoAction());
+                this.redoItem = new JMenuItem(sourceUndoManager.getRedoAction());
+            }
             initialize();
         }
 
@@ -1220,18 +1325,22 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
             copyItem.addActionListener(this);
             pasteItem.addActionListener(this);
 
+            if( undoItem != null && redoItem != null ) {
+                add(undoItem);
+                add(redoItem);
+                addSeparator();
+            }
             add(cutItem);
             add(copyItem);
             add(pasteItem);
-            addSeparator();
-            add(cancelItem);
         }
 
         private void refreshLanguage() {
+            if( undoItem != null ) { undoItem.setText(language.getString("Common.undo")); }
+            if( redoItem != null ) { redoItem.setText(language.getString("Common.redo")); }
             cutItem.setText(language.getString("Common.cut"));
             copyItem.setText(language.getString("Common.copy"));
             pasteItem.setText(language.getString("Common.paste"));
-            cancelItem.setText(language.getString("Common.cancel"));
         }
 
         public void lostOwnership(final Clipboard nclipboard, final Transferable contents) {}
@@ -1256,17 +1365,11 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
         }
     }
 
-    private class MFAttachedBoard implements TableMember {
+    private class MFAttachedBoard extends TableMember.BaseTableMember<MFAttachedBoard> {
         Board aBoard;
 
         public MFAttachedBoard(final Board ab) {
             aBoard = ab;
-        }
-
-        public int compareTo( final TableMember anOther, final int tableColumIndex ) {
-            final Comparable c1 = getValueAt(tableColumIndex);
-            final Comparable c2 = anOther.getValueAt(tableColumIndex);
-            return c1.compareTo( c2 );
         }
 
         public Board getBoardObject() {
@@ -1284,7 +1387,7 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
         }
     }
 
-    private class MFAttachedBoardsTable extends SortedTable {
+    private class MFAttachedBoardsTable extends SortedTable<MFAttachedBoard> {
         public MFAttachedBoardsTable(final MFAttachedBoardsTableModel m) {
             super(m);
             // set column sizes
@@ -1299,7 +1402,7 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
         }
     }
 
-    private class MFAttachedBoardsTableModel extends SortedTableModel {
+    private class MFAttachedBoardsTableModel extends SortedTableModel<MFAttachedBoard> {
         protected final Class<?> columnClasses[] = {
             String.class,
             String.class,
@@ -1342,32 +1445,44 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
         public void setValueAt(final Object aValue, final int row, final int column) {}
     }
 
-    private class MFAttachedFile implements TableMember {
+    private class MFAttachedFile extends TableMember.BaseTableMember<MFAttachedFile>  {
         File aFile;
         
         public MFAttachedFile(final File af) {
             aFile = af;
         }
         
-        @SuppressWarnings("unchecked")
-		public int compareTo( final TableMember anOther, final int tableColumIndex ) {
-            final Comparable c1 = (Comparable)getValueAt(tableColumIndex);
-            final Comparable c2 = (Comparable)anOther.getValueAt(tableColumIndex);
-            return c1.compareTo( c2 );
+        public File getFile() {
+            return aFile;
         }
         
-        @SuppressWarnings("unchecked")
-		public Comparable getValueAt(final int column)  {
+        public Comparable<?> getValueAt(final int column)  {
             switch(column) {
                 case 0: return aFile.getName();
                 case 1: return Long.toString(aFile.length());
             }
-            return "*ERR*";
+            throw new IndexOutOfBoundsException("No such column: " + Integer.toString(column));
+        }
+
+        @Override
+        public int compareTo(final MFAttachedFile otherTableMember, final int tableColumnIndex) {
+            // override sorting of specific columns
+            if( tableColumnIndex == 1 ) { // filesize
+                // if the other table member object is null, just return -1 instantly so that the non-null
+                // member we're comparing will be sorted above the null-row. this is just a precaution.
+                // NOTE: we could also make sure "trackDownloadKey" is non-null for each, but it always is.
+                if( otherTableMember == null ) { return -1; }
+
+                // we know that both filesize is a long, so we don't need any null-checks since longs are a basic type (never null).
+                return Mixed.compareLong(aFile.length(), otherTableMember.getFile().length());
+            } else {
+                // all other columns use the default case-insensitive string comparator
+                return super.compareTo(otherTableMember, tableColumnIndex);
+            }
         }
     }
 
-    @SuppressWarnings("serial")
-	private class MFAttachedFilesTable extends SortedTable {
+    private class MFAttachedFilesTable extends SortedTable<MFAttachedFile> {
         public MFAttachedFilesTable(final MFAttachedFilesTableModel m) {
             super(m);
             // set column sizes
@@ -1382,7 +1497,7 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
         }
     }
 
-    private class MFAttachedFilesTableModel extends SortedTableModel {
+    private class MFAttachedFilesTableModel extends SortedTableModel<MFAttachedFile> {
     	
         protected final Class<?> columnClasses[] = {
             String.class,
@@ -1421,8 +1536,6 @@ public class FreetalkMessageFrame extends JFrame implements AltEditCallbackInter
         public boolean isCellEditable(final int row, final int col) {
             return false;
         }
-        @Override
-        public void setValueAt(final Object aValue, final int row, final int column) {}
     }
 
     private class TransferObject {

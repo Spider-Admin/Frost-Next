@@ -26,11 +26,15 @@ import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Point;
+import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,22 +42,25 @@ import java.util.Hashtable;
 import java.util.LinkedList;
 import java.util.List;
 
+import javax.swing.AbstractAction;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JDialog;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
+import javax.swing.KeyStroke;
 import javax.swing.ProgressMonitor;
 import javax.swing.UIManager;
+import javax.swing.WindowConstants;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.event.ListSelectionEvent;
@@ -62,8 +69,7 @@ import javax.swing.filechooser.FileFilter;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableColumn;
 
-import org.joda.time.DateMidnight;
-import org.joda.time.DateTimeZone;
+import org.joda.time.*;
 
 import frost.Core;
 import frost.MainFrame;
@@ -81,6 +87,8 @@ import frost.util.Mixed;
 import frost.util.gui.FrostSwingWorker;
 import frost.util.gui.JSkinnablePopupMenu;
 import frost.util.gui.MiscToolkit;
+import frost.util.gui.TrustStateColors;
+import frost.util.gui.search.TableFindAction;
 import frost.util.gui.translation.Language;
 import frost.util.gui.translation.LanguageEvent;
 import frost.util.gui.translation.LanguageListener;
@@ -96,9 +104,9 @@ public class IdentitiesBrowser extends JDialog {
     private JPanel buttonPanel = null;
     private JPanel mainPanel = null;
     private JButton Bclose = null;
+    private JButton BmarkFRIEND = null;
     private JButton BmarkGOOD = null;
-    private JButton BmarkOBSERVE = null;
-    private JButton BmarkCHECK = null;
+    private JButton BmarkNEUTRAL = null;
     private JButton BmarkBAD = null;
     private JButton Bdelete = null;
 
@@ -130,6 +138,18 @@ public class IdentitiesBrowser extends JDialog {
         minCleanupTime = getMinCleanupTime();
 
         setLocationRelativeTo(parent);
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(final WindowEvent e) {
+                dispose();
+            }
+            @Override
+            public void windowClosed(final WindowEvent e) {
+                // update messages if a board is shown
+                MainFrame.getInstance().getMessagePanel().updateTableAfterChangeOfIdentityState();
+            }
+        });
+        setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
     }
 
     /**
@@ -140,20 +160,20 @@ public class IdentitiesBrowser extends JDialog {
         this.setBounds(new java.awt.Rectangle(0,0,630,420));
         this.setContentPane(getJContentPane());
 
-        getBmarkGOOD().setText("");
+        getBmarkFRIEND().setText("");
         getBmarkBAD().setText("");
-        getBmarkCHECK().setText("");
-        getBmarkOBSERVE().setText("");
+        getBmarkNEUTRAL().setText("");
+        getBmarkGOOD().setText("");
 
-        getBmarkGOOD().setIcon(MiscToolkit.loadImageIcon("/data/toolbar/weather-clear.png"));
-        getBmarkOBSERVE().setIcon(MiscToolkit.loadImageIcon("/data/toolbar/weather-few-clouds.png"));
-        getBmarkCHECK().setIcon(MiscToolkit.loadImageIcon("/data/toolbar/weather-overcast.png"));
+        getBmarkFRIEND().setIcon(MiscToolkit.loadImageIcon("/data/toolbar/weather-clear.png"));
+        getBmarkGOOD().setIcon(MiscToolkit.loadImageIcon("/data/toolbar/weather-few-clouds.png"));
+        getBmarkNEUTRAL().setIcon(MiscToolkit.loadImageIcon("/data/toolbar/weather-overcast.png"));
         getBmarkBAD().setIcon(MiscToolkit.loadImageIcon("/data/toolbar/weather-storm.png"));
 
-        MiscToolkit.configureButton(getBmarkGOOD(), "MessagePane.toolbar.tooltip.setToGood", language);
-        MiscToolkit.configureButton(getBmarkBAD(), "MessagePane.toolbar.tooltip.setToBad", language);
-        MiscToolkit.configureButton(getBmarkCHECK(), "MessagePane.toolbar.tooltip.setToCheck", language);
-        MiscToolkit.configureButton(getBmarkOBSERVE(), "MessagePane.toolbar.tooltip.setToObserve", language);
+        MiscToolkit.configureButton(getBmarkFRIEND(), "MessagePane.toolbar.tooltip.setToFRIEND", language);
+        MiscToolkit.configureButton(getBmarkBAD(), "MessagePane.toolbar.tooltip.setToBAD", language);
+        MiscToolkit.configureButton(getBmarkNEUTRAL(), "MessagePane.toolbar.tooltip.setToNEUTRAL", language);
+        MiscToolkit.configureButton(getBmarkGOOD(), "MessagePane.toolbar.tooltip.setToGOOD", language);
 
         setTitle(language.getString("IdentitiesBrowser.title"));
         getBdelete().setText(language.getString("IdentitiesBrowser.button.delete"));
@@ -165,6 +185,49 @@ public class IdentitiesBrowser extends JDialog {
 
         Lfilter.setText(language.getString("IdentitiesBrowser.label.filter")+":");
         Llookup.setText(language.getString("IdentitiesBrowser.label.lookup")+":");
+
+        assignHotkeys();
+    }
+
+    private void assignHotkeys() {
+        final JPanel p = getJContentPane();
+
+        // we assign these four shortcuts in the same order as the toolbar row of state icons, to avoid confusion
+        // assign 1/NUMPAD1 key - set FRIEND
+        p.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_1, 0, true), "SET_FRIEND");
+        p.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_NUMPAD1, 0, true), "SET_FRIEND");
+        p.getActionMap().put("SET_FRIEND", new AbstractAction() {
+            public void actionPerformed(final ActionEvent event) {
+                getBmarkFRIEND().doClick();
+            }
+        });
+
+        // assign 2/NUMPAD2 key - set GOOD
+        p.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_2, 0, true), "SET_GOOD");
+        p.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_NUMPAD2, 0, true), "SET_GOOD");
+        p.getActionMap().put("SET_GOOD", new AbstractAction() {
+            public void actionPerformed(final ActionEvent event) {
+                getBmarkGOOD().doClick();
+            }
+        });
+
+        // assign 3/NUMPAD3 key - set NEUTRAL
+        p.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_3, 0, true), "SET_NEUTRAL");
+        p.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_NUMPAD3, 0, true), "SET_NEUTRAL");
+        p.getActionMap().put("SET_NEUTRAL", new AbstractAction() {
+            public void actionPerformed(final ActionEvent event) {
+                getBmarkNEUTRAL().doClick();
+            }
+        });
+
+        // assign 4/NUMPAD4 key - set BAD
+        p.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_4, 0, true), "SET_BAD");
+        p.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_NUMPAD4, 0, true), "SET_BAD");
+        p.getActionMap().put("SET_BAD", new AbstractAction() {
+            public void actionPerformed(final ActionEvent event) {
+                getBmarkBAD().doClick();
+            }
+        });
     }
 
     private void updateTitle() {
@@ -238,9 +301,21 @@ public class IdentitiesBrowser extends JDialog {
     private SortedTable<InnerTableMember> getIdentitiesTable() {
         if( identitiesTable == null ) {
             tableModel = new InnerTableModel();
-            identitiesTable = new SortedTable<InnerTableMember>(tableModel);
+            identitiesTable = new SortedTable<InnerTableMember>(tableModel) {
+                // override the default sort order when clicking different columns
+                @Override
+                public boolean getColumnDefaultAscendingState(final int col) {
+                    if( col == 3 ) {
+                        // sort "last seen" column descending by default
+                        return false;
+                    }
+                    return true; // all other columns: ascending
+                }
+            };
+            new TableFindAction().install(identitiesTable);
             // set column sizes
-            final int[] widths = { 130, 30, 30, 70, 20, 20 };
+//#DIEFILESHARING            final int[] widths = { 130, 30, 30, 70, 20, 20 };
+            final int[] widths = { 130, 30, 30, 70, 20 };
             for (int i = 0; i < widths.length; i++) {
                 identitiesTable.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
             }
@@ -251,7 +326,7 @@ public class IdentitiesBrowser extends JDialog {
             identitiesTable.getColumnModel().getColumn(2).setCellRenderer(showColoredLinesRenderer);
             identitiesTable.getColumnModel().getColumn(3).setCellRenderer(showColoredLinesRenderer);
             identitiesTable.getColumnModel().getColumn(4).setCellRenderer(showColoredLinesRenderer);
-            identitiesTable.getColumnModel().getColumn(5).setCellRenderer(showColoredLinesRenderer);
+//#DIEFILESHARING            identitiesTable.getColumnModel().getColumn(5).setCellRenderer(showColoredLinesRenderer);
 
             jScrollPane.addMouseListener(listener);
             identitiesTable.addMouseListener(listener);
@@ -270,16 +345,16 @@ public class IdentitiesBrowser extends JDialog {
                     }
 
                     if( selRows.length == 1 ) {
-                        // one selected: enable good,bad,... buttons, disable button with current state
+                        // one selected: enable FRIEND,BAD,... buttons, disable button with current state
                         final Identity id = ((InnerTableMember)tableModel.getRow(selRows[0])).getIdentity();
                         // setting all together avoids flickering buttons
                         if( id.isBAD() ) {
                             updateStateButtons(false, true, true, true);
-                        } else if( id.isCHECK() ) {
+                        } else if( id.isNEUTRAL() ) {
                             updateStateButtons(true, false, true, true);
-                        } else if( id.isGOOD() ) {
+                        } else if( id.isFRIEND() ) {
                             updateStateButtons(true, true, false, true);
-                        } else if( id.isOBSERVE() ) {
+                        } else if( id.isGOOD() ) {
                             updateStateButtons(true, true, true, false);
                         }
                     } else {
@@ -287,7 +362,8 @@ public class IdentitiesBrowser extends JDialog {
                         updateStateButtons(true, true, true, true);
                     }
 
-                    // if one in selection has more than 0 msgs / files, disable delete button
+                    // if anyone in selection has more than 0 msgs, disable delete button
+                    //#DIEFILESHARING: In the past, when filesharing was enabled, the isDeleteable() function also checked if they had >0 files
                     boolean enableDelete = true;
                     for( final int element : selRows ) {
                         if( ((InnerTableMember)tableModel.getRow(element)).isDeleteable() == false ) {
@@ -311,11 +387,11 @@ public class IdentitiesBrowser extends JDialog {
         return identitiesTable;
     }
 
-    private void updateStateButtons(final boolean badState, final boolean checkState, final boolean goodState, final boolean observeState) {
-        getBmarkBAD().setEnabled(badState);
-        getBmarkCHECK().setEnabled(checkState);
-        getBmarkGOOD().setEnabled(goodState);
-        getBmarkOBSERVE().setEnabled(observeState);
+    private void updateStateButtons(final boolean BADState, final boolean NEUTRALState, final boolean FRIENDState, final boolean GOODState) {
+        getBmarkBAD().setEnabled(BADState);
+        getBmarkNEUTRAL().setEnabled(NEUTRALState);
+        getBmarkFRIEND().setEnabled(FRIENDState);
+        getBmarkGOOD().setEnabled(GOODState);
     }
 
     /**
@@ -408,9 +484,9 @@ public class IdentitiesBrowser extends JDialog {
             mainPanel = new JPanel();
             mainPanel.setLayout(new GridBagLayout());
             mainPanel.add(getJScrollPane(), gridBagConstraints);
-            mainPanel.add(getBmarkGOOD(), gridBagConstraints1);
-            mainPanel.add(getBmarkOBSERVE(), gridBagConstraints2);
-            mainPanel.add(getBmarkCHECK(), gridBagConstraints3);
+            mainPanel.add(getBmarkFRIEND(), gridBagConstraints1);
+            mainPanel.add(getBmarkGOOD(), gridBagConstraints2);
+            mainPanel.add(getBmarkNEUTRAL(), gridBagConstraints3);
             mainPanel.add(getBmarkBAD(), gridBagConstraints4);
             mainPanel.add(getBdelete(), gridBagConstraints5);
             mainPanel.add(getBcleanup(), gridBagConstraints6);
@@ -431,14 +507,75 @@ public class IdentitiesBrowser extends JDialog {
             Bclose.setText("IdentitiesBrowser.button.close");
             Bclose.addActionListener(new java.awt.event.ActionListener() {
                 public void actionPerformed(final java.awt.event.ActionEvent e) {
-                    setVisible(false);
-                    // update messages if a board is shown
-                    MainFrame.getInstance().getMessagePanel().updateTableAfterChangeOfIdentityState();
+                    // create an event which acts exactly as if the user pressed the X, to close the window and dispose() it
+                    final WindowEvent closingEvent = new WindowEvent(IdentitiesBrowser.this, WindowEvent.WINDOW_CLOSING);
+                    Toolkit.getDefaultToolkit().getSystemEventQueue().postEvent(closingEvent);
                 }
             });
         }
         return Bclose;
     }
+
+    /**
+     * Allows us to perform an action on all selected identities.
+     * The table is NOT re-sorted afterwards, since that's annoying and interferes
+     * with the ability to rapidly change states of the same group of selected items
+     * several times in a row before deciding on the proper state to use.
+     */
+    abstract protected class SelectedIdentitiesAction {
+        abstract protected void action(final Identity id);
+
+        public SelectedIdentitiesAction() {
+            iterateSelectedIdentities();
+        }
+
+        private void iterateSelectedIdentities() {
+            // we must first make a list of all objects, since modifying them may change the sorting
+            // and row numbers of the subsequent items otherwise, which means we'd target the wrong items.
+            final ArrayList<InnerTableMember> selITMs = getIdentitiesTable().getListOfSelectedItems();
+            // now just perform the action on every selected identity
+            if( selITMs.size() > 0 ) {
+                for( final InnerTableMember itm : selITMs ) {
+                    final Identity id = itm.getIdentity();
+                    action(id);
+                }
+
+                // repaints the whole table and clears the user's selection
+                tableModel.tableEntriesChanged();
+
+                // selects the modified items at their latest row positions
+                // NOTE: the positions will be the same since we didn't call something
+                // like updateRow() or resortTable(). We may do that in the future, though.
+                // but right now it makes no sense, since it's annoying if IDs constantly fly around.
+                getIdentitiesTable().setSelectedItems(selITMs);
+            }
+        }
+    }
+
+    /**
+     * This method initializes BmarkFRIEND
+     *
+     * @return javax.swing.JButton
+     */
+    private JButton getBmarkFRIEND() {
+        if( BmarkFRIEND == null ) {
+            BmarkFRIEND = new JButton();
+            BmarkFRIEND.setText("F");
+            BmarkFRIEND.addActionListener(new java.awt.event.ActionListener() {
+                public void actionPerformed(final java.awt.event.ActionEvent e) {
+                    new SelectedIdentitiesAction() {
+                        protected void action(final Identity id) {
+                            if( id.isFRIEND() == false ) {
+                                id.setFRIEND();
+                            }
+                        }
+                    };
+                }
+            });
+        }
+        return BmarkFRIEND;
+    }
+
 
     /**
      * This method initializes BmarkGOOD
@@ -451,15 +588,13 @@ public class IdentitiesBrowser extends JDialog {
             BmarkGOOD.setText("G");
             BmarkGOOD.addActionListener(new java.awt.event.ActionListener() {
                 public void actionPerformed(final java.awt.event.ActionEvent e) {
-                    final int[] selRows = getIdentitiesTable().getSelectedRows();
-                    for( final int element : selRows ) {
-                        final InnerTableMember itm = (InnerTableMember)tableModel.getRow(element);
-                        final Identity id = itm.getIdentity();
-                        if( id.isGOOD() == false ) {
-                            id.setGOOD();
+                    new SelectedIdentitiesAction() {
+                        protected void action(final Identity id) {
+                            if( id.isGOOD() == false ) {
+                                id.setGOOD();
+                            }
                         }
-                        tableModel.updateRow(itm);
-                    }
+                    };
                 }
             });
         }
@@ -467,55 +602,27 @@ public class IdentitiesBrowser extends JDialog {
     }
 
     /**
-     * This method initializes BmarkOBSERVE
+     * This method initializes BmarkNEUTRAL
      *
      * @return javax.swing.JButton
      */
-    private JButton getBmarkOBSERVE() {
-        if( BmarkOBSERVE == null ) {
-            BmarkOBSERVE = new JButton();
-            BmarkOBSERVE.setText("O");
-            BmarkOBSERVE.addActionListener(new java.awt.event.ActionListener() {
+    private JButton getBmarkNEUTRAL() {
+        if( BmarkNEUTRAL == null ) {
+            BmarkNEUTRAL = new JButton();
+            BmarkNEUTRAL.setText("O");
+            BmarkNEUTRAL.addActionListener(new java.awt.event.ActionListener() {
                 public void actionPerformed(final java.awt.event.ActionEvent e) {
-                    final int[] selRows = getIdentitiesTable().getSelectedRows();
-                    for( final int element : selRows ) {
-                        final InnerTableMember itm = (InnerTableMember)tableModel.getRow(element);
-                        final Identity id = itm.getIdentity();
-                        if( id.isOBSERVE() == false ) {
-                            id.setOBSERVE();
+                    new SelectedIdentitiesAction() {
+                        protected void action(final Identity id) {
+                            if( id.isNEUTRAL() == false ) {
+                                id.setNEUTRAL();
+                            }
                         }
-                        tableModel.updateRow(itm);
-                    }
+                    };
                 }
             });
         }
-        return BmarkOBSERVE;
-    }
-
-    /**
-     * This method initializes BmarkCHECK
-     *
-     * @return javax.swing.JButton
-     */
-    private JButton getBmarkCHECK() {
-        if( BmarkCHECK == null ) {
-            BmarkCHECK = new JButton();
-            BmarkCHECK.setText("C");
-            BmarkCHECK.addActionListener(new java.awt.event.ActionListener() {
-                public void actionPerformed(final java.awt.event.ActionEvent e) {
-                    final int[] selRows = getIdentitiesTable().getSelectedRows();
-                    for( final int element : selRows ) {
-                        final InnerTableMember itm = (InnerTableMember)tableModel.getRow(element);
-                        final Identity id = itm.getIdentity();
-                        if( id.isCHECK() == false ) {
-                            id.setCHECK();
-                        }
-                        tableModel.updateRow(itm);
-                    }
-                }
-            });
-        }
-        return BmarkCHECK;
+        return BmarkNEUTRAL;
     }
 
     /**
@@ -529,15 +636,13 @@ public class IdentitiesBrowser extends JDialog {
             BmarkBAD.setText("B");
             BmarkBAD.addActionListener(new java.awt.event.ActionListener() {
                 public void actionPerformed(final java.awt.event.ActionEvent e) {
-                    final int[] selRows = getIdentitiesTable().getSelectedRows();
-                    for( final int element : selRows ) {
-                        final InnerTableMember itm = (InnerTableMember)tableModel.getRow(element);
-                        final Identity id = itm.getIdentity();
-                        if( id.isBAD() == false ) {
-                            id.setBAD();
+                    new SelectedIdentitiesAction() {
+                        protected void action(final Identity id) {
+                            if( id.isBAD() == false ) {
+                                id.setBAD();
+                            }
                         }
-                        tableModel.updateRow(itm);
-                    }
+                    };
                 }
             });
         }
@@ -556,13 +661,13 @@ public class IdentitiesBrowser extends JDialog {
             Bdelete.addActionListener(new java.awt.event.ActionListener() {
                 public void actionPerformed(final java.awt.event.ActionEvent e) {
                     final int[] selRows = getIdentitiesTable().getSelectedRows();
-                    final int answer = JOptionPane.showConfirmDialog(
+                    final int answer = MiscToolkit.showConfirmDialog(
                             IdentitiesBrowser.this,
                             language.formatMessage("IdentitiesBrowser.deleteDialog.body", Integer.toString(selRows.length)),
                             language.getString("IdentitiesBrowser.deleteDialog.title"),
-                            JOptionPane.YES_NO_OPTION,
-                            JOptionPane.QUESTION_MESSAGE);
-                    if( answer == JOptionPane.NO_OPTION ) {
+                            MiscToolkit.YES_NO_OPTION,
+                            MiscToolkit.QUESTION_MESSAGE);
+                    if( answer != MiscToolkit.YES_OPTION ) {
                         return;
                     }
                     Arrays.sort(selRows); // ensure sorted, we must delete from end to begin
@@ -587,7 +692,7 @@ public class IdentitiesBrowser extends JDialog {
 
         Identity identity;
         Integer msgCount;
-        Integer fileCount;
+//#DIEFILESHARING        Integer fileCount;
         String lastSeenStr;
         String htmlName;
         Integer receivedMsgs;
@@ -598,11 +703,11 @@ public class IdentitiesBrowser extends JDialog {
             final IdentitiesStorage.IdentityMsgAndFileCount data = idDatas.get(identity.getUniqueName());
             if( data != null ) {
                 msgCount = new Integer(data.getMessageCount());
-                fileCount = new Integer(data.getFileCount());
+//#DIEFILESHARING                fileCount = new Integer(data.getFileCount());
             } else {
                 // error
                 msgCount = new Integer(-1);
-                fileCount = new Integer(-1);
+//#DIEFILESHARING                fileCount = new Integer(-1);
             }
             lastSeenStr = buildLastSeenString(identity.getLastSeenTimestamp());
             receivedMsgs = new Integer(identity.getReceivedMessageCount());
@@ -612,7 +717,8 @@ public class IdentitiesBrowser extends JDialog {
             return identity;
         }
         public boolean isDeleteable() {
-            if( msgCount.intValue() == 0 && fileCount.intValue() == 0 ) {
+//#DIEFILESHARING            if( msgCount.intValue() == 0 && fileCount.intValue() == 0 ) {
+            if( msgCount.intValue() == 0 ) {
                 return true;
             }
             return false;
@@ -621,8 +727,8 @@ public class IdentitiesBrowser extends JDialog {
             if( !isDeleteable() ) {
                 return false;
             }
-            // always keep identities marked GOOD and OBSERVE
-            if( identity.isGOOD() || identity.isOBSERVE()) {
+            // always keep identities marked FRIEND and GOOD
+            if( identity.isFRIEND() || identity.isGOOD()) {
                 return false;
             }
             // keep identities marked BAD, if not expired
@@ -650,7 +756,7 @@ public class IdentitiesBrowser extends JDialog {
                 return "";
             }
             String lsStr = DateFun.FORMAT_DATE_EXT.print(lastSeen);
-            long days = new DateMidnight(DateTimeZone.UTC).getMillis() - new DateMidnight(lastSeen, DateTimeZone.UTC).getMillis();
+            long days = new DateTime(DateTimeZone.UTC).withTimeAtStartOfDay().getMillis() - new DateTime(lastSeen, DateTimeZone.UTC).withTimeAtStartOfDay().getMillis(); // current midnight in UTC - last seen midnight in UTC
             days /= 1000L * 60L * 60L * 24L;
             lsStr += "  ("+days+")";
 
@@ -664,66 +770,71 @@ public class IdentitiesBrowser extends JDialog {
                 case 2: return receivedMsgs;
                 case 3: return lastSeenStr;
                 case 4: return msgCount;
-                case 5: return fileCount;
+//#DIEFILESHARING                case 5: return fileCount;
             }
             return "*ERR*";
         }
 
-        public int compareTo(final InnerTableMember anOther, final int tableColumnIndex) {
+        public int compareTo(final InnerTableMember otherTableMember, final int tableColumnIndex) {
             if( tableColumnIndex == 0 || tableColumnIndex == 1 ) {
                 final String s1 = (String)getValueAt(tableColumnIndex);
-                final String s2 = (String)anOther.getValueAt(tableColumnIndex);
+                final String s2 = (String)otherTableMember.getValueAt(tableColumnIndex);
                 return s1.compareToIgnoreCase(s2);
             }
             if( tableColumnIndex == 2 ) {
                 final int l1 = getIdentity().getReceivedMessageCount();
-                final int l2 = ((InnerTableMember)anOther).getIdentity().getReceivedMessageCount();
+                final int l2 = ((InnerTableMember)otherTableMember).getIdentity().getReceivedMessageCount();
                 return Mixed.compareLong(l1, l2);
             }
             if( tableColumnIndex == 3 ) {
                 final long l1 = getIdentity().getLastSeenTimestamp();
-                final long l2 = ((InnerTableMember)anOther).getIdentity().getLastSeenTimestamp();
+                final long l2 = ((InnerTableMember)otherTableMember).getIdentity().getLastSeenTimestamp();
                 return Mixed.compareLong(l1, l2);
             }
             if( tableColumnIndex == 4 ) {
                 Integer i1 = (Integer)getValueAt(tableColumnIndex);
-                Integer i2 = (Integer)anOther.getValueAt(tableColumnIndex);
+                Integer i2 = (Integer)otherTableMember.getValueAt(tableColumnIndex);
                 final int res = i1.compareTo(i2);
+                /* //#DIEFILESHARING: This entire block has been disabled since filesharing was removed.
                 if( res == 0) {
                     // same msgcount, compare filecount
                     i1 = (Integer)getValueAt(5);
-                    i2 = (Integer)anOther.getValueAt(5);
+                    i2 = (Integer)otherTableMember.getValueAt(5);
                     return i1.compareTo(i2);
                 }
+                */
                 return res;
             }
+            /* //#DIEFILESHARING: This entire block has been disabled since filesharing was removed.
             if( tableColumnIndex == 5 ) {
                 Integer i1 = (Integer)getValueAt(tableColumnIndex);
-                Integer i2 = (Integer)anOther.getValueAt(tableColumnIndex);
+                Integer i2 = (Integer)otherTableMember.getValueAt(tableColumnIndex);
                 final int res = i1.compareTo(i2);
                 if( res == 0) {
                     // same filecount, compare msgcount
                     i1 = (Integer)getValueAt(4);
-                    i2 = (Integer)anOther.getValueAt(4);
+                    i2 = (Integer)otherTableMember.getValueAt(4);
                     return i1.compareTo(i2);
                 }
                 return res;
             }
+            */
             return 0;
         }
     }
 
     public class InnerTableModel extends SortedTableModel<InnerTableMember> {
 
-        protected final String columnNames[] = new String[6];
+//#DIEFILESHARING        protected final String columnNames[] = new String[6];
+        protected final String columnNames[] = new String[5];
 
         protected final Class<?> columnClasses[] = {
             String.class, // name
             String.class, // state
             Integer.class, // received msgs
             String.class, // lastSeen,
-            Integer.class, // msgs
-            Integer.class  // files
+            Integer.class // msgs
+//#DIEFILESHARING            Integer.class  // files
         };
 
         public InnerTableModel() {
@@ -763,7 +874,7 @@ public class IdentitiesBrowser extends JDialog {
             columnNames[2] = language.getString("IdentitiesBrowser.identitiesTable.receivedMessages");
             columnNames[3] = language.getString("IdentitiesBrowser.identitiesTable.lastSeen");
             columnNames[4] = language.getString("IdentitiesBrowser.identitiesTable.messages");
-            columnNames[5] = language.getString("IdentitiesBrowser.identitiesTable.files");
+//#DIEFILESHARING            columnNames[5] = language.getString("IdentitiesBrowser.identitiesTable.files");
         }
     }
 
@@ -771,10 +882,10 @@ public class IdentitiesBrowser extends JDialog {
 
         private Font boldFont = null;
         private Font normalFont = null;
-        private final Color col_good    = new Color(0x00, 0x80, 0x00);
-        private final Color col_check   = new Color(0xFF, 0xCC, 0x00);
-        private final Color col_observe = new Color(0x00, 0xD0, 0x00);
-        private final Color col_bad     = new Color(0xFF, 0x00, 0x00);
+        private final Color col_BAD       = TrustStateColors.BAD;
+        private final Color col_NEUTRAL   = TrustStateColors.NEUTRAL;
+        private final Color col_GOOD      = TrustStateColors.GOOD;
+        private final Color col_FRIEND    = TrustStateColors.FRIEND;
 
         public StringCellRenderer() {
             final Font baseFont = getIdentitiesTable().getFont();
@@ -815,25 +926,25 @@ public class IdentitiesBrowser extends JDialog {
             } else if( column == 1 ) {
                 final Identity id = tableMember.getIdentity();
                 // STATE
-                // state == good/bad/check/observe -> bold and coloured
+                // state == BAD/NEUTRAL/GOOD/FRIEND -> bold and colored
                 if (Core.getIdentities().isMySelf(id.getUniqueName())) {
                     if( !Core.frostSettings.getBoolValue(SettingsClass.SHOW_OWN_MESSAGES_AS_ME_DISABLED) ) {
-                        setText("ME");
+                        setText("ME"); // this doesn't override "getValueAt", it's just for display
                     }
                     setFont(boldFont);
-                    setForeground(col_good);
+                    setForeground(col_FRIEND);
+                } else if( id.isNEUTRAL() ) {
+                    setFont(boldFont);
+                    setForeground(col_NEUTRAL);
                 } else if( id.isGOOD() ) {
                     setFont(boldFont);
-                    setForeground(col_good);
-                } else if( id.isCHECK() ) {
+                    setForeground(col_GOOD);
+                } else if( id.isFRIEND() ) {
                     setFont(boldFont);
-                    setForeground(col_check);
-                } else if( id.isOBSERVE() ) {
-                    setFont(boldFont);
-                    setForeground(col_observe);
+                    setForeground(col_FRIEND);
                 } else if( id.isBAD() ) {
                     setFont(boldFont);
-                    setForeground(col_bad);
+                    setForeground(col_BAD);
                 }
             }
             return this;
@@ -944,20 +1055,20 @@ public class IdentitiesBrowser extends JDialog {
                         }
                     }
                     if( li.size() == 0 ) {
-                        JOptionPane.showMessageDialog(
+                        MiscToolkit.showMessageDialog(
                                 IdentitiesBrowser.this,
                                 language.getString("IdentitiesBrowser.cleanupDialog.nothingToDelete.body"),
                                 language.getString("IdentitiesBrowser.cleanupDialog.nothingToDelete.title"),
-                                JOptionPane.INFORMATION_MESSAGE);
+                                MiscToolkit.INFORMATION_MESSAGE);
                         return;
                     }
-                    final int answer = JOptionPane.showConfirmDialog(
+                    final int answer = MiscToolkit.showConfirmDialog(
                             IdentitiesBrowser.this,
                             language.formatMessage("IdentitiesBrowser.cleanupDialog.deleteIdentities.body", Integer.toString(li.size())),
                             language.getString("IdentitiesBrowser.cleanupDialog.deleteIdentities.title"),
-                            JOptionPane.YES_NO_OPTION,
-                            JOptionPane.QUESTION_MESSAGE);
-                    if( answer == JOptionPane.NO_OPTION ) {
+                            MiscToolkit.YES_NO_OPTION,
+                            MiscToolkit.QUESTION_MESSAGE);
+                    if( answer != MiscToolkit.YES_OPTION ) {
                         return;
                     }
 
@@ -1044,7 +1155,8 @@ public class IdentitiesBrowser extends JDialog {
                     getIdentitiesTable().getSelectionModel().setSelectionInterval(row, row);
                     // now scroll to selected row, try to show it on top of table
 
-                    // determine the count of showed rows
+                    // determine how many rows are visible, and scroll the view so that the found item is at the top of the table
+                    // and the last visible item on screen is nicely aligned with the bottom of the scrollbar
                     final int visibleRows = (int)(getIdentitiesTable().getVisibleRect().getHeight() / getIdentitiesTable().getCellRect(row,0,true).getHeight());
                     int scrollToRow;
                     if( row + visibleRows > tableModel.getRowCount() ) {
@@ -1143,13 +1255,13 @@ public class IdentitiesBrowser extends JDialog {
                 f = new File(f.getPath() + ".xml");
             }
             if( f.exists() ) {
-                final int answer = JOptionPane.showConfirmDialog(
+                final int answer = MiscToolkit.showConfirmDialog(
                         this,
                         language.formatMessage("IdentitiesBrowser.exportIdentitiesConfirmXmlFileOverwrite.body", f.getName()),
                         language.getString("IdentitiesBrowser.exportIdentitiesConfirmXmlFileOverwrite.title"),
-                        JOptionPane.YES_NO_OPTION,
-                        JOptionPane.WARNING_MESSAGE);
-                if( answer == JOptionPane.NO_OPTION ) {
+                        MiscToolkit.YES_NO_OPTION,
+                        MiscToolkit.WARNING_MESSAGE);
+                if( answer != MiscToolkit.YES_OPTION ) {
                     return null;
                 }
             }
@@ -1177,25 +1289,25 @@ public class IdentitiesBrowser extends JDialog {
                     final List<Identity> importedIdentities = IdentitiesXmlDAO.loadIdentities(xmlFile);
                     if( importedIdentities.size() == 0 ) {
                         // nothing loaded
-                        JOptionPane.showMessageDialog(
+                        MiscToolkit.showMessageDialog(
                                 IdentitiesBrowser.this,
                                 language.getString("IdentitiesBrowser.noIdentityToImport.body"),
                                 language.getString("IdentitiesBrowser.noIdentityToImport.title"),
-                                JOptionPane.INFORMATION_MESSAGE);
+                                MiscToolkit.INFORMATION_MESSAGE);
                         return;
                     }
 
                     final int importedCount = Core.getIdentities().importIdentities(importedIdentities);
                     final int skippedCount = importedIdentities.size() - importedCount;
 
-                    JOptionPane.showMessageDialog(
+                    MiscToolkit.showMessageDialog(
                             IdentitiesBrowser.this,
                             language.formatMessage(
                                     "IdentitiesBrowser.identitiesImported.body",
                                     Integer.toString(importedCount),
                                     Integer.toString(skippedCount)),
                                 language.getString("IdentitiesBrowser.identitiesImported.title"),
-                                JOptionPane.INFORMATION_MESSAGE);
+                                MiscToolkit.INFORMATION_MESSAGE);
 
                     updateTitle();
                 }
@@ -1224,7 +1336,7 @@ public class IdentitiesBrowser extends JDialog {
     }
 
     private void exportIdentities(final List<Identity> ids) {
-        // saves only good,observe,bad
+        // saves only FRIEND,GOOD,BAD
         final File xmlFile = chooseXmlExportFile();
         if( xmlFile == null ) {
             return;
@@ -1233,25 +1345,25 @@ public class IdentitiesBrowser extends JDialog {
         final int count = IdentitiesXmlDAO.saveIdentities(xmlFile, ids);
         if( count > 0 ) {
             // 'count' identities exported
-            JOptionPane.showMessageDialog(
+            MiscToolkit.showMessageDialog(
                     IdentitiesBrowser.this,
                     language.formatMessage("IdentitiesBrowser.identitiesExported.body", Integer.toString(count)),
                     language.getString("IdentitiesBrowser.identitiesExported.title"),
-                    JOptionPane.INFORMATION_MESSAGE);
+                    MiscToolkit.INFORMATION_MESSAGE);
         } else if( count < 0 ) {
             // identities export failed
-            JOptionPane.showMessageDialog(
+            MiscToolkit.showMessageDialog(
                     IdentitiesBrowser.this,
                     language.getString("IdentitiesBrowser.identitiesExportFailed.body"),
                     language.getString("IdentitiesBrowser.identitiesExportFailed.title"),
-                    JOptionPane.ERROR_MESSAGE);
+                    MiscToolkit.ERROR_MESSAGE);
         } else {
-            // no identities to export, all are CHECK?
-            JOptionPane.showMessageDialog(
+            // no identities to export, all are NEUTRAL?
+            MiscToolkit.showMessageDialog(
                     IdentitiesBrowser.this,
                     language.getString("IdentitiesBrowser.noIdentityToExport.body"),
                     language.getString("IdentitiesBrowser.noIdentityToExport.title"),
-                    JOptionPane.INFORMATION_MESSAGE);
+                    MiscToolkit.INFORMATION_MESSAGE);
         }
     }
 
@@ -1286,7 +1398,7 @@ public class IdentitiesBrowser extends JDialog {
         return popupMenu;
     }
 
-    private void showUploadTablePopupMenu(final MouseEvent e) {
+    private void showIdentitiesTablePopupMenu(final MouseEvent e) {
         // select row where rightclick occurred if row under mouse is NOT selected
         final Point p = e.getPoint();
         final int y = identitiesTable.rowAtPoint(p);
@@ -1410,7 +1522,7 @@ public class IdentitiesBrowser extends JDialog {
             if (e.isPopupTrigger()) {
                 if ((e.getSource() == identitiesTable)
                     || (e.getSource() == jScrollPane)) {
-                    showUploadTablePopupMenu(e);
+                    showIdentitiesTablePopupMenu(e);
                 }
             }
         }
@@ -1419,7 +1531,7 @@ public class IdentitiesBrowser extends JDialog {
             if ((e.getClickCount() == 1) && (e.isPopupTrigger())) {
                 if ((e.getSource() == identitiesTable)
                     || (e.getSource() == jScrollPane)) {
-                    showUploadTablePopupMenu(e);
+                    showIdentitiesTablePopupMenu(e);
                 }
             }
         }

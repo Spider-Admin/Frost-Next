@@ -36,6 +36,7 @@ import frost.gui.model.*;
 import frost.messaging.frost.boards.*;
 import frost.storage.*;
 import frost.util.gui.*;
+import frost.util.gui.search.TableFindAction;
 import frost.util.gui.translation.*;
 
 @SuppressWarnings("serial")
@@ -51,6 +52,7 @@ public class KnownBoardsFrame extends JDialog {
 
     private JButton Bclose;
     private JButton BboardActions;
+    private JButton BdefImport;
     private JButton Bimport;
     private JButton Bexport;
     private JCheckBox CBshowHidden;
@@ -133,13 +135,16 @@ public class KnownBoardsFrame extends JDialog {
                     } else {
                         return showContentTooltipRenderer;
                     }
-            }};
+                }
+            };
+        new TableFindAction().install(boardsTable);
         boardsTable.setRowSelectionAllowed(true);
         boardsTable.setSelectionMode( ListSelectionModel.MULTIPLE_INTERVAL_SELECTION );
         boardsTable.setRowHeight(18);
 
         Bclose = new JButton(language.getString("KnownBoardsFrame.button.close"));
         BboardActions = new JButton(language.getString("KnownBoardsFrame.button.actions")+" ...");
+        BdefImport = new JButton(language.getString("KnownBoardsFrame.button.defImport"));
         Bimport = new JButton(language.getString("KnownBoardsFrame.button.import")+" ...");
         Bexport = new JButton(language.getString("KnownBoardsFrame.button.export")+" ...");
         CBshowHidden = new JCheckBox();
@@ -190,6 +195,10 @@ public class KnownBoardsFrame extends JDialog {
                         tablePopupMenu.show(BboardActions, 5, 5);
                     }
                 } });
+        BdefImport.addActionListener( new java.awt.event.ActionListener() {
+                public void actionPerformed(final ActionEvent e) {
+                    defImport_actionPerformed(e);
+                } });
         Bimport.addActionListener( new java.awt.event.ActionListener() {
                 public void actionPerformed(final ActionEvent e) {
                     import_actionPerformed(e);
@@ -228,6 +237,8 @@ public class KnownBoardsFrame extends JDialog {
         buttons.add( CBshowHidden );
         buttons.add(Box.createRigidArea(new Dimension(5,3)));
         buttons.add( BboardActions );
+        buttons.add(Box.createRigidArea(new Dimension(10,3)));
+        buttons.add( BdefImport );
         buttons.add(Box.createRigidArea(new Dimension(10,3)));
         buttons.add( Bimport );
         buttons.add(Box.createRigidArea(new Dimension(5,3)));
@@ -485,6 +496,19 @@ public class KnownBoardsFrame extends JDialog {
         }
     }
 
+    private void defImport_actionPerformed(final ActionEvent e) {
+        // ask the user which board types to import and display statistics
+        final int added = KnownBoardsManager.importDefaultBoardsWithConfirmation(
+                KnownBoardsFrame.this, // parent the popups to the known boards frame
+                "KnownBoardsFrame.confirmImportDefaultBoards.body",
+                "KnownBoardsFrame.confirmImportDefaultBoards.title",
+                false); // don't use "always on top" for the dialogs
+
+        // reload the board table even if nothing was added, because this also forcibly updated
+        // all board descriptions to the correct/default ones (which counts as 0 additions)
+        loadKnownBoardsIntoTable(CBshowHidden.isSelected());
+    }
+
     private void import_actionPerformed(final ActionEvent e) {
         final File xmlFile = chooseImportFile();
         if( xmlFile == null ) {
@@ -492,19 +516,21 @@ public class KnownBoardsFrame extends JDialog {
         }
         final List<Board> imports = KnownBoardsXmlDAO.loadKnownBoards(xmlFile);
         if( imports.size() == 0 ) {
-            MiscToolkit.showMessage(
+            MiscToolkit.showMessageDialog(
+                    null,
                     language.getString("KnownBoardsFrame.noBoardsImported.body"),
-                    JOptionPane.WARNING_MESSAGE,
-                    language.getString("KnownBoardsFrame.noBoardsImported.title"));
+                    language.getString("KnownBoardsFrame.noBoardsImported.title"),
+                    MiscToolkit.WARNING_MESSAGE);
         } else {
             final int added = KnownBoardsManager.addNewKnownBoards(imports);
-            MiscToolkit.showMessage(
+            MiscToolkit.showMessageDialog(
+                    null,
                     language.formatMessage("KnownBoardsFrame.boardsImported.body",
                             Integer.toString(imports.size()),
                             xmlFile.getName(),
                             Integer.toString(added)),
-                    JOptionPane.WARNING_MESSAGE,
-                    language.getString("KnownBoardsFrame.boardsImported.title"));
+                    language.getString("KnownBoardsFrame.boardsImported.title"),
+                    MiscToolkit.INFORMATION_MESSAGE);
             loadKnownBoardsIntoTable(CBshowHidden.isSelected());
         }
     }
@@ -525,15 +551,17 @@ public class KnownBoardsFrame extends JDialog {
         }
 
         if( KnownBoardsXmlDAO.saveKnownBoards(xmlFile, frostboards) ) {
-            MiscToolkit.showMessage(
+            MiscToolkit.showMessageDialog(
+                    null,
                     language.formatMessage("KnownBoardsFrame.boardsExported.body", Integer.toString(frostboards.size()), xmlFile.getName()),
-                    JOptionPane.INFORMATION_MESSAGE,
-                    language.getString("KnownBoardsFrame.boardsExported.title"));
+                    language.getString("KnownBoardsFrame.boardsExported.title"),
+                    MiscToolkit.INFORMATION_MESSAGE);
         } else {
-            MiscToolkit.showMessage(
+            MiscToolkit.showMessageDialog(
+                    null,
                     language.getString("KnownBoardsFrame.exportFailed.body"),
-                    JOptionPane.ERROR_MESSAGE,
-                    language.getString("KnownBoardsFrame.exportFailed.title"));
+                    language.getString("KnownBoardsFrame.exportFailed.title"),
+                    MiscToolkit.ERROR_MESSAGE);
         }
     }
 
@@ -616,11 +644,11 @@ public class KnownBoardsFrame extends JDialog {
                     return frostboard.getName();
                 }
             case 1:
-                return ((frostboard.getPublicKey() == null) ? "" : frostboard.getPublicKey());
+                return frostboard.getPublicKey();
             case 2:
-                return ((frostboard.getPrivateKey() == null) ? "" : frostboard.getPrivateKey());
+                return frostboard.getPrivateKey();
             case 3:
-                return ((frostboard.getDescription() == null) ? "" : frostboard.getDescription());
+                return frostboard.getDescription();
             }
             return "*ERR*";
         }
@@ -644,7 +672,8 @@ public class KnownBoardsFrame extends JDialog {
                     boardsTable.getSelectionModel().setSelectionInterval(row, row);
                     // now scroll to selected row, try to show it on top of table
 
-                    // determine the count of showed rows
+                    // determine how many rows are visible, and scroll the view so that the found item is at the top of the table
+                    // and the last visible item on screen is nicely aligned with the bottom of the scrollbar
                     final int visibleRows = (int)(boardsTable.getVisibleRect().getHeight() / boardsTable.getCellRect(row,0,true).getHeight());
                     int scrollToRow;
                     if( row + visibleRows > tableModel.getRowCount() ) {

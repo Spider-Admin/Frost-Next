@@ -2,6 +2,8 @@ package frost.util.gui;
 
 import java.awt.*;
 import java.util.List;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 import javax.swing.text.*;
 import javax.swing.text.Highlighter.*;
@@ -47,7 +49,36 @@ public class TextHighlighter {
         }
     }
 
-//  Creates highlights around all occurrences of pattern in textComp
+    // Highlights all matches for the regex in textComp
+    public void highlight(final JTextComponent textComp, final Pattern regexPattern, final boolean removeOldHighlights) {
+        if( removeOldHighlights ) {
+            // First remove all old highlights
+            removeHighlights(textComp);
+        }
+
+        try {
+            final Highlighter hilite = textComp.getHighlighter();
+            final Document doc = textComp.getDocument();
+            // NOTE: we don't need to "toLowerCase()" the text if matchAnyCase is true; because
+            // the regex pattern itself has been configured for the user's choice of case
+            // sensitivity/insensitivity.
+            String text = doc.getText(0, doc.getLength());
+
+            // Search for regex pattern in the text
+            Matcher m = regexPattern.matcher(text); // begins at offset 0
+            while( m.find() ) { // constantly iterates to the next match until there are no more matches
+                // Create highlighter using private painter and apply around pattern
+                hilite.addHighlight(m.start(), m.end(), myHighlightPainter);
+            }
+        } catch (final BadLocationException e) {
+        }
+    }
+
+    //  Creates highlights around all occurrences of string in textComp
+    //  NOTE: This old highlighter is not used anywhere anymore and can be deleted, but is kept
+    //  for potential future use; it's also pretty terrible since it lowercases the text but not
+    //  the searchpattern, so it doesn't even do a real case-insensitive search. Yet another
+    //  example of the extreme sloppiness of Frost's original author.
     public void highlight(final JTextComponent textComp, final String pattern, final boolean removeOldHighlights) {
         if( removeOldHighlights ) {
             // First remove all old highlights
@@ -63,9 +94,9 @@ public class TextHighlighter {
             }
             int pos = 0;
 
-            // Search for pattern
+            // Search for string
             while ((pos = text.indexOf(pattern, pos)) >= 0) {
-                // Create highlighter using private painter and apply around pattern
+                // Create highlighter using private painter and apply around string
                 hilite.addHighlight(pos, pos+pattern.length(), myHighlightPainter);
                 pos += pattern.length();
             }

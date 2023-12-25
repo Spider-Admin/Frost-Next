@@ -34,7 +34,7 @@ public class TranslationDialog extends JFrame {
 
     private JPanel jContentPane = null;
     private JLabel jLabel = null;
-    private JList Lkeys = null;
+    private JList<String> Lkeys = null;
     private JLabel Lsource = null;
     private JTextArea TAsource = null;
     private JLabel Ltranslation = null;
@@ -185,9 +185,9 @@ public class TranslationDialog extends JFrame {
      *
      * @return javax.swing.JList
      */
-    private JList getLkeys() {
+    private JList<String> getLkeys() {
         if( Lkeys == null ) {
-            Lkeys = new JList();
+            Lkeys = new JList<String>();
             Lkeys.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
             Lkeys.setCellRenderer(new ListRenderer());
             Lkeys.setSelectionModel(new DefaultListSelectionModel() {
@@ -484,15 +484,15 @@ public class TranslationDialog extends JFrame {
     }
 
     private void closeDialog() {
-        final int answer = JOptionPane.showConfirmDialog(
+        final int answer = MiscToolkit.showConfirmDialog(
                 this,
                 "Do you want to save before closing the dialog?",
                 "Save before close",
-                JOptionPane.YES_NO_CANCEL_OPTION,
-                JOptionPane.QUESTION_MESSAGE);
-        if( answer == JOptionPane.CANCEL_OPTION ) {
+                MiscToolkit.YES_NO_CANCEL_OPTION,
+                MiscToolkit.QUESTION_MESSAGE);
+        if( answer == MiscToolkit.CANCEL_OPTION ) {
             return;
-        } else if( answer == JOptionPane.YES_OPTION ) {
+        } else if( answer == MiscToolkit.YES_OPTION ) {
             if( saveBundle(true) == false ) {
                 return; // don't close, error during save
             }
@@ -525,7 +525,7 @@ public class TranslationDialog extends JFrame {
         radioButtons.setSelected(getRBshowAll().getModel(), true);
 
         final List<String> allKeys = getAllKeys();
-        getLkeys().setModel(new ItemListModel(allKeys));
+        getLkeys().setModel(new ItemListModel<String>(allKeys));
 
         setVisible(true);
     }
@@ -563,17 +563,17 @@ public class TranslationDialog extends JFrame {
     private boolean saveBundle(final boolean quiet) {
         final boolean wasOk = targetBundle.saveBundleToFile(targetLanguageName);
         if( wasOk == false ) {
-            JOptionPane.showMessageDialog(
+            MiscToolkit.showMessageDialog(
                     this,
                     "Error saving bundle! Check the log file.",
                     "Error",
-                    JOptionPane.ERROR_MESSAGE);
+                    MiscToolkit.ERROR_MESSAGE);
         } else if( quiet == false ) {
-            JOptionPane.showMessageDialog(
+            MiscToolkit.showMessageDialog(
                     this,
                     "Bundle was successfully saved.",
                     "Save successful",
-                    JOptionPane.INFORMATION_MESSAGE);
+                    MiscToolkit.INFORMATION_MESSAGE);
         }
         return wasOk;
     }
@@ -585,7 +585,7 @@ public class TranslationDialog extends JFrame {
         } else {
             items = getMissingKeys();
         }
-        getLkeys().setModel(new ItemListModel(items));
+        getLkeys().setModel(new ItemListModel<String>(items));
     }
 
     private void applyChanges(final String selectedKey, final int ix) {
@@ -598,9 +598,9 @@ public class TranslationDialog extends JFrame {
 
         // either update item in list, or remove from list
         if( getRBshowAll().isSelected() ) {
-            ((ItemListModel)getLkeys().getModel()).itemChanged(ix);
+            ((ItemListModel<String>)getLkeys().getModel()).itemChanged(ix);
         } else {
-            ((ItemListModel)getLkeys().getModel()).removeItem(ix);
+            ((ItemListModel<String>)getLkeys().getModel()).removeItem(ix);
             if( getLkeys().getSelectedValue() == null ) {
                 // nothing selected now, clear textfields
                 getTAsource().setText("");
@@ -631,7 +631,7 @@ public class TranslationDialog extends JFrame {
         getTAtranslation().setText("");
 
         final int ix = getLkeys().getSelectedIndex();
-        ((ItemListModel)getLkeys().getModel()).itemChanged(ix);
+        ((ItemListModel<String>)getLkeys().getModel()).itemChanged(ix);
     }
 
     private void keySelectionChanged() {
@@ -652,17 +652,17 @@ public class TranslationDialog extends JFrame {
         getTAtranslation().setText(txt);
     }
 
-    private class ItemListModel extends AbstractListModel {
-        List<String> items;
+    private class ItemListModel<T> extends AbstractListModel<T> {
+        List<T> items;
 
-        public ItemListModel(final List<String> i) {
+        public ItemListModel(final List<T> i) {
             super();
             items = i;
         }
         public int getSize() {
             return items.size();
         }
-        public Object getElementAt(final int x) {
+        public T getElementAt(final int x) {
             return items.get(x);
         }
         public void itemChanged(final int ix) {
@@ -674,6 +674,7 @@ public class TranslationDialog extends JFrame {
         }
     }
 
+    // NOTE: only handles JList<String> (or things which can be converted to string)
     private class ListRenderer extends DefaultListCellRenderer {
         public ListRenderer() {
             super();

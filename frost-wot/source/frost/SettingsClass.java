@@ -39,8 +39,10 @@ import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import frost.fileTransfer.ExtraInserts;
 import frost.storage.ExitSavable;
 import frost.storage.StorageException;
+import frost.util.gui.KeyConversionUtility;
 import frost.util.Logging;
 
 /**
@@ -57,17 +59,19 @@ public class SettingsClass implements ExitSavable {
 
     private static final Logger logger = Logger.getLogger(SettingsClass.class.getName());
 
-	public static final String DOWNLOAD_ENABLED_DEFAULT = "downloads.autoenable"; //SF_EDIT
-	public static final String SNOWFLAKE_HACK_WRITE_LAST_DAY = "snowflakehack.writeLastDay";
-	public static final String DOWNLOAD_TODAY_DAYS_BACK = "message.DN_LOAD_TODAY.maxDaysBack";
+    public static final String FREENETCOMPATMANAGER_USERMODES = "compatManager.userModes";
 
     public static final String DOS_STOP_BOARD_UPDATES_WHEN_DOSED = "dos.stopBoardUpdatesWhenDosed";
     public static final String DOS_INVALID_SUBSEQUENT_MSGS_THRESHOLD = "dos.invalidSubsequentMessagesThreshold";
 
     public static final String MIGRATE_VERSION = "migrate.version";
 
+    public static final String STARTUP_OFFERED_DEFAULT_BOARDS = "startup.offeredDefaultBoards";
+    public static final String STARTUP_SHOWN_INAPP_HELP_GUIDE = "startup.shownInAppHelpGuide";
+
     public static final String DB_CLEANUP_INTERVAL = "database.cleanup.interval";
     public static final String DB_CLEANUP_LASTRUN = "database.cleanup.lastRun";
+    public static final String DB_CLEANUP_FORCESTART = "database.cleanup.forceStart";
 
     public static final String DB_CLEANUP_REMOVEOFFLINEFILEWITHKEY = "database.cleanup.removeOfflineFilesWithKey";
     public static final String DB_CLEANUP_OFFLINEFILESMAXDAYSOLD = "database.cleanup.offlineFilesMaxDaysOld";
@@ -88,6 +92,9 @@ public class SettingsClass implements ExitSavable {
 
     public static final String LANGUAGE_LOCALE = "locale";
 
+    public static final String WARN_NO_IMAGES_TO_OPEN = "warnNoImagesToOpen";
+    public static final String CONFIRM_ENABLE_UPLOAD_COMPRESSION = "confirm.enableUploadCompression";
+    public static final String CONFIRM_SEND_UNSIGNED_MSG = "confirm.sendUnsignedMessage";
     public static final String CONFIRM_MARK_ALL_MSGS_READ = "confirm.markAllMessagesRead";
     public static final String CONFIRM_FILESHARING_IS_ENABLED = "confirm.fileSharingIsEnabled";
 
@@ -102,6 +109,8 @@ public class SettingsClass implements ExitSavable {
     public static final String PERST_PAGEPOOLSIZE_FILES = "perst.pagepoolsizeKiB.files";
     public static final String PERST_PAGEPOOLSIZE_INDEXSLOTS = "perst.pagepoolsizeKiB.indexslots";
     public static final String PERST_PAGEPOOLSIZE_SHAREDFILESCHKKEYS = "perst.pagepoolsizeKiB.sharedfilechkkeys";
+    public static final String PERST_PAGEPOOLSIZE_TRACKDOWNLOADKEYS = "perst.pagepoolsizeKiB.trackdownloadkeys";
+    public static final String PERST_PAGEPOOLSIZE_HASHBLOCKLIST = "perst.pagepoolsizeKiB.hashblocklist";
     public static final String PERST_PAGEPOOLSIZE_FILELIST = "perst.pagepoolsizeKiB.filelist";
     public static final String PERST_PAGEPOOLSIZE_IDENTITIES = "perst.pagepoolsizeKiB.identities";
     public static final String PERST_PAGEPOOLSIZE_MESSAGEARCHIVE = "perst.pagepoolsizeKiB.messagearchive";
@@ -130,7 +139,7 @@ public class SettingsClass implements ExitSavable {
     public static final String AUTO_SAVE_INTERVAL = "autoSaveInterval";
     public static final String AUTO_SAVE_LOCAL_IDENTITIES = "autoSaveLocalIdentities";
     public static final String FILESHARING_DISABLE = "disableFilesharing";
-    public static final String FILESHARING_IGNORE_CHECK_AND_BELOW = "filesharing.ignoreCheckAndBelow";
+    public static final String FILESHARING_IGNORE_NEUTRAL_AND_BELOW = "filesharing.ignoreNEUTRALAndBelow";
     public static final String REMEMBER_SHAREDFILE_DOWNLOADED = "rememberSharedFileDownloaded";
     public static final String DOWNLOADING_ACTIVATED = "downloadingActivated";
 
@@ -162,11 +171,13 @@ public class SettingsClass implements ExitSavable {
 
     public static final String ALWAYS_DOWNLOAD_MESSAGES_BACKLOAD = "alwaysDownloadMessagesBackload";
 
+    public static final String UPLOAD_ENABLED_DEFAULT = "uploadEnabledByDefault";
     public static final String UPLOAD_MAX_RETRIES = "uploadMaxRetries";
     public static final String UPLOAD_WAITTIME = "uploadRetriesWaitTime";
     public static final String UPLOAD_MAX_THREADS = "uploadThreads";
-    public static final String UPLOAD_REMOVE_NOT_EXISTING_FILES = "uploadRemoveNotExistingFiles";
+    public static final String UPLOAD_EXTRA_INSERTS = "uploadExtraInserts"; // can have values of Options.uploads.extraInserts.0, 2 and 7
 
+    public static final String DOWNLOAD_ENABLED_DEFAULT = "downloadEnabledByDefault";
     public static final String DOWNLOAD_MAX_THREADS = "downloadThreads";
     public static final String DOWNLOAD_MAX_RETRIES = "downloadMaxRetries";
     public static final String DOWNLOAD_WAITTIME = "downloadWaittime";
@@ -176,7 +187,7 @@ public class SettingsClass implements ExitSavable {
     public static final String GQ_SHOW_EXTERNAL_ITEMS_DOWNLOAD = "showExternalGlobalQueueDownloads";
     public static final String GQ_SHOW_EXTERNAL_ITEMS_UPLOAD = "showExternalGlobalQueueUploads";
 
-    public static final String COMPRESS_UPLOADS = "compressUploads";
+    public static final String UPLOAD_QUICKHEAL_MODE = "quickhealMode";
 
     public static final String SAVE_SORT_STATES = "saveSortStates";
     public static final String MSGTABLE_MULTILINE_SELECT = "messageTableMultilineSelect";
@@ -189,7 +200,6 @@ public class SettingsClass implements ExitSavable {
     public static final String SHOW_BOARD_UPDATED_COUNT = "showBoardUpdatedCount";
     public static final String PREVENT_BOARDTREE_REORDERING = "preventBoardTreeReordering";
     public static final String SHOW_BOARDTREE_FLAGGEDSTARRED_INDICATOR = "showBoardtreeFlaggedStarredIndicators";
-    public static final String SHOW_BOARD_UPDATE_VISUALIZATION = SettingsClass.BOARD_UPDATE_VISUALIZATION_ENABLED;
     public static final String DISABLE_SPLASHSCREEN = "disableSplashScreen";
     public static final String SHOW_SYSTRAY_ICON = "showSystrayIcon";
     public static final String MINIMIZE_TO_SYSTRAY = "minimizeToSystray";
@@ -197,55 +207,62 @@ public class SettingsClass implements ExitSavable {
     public static final String MAX_MESSAGE_DISPLAY = "maxMessageDisplay";
     public static final String MAX_MESSAGE_DOWNLOAD = "maxMessageDownload";
     public static final String MESSAGE_UPLOAD_DISABLED = "messageUploadDisabled";
-    public static final String MAX_MESSAGE_FAILURE = "maxMesssageFailure";
+    public static final String MESSAGE_UPLOAD_QUICKSEND = "messageUploadQuicksend";
+    public static final String MAX_MESSAGE_DOWNLOADDATE_FAILURES = "maxMessageDownloadDateFailures";
 
     public static final String SEARCH_MAX_RESULTS = "maxSearchResults";
-    public static final String SEARCH_HIDE_BAD = "hideBadFiles";
-    public static final String SEARCH_HIDE_CHECK = "hideCheckFiles";
-    public static final String SEARCH_HIDE_OBSERVE = "hideObserveFiles";
+    public static final String SEARCH_HIDE_BAD = "hideBADFiles";
+    public static final String SEARCH_HIDE_NEUTRAL = "hideNEUTRALFiles";
+    public static final String SEARCH_HIDE_GOOD = "hideGOODFiles";
     public static final String SEARCH_HIDE_FILES_WITHOUT_CHK = "hideFilesWithoutChk";
 
     public static final String BOARDLIST_LAST_SELECTED_BOARD = "tofTreeSelectedRow";
 
-    public static final String MESSAGE_BLOCK_SUBJECT = "blockMessage";
-    public static final String MESSAGE_BLOCK_SUBJECT_ENABLED = "blockMessageChecked";
+    public static final String MESSAGE_BLOCK_SUBJECT = "blockMessageSubject";
+    public static final String MESSAGE_BLOCK_SUBJECT_ENABLED = "blockMessageSubjectEnabled";
     public static final String MESSAGE_BLOCK_BODY = "blockMessageBody";
-    public static final String MESSAGE_BLOCK_BODY_ENABLED = "blockMessageBodyChecked";
+    public static final String MESSAGE_BLOCK_BODY_ENABLED = "blockMessageBodyEnabled";
     public static final String MESSAGE_BLOCK_BOARDNAME = "blockMessageBoard";
-    public static final String MESSAGE_BLOCK_BOARDNAME_ENABLED = "blockMessageBoardChecked";
+    public static final String MESSAGE_BLOCK_BOARDNAME_ENABLED = "blockMessageBoardEnabled";
 
-    public static final String JUNK_HIDE_JUNK_MESSAGES = "junk.hideJunkMessages";
-    public static final String JUNK_MARK_JUNK_IDENTITY_BAD = "junk.markJunkIdentityBad";
+    public static final String JUNK_MARK_JUNK_IDENTITY_BAD = "junk.markJunkIdentityBAD";
 
-    public static final String MESSAGE_HIDE_OBSERVE = "hideObserveMessages";
-    public static final String MESSAGE_HIDE_CHECK = "hideCheckMessages";
-    public static final String MESSAGE_HIDE_BAD = "hideBadMessages";
     public static final String MESSAGE_HIDE_UNSIGNED = "signedOnly";
+    public static final String MESSAGE_HIDE_BAD = "hideBADMessages";
+    public static final String MESSAGE_HIDE_NEUTRAL = "hideNEUTRALMessages";
+    public static final String MESSAGE_HIDE_GOOD = "hideGOODMessages";
     public static final String MESSAGE_HIDE_COUNT = "hideMessageCount";
     public static final String MESSAGE_HIDE_COUNT_EXCLUDE_PRIVATE = "hideMessageCountExcludePrivate";
 
-    public static final String KNOWNBOARDS_BLOCK_FROM_OBSERVE = "blockBoardsFromObserve";
-    public static final String KNOWNBOARDS_BLOCK_FROM_CHECK = "blockBoardsFromCheck";
-    public static final String KNOWNBOARDS_BLOCK_FROM_BAD = "blockBoardsFromBad";
     public static final String KNOWNBOARDS_BLOCK_FROM_UNSIGNED = "blockBoardsFromUnsigned";
+    public static final String KNOWNBOARDS_BLOCK_FROM_BAD = "blockBoardsFromBAD";
+    public static final String KNOWNBOARDS_BLOCK_FROM_NEUTRAL = "blockBoardsFromNEUTRAL";
+    public static final String KNOWNBOARDS_BLOCK_FROM_GOOD = "blockBoardsFromGOOD";
 
     public static final String BOARD_AUTOUPDATE_ENABLED = "automaticUpdate";
     public static final String BOARD_AUTOUPDATE_CONCURRENT_UPDATES = "automaticUpdate.concurrentBoardUpdates";
     public static final String BOARD_AUTOUPDATE_MIN_INTERVAL = "automaticUpdate.boardsMinimumUpdateInterval";
 
+    /* Colors */
     public static final String BOARD_UPDATE_VISUALIZATION_ENABLED = "boardUpdateVisualization";
-    public static final String BOARD_UPDATE_VISUALIZATION_BGCOLOR_SELECTED = "boardUpdatingSelectedBackgroundColor";
-    public static final String BOARD_UPDATE_VISUALIZATION_BGCOLOR_NOT_SELECTED = "boardUpdatingNonSelectedBackgroundColor";
+    public static final String COLORS_BOARD_UPDATE_VISUALIZATION_BACKGROUND_SELECTED = "Colors.boardUpdatingSelectedBackground";
+    public static final String COLORS_BOARD_UPDATE_VISUALIZATION_BACKGROUND_NOTSELECTED = "Colors.boardUpdatingNonSelectedBackground";
+    public static final String COLORS_MESSAGE_NORMALMSG = "Colors.Messages.Normal";
+    public static final String COLORS_MESSAGE_PRIVMSG = "Colors.Messages.Private";
+    public static final String COLORS_MESSAGE_PRIVEDITOR = "Colors.Messages.PrivateEditor";
+    public static final String COLORS_MESSAGE_WITHATTACHMENTS = "Colors.Messages.WithAttachments";
+    public static final String COLORS_MESSAGE_UNSIGNEDMSG = "Colors.Messages.Unsigned";
 
     public static final String SHOW_THREADS = "MessagePanel.showThreads";
 
     public static final String INDICATE_LOW_RECEIVED_MESSAGES = "MessagePanel.indicateLowReceivedMessages";
     public static final String INDICATE_LOW_RECEIVED_MESSAGES_COUNT_RED = "MessagePanel.indicateLowReceivedMessages.redCount";
-    public static final String INDICATE_LOW_RECEIVED_MESSAGES_COUNT_LIGHTRED = "MessagePanel.indicateLowReceivedMessages.lightRedCount";
+    public static final String INDICATE_LOW_RECEIVED_MESSAGES_COUNT_BLUE = "MessagePanel.indicateLowReceivedMessages.blueCount";
 
     public static final String SHOW_UNREAD_ONLY = "MessagePanel.showUnreadOnly";
     public static final String SHOW_FLAGGED_ONLY = "MessagePanel.showFlaggedOnly";
     public static final String SHOW_STARRED_ONLY = "MessagePanel.showStarredOnly";
+    public static final String SHOW_JUNK_MESSAGES = "MessagePanel.showJunkMessages";
 
     public static final String MSGTABLE_MSGTEXT_DIVIDER_LOCATION = "MessagePanel.msgTableAndMsgTextSplitpaneDividerLocation";
 
@@ -261,6 +278,7 @@ public class SettingsClass implements ExitSavable {
 
 
     public static final String SHOW_COLORED_ROWS = "showColoredRows";
+    public static final String TREE_EXPANSION_ICON = "treeExpansionIcon";
     public static final String SHOW_SMILEYS = "showSmileys";
     public static final String SHOW_KEYS_AS_HYPERLINKS = "showKeysAsHyperlinks";
     public static final String MESSAGE_BODY_ANTIALIAS = "messageBodyAA";
@@ -302,6 +320,12 @@ public class SettingsClass implements ExitSavable {
     public static final String USE_BOARDNAME_DOWNLOAD_SUBFOLDER_ENABLED = "useBoardnameDownloadSubfolder";
     
     public static final String BROWSER_ADDRESS = "browserAddress";
+
+    public static final String KEYCONVERSIONUTILITY_FORMAT = "KeyConversionUtility.format";
+    public static final String KEYCONVERSIONUTILITY_ADDSPACE = "KeyConversionUtility.addSpace";
+
+    public static final String HASHBLOCKLIST_ENABLED = "HashBlocklist.enabled";
+    public static final String HASHBLOCKLIST_MD5FILE = "HashBlocklist.md5File";
 
     public SettingsClass() {
         settingsHash = new Hashtable<String,Object>();
@@ -359,28 +383,27 @@ public class SettingsClass implements ExitSavable {
     }
 
     public boolean readSettingsFile() {
-        LineNumberReader settingsReader = null;
-        String line;
-
         // maybe restore a .bak of the .ini file
         if (settingsFile.isFile() == false || settingsFile.length() == 0 ) {
-            // try to restore .bak file
+            // try to restore frost.ini.bak file
             final String configDirStr = getValue(SettingsClass.DIR_CONFIG);
             final File bakFile = new File(configDirStr + "frost.ini.bak");
             if( bakFile.isFile() && bakFile.length() > 0 ) {
                 bakFile.renameTo(settingsFile);
             } else {
+                // we don't have a frost.ini, nor a frost.ini.bak
+                logger.warning(settingsFile.getName() + " does not exist, will create it");
                 return false;
             }
         }
 
-        try {
-            settingsReader = new LineNumberReader(new FileReader(settingsFile));
-        } catch (final Exception e) {
-            logger.warning(settingsFile.getName() + " does not exist, will create it");
-            return false;
-        }
-        try {
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final FileReader fileReader = new FileReader(settingsFile);
+            final LineNumberReader settingsReader = new LineNumberReader(fileReader);
+        ) {
+            String line;
+
             while ((line = settingsReader.readLine()) != null) {
                 line = line.trim();
                 if (line.length() != 0 && line.startsWith("#") == false) {
@@ -423,8 +446,14 @@ public class SettingsClass implements ExitSavable {
                                 || key.equals(DIR_LAST_USED)) {
                             value = setSystemFileSeparator(value);
                             objValue = value;
+                        } else if( key.equals(SettingsClass.FILESHARING_DISABLE) ) {
+                            //#DIEFILESHARING: force "disable filesharing" to true anytime we read frost.ini.
+                            //this isn't strictly necessary since nothing in Frost reads the property anymore
+                            //and just hardcodes it to disabled, but this is done for frost.ini consistency.
+                            value = "true";
+                            objValue = value;
                         } else {
-                            // 'old' behaviour
+                            // all other ini properties simply get the ini value as-is
                             objValue = value;
                         }
                         if (objValue != null) {
@@ -434,11 +463,8 @@ public class SettingsClass implements ExitSavable {
                 }
             }
         } catch (final Exception e) {
-            logger.log(Level.SEVERE, "Exception thrown in readSettingsFile()", e);
-        }
-        try {
-            settingsReader.close();
-        } catch (final Exception e) {
+            // NOTE: even if there's an exception, we still return true since we may have
+            // partially read the file. returning false is really only if the file doesn't exist.
             logger.log(Level.SEVERE, "Exception thrown in readSettingsFile()", e);
         }
 
@@ -486,6 +512,33 @@ public class SettingsClass implements ExitSavable {
         settingsHash.remove("selectedSkin");
         settingsHash.remove("doBoardBackoff");
         settingsHash.remove("compactDatabaseTables");
+
+        // remove old (removed or renamed) legacy / sadao / snowflake settings to clean up frost.ini
+        settingsHash.remove("downloads.autoenable");
+        settingsHash.remove("snowflakehack.writeLastDay");
+        settingsHash.remove("message.DN_LOAD_TODAY.maxDaysBack");
+        settingsHash.remove("filesharing.ignoreCheckAndBelow");
+        settingsHash.remove("uploadRemoveNotExistingFiles");
+        settingsHash.remove("compressUploads");
+        settingsHash.remove("maxMesssageFailure");
+        settingsHash.remove("boardUpdatingSelectedBackgroundColor");
+        settingsHash.remove("boardUpdatingNonSelectedBackgroundColor");
+        settingsHash.remove("MessagePanel.indicateLowReceivedMessages.lightRedCount");
+        settingsHash.remove("junk.hideJunkMessages");
+        settingsHash.remove("junk.markJunkIdentityBad");
+        settingsHash.remove("hideBadFiles");
+        settingsHash.remove("hideCheckFiles");
+        settingsHash.remove("hideObserveFiles");
+        settingsHash.remove("hideBadMessages");
+        settingsHash.remove("hideCheckMessages");
+        settingsHash.remove("hideObserveMessages");
+        settingsHash.remove("blockBoardsFromBad");
+        settingsHash.remove("blockBoardsFromCheck");
+        settingsHash.remove("blockBoardsFromObserve");
+        settingsHash.remove("blockMessage");
+        settingsHash.remove("blockMessageChecked");
+        settingsHash.remove("blockMessageBodyChecked");
+        settingsHash.remove("blockMessageBoardChecked");
     }
 
     private boolean writeSettingsFile() {
@@ -501,42 +554,37 @@ public class SettingsClass implements ExitSavable {
         final File oldFile = new File(configDirStr + "frost.ini.old");
         final File bakFile = new File(configDirStr + "frost.ini.bak");
 
-        final PrintWriter settingsWriter;
-        try {
-            settingsWriter = new PrintWriter(new FileWriter(newFile));
-        } catch (final IOException exception) {
-            logger.log(Level.SEVERE, "Exception thrown in writeSettingsFile()", exception);
-            return false;
-        }
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final FileWriter fileWriter = new FileWriter(newFile);
+            final PrintWriter settingsWriter = new PrintWriter(fileWriter);
+        ) {
+            final TreeMap<String,Object> sortedSettings = new TreeMap<String,Object>(settingsHash); // sort the lines
+            final Iterator<String> i = sortedSettings.keySet().iterator();
+            while( i.hasNext() ) {
+                final String key = i.next();
+                if( key.equals(DIR_CONFIG) ) {
+                    continue; // do not save the config dir, its unchangeable
+                }
 
-        final TreeMap<String,Object> sortedSettings = new TreeMap<String,Object>(settingsHash); // sort the lines
-        final Iterator<String> i = sortedSettings.keySet().iterator();
-        while (i.hasNext()) {
-            final String key = i.next();
-            if (key.equals(DIR_CONFIG)) {
-                continue; // do not save the config dir, its unchangeable
+                String val = null;
+                final Object objVal = sortedSettings.get(key);
+                if( objVal instanceof Color ) {
+                    final Color c = (Color) objVal;
+                    val = new StringBuilder()
+                            .append("type.color(")
+                            .append(c.getRed()).append(",")
+                            .append(c.getGreen()).append(",")
+                            .append(c.getBlue())
+                            .append(")")
+                            .toString();
+                } else {
+                    val = objVal.toString();
+                }
+
+                settingsWriter.println(key + "=" + val);
             }
-
-            String val = null;
-            if (sortedSettings.get(key) instanceof Color) {
-                final Color c = (Color) sortedSettings.get(key);
-                val = new StringBuilder()
-                        .append("type.color(")
-                        .append(c.getRed()).append(",")
-                        .append(c.getGreen()).append(",")
-                        .append(c.getBlue())
-                        .append(")")
-                        .toString();
-            } else {
-                val = sortedSettings.get(key).toString();
-            }
-
-            settingsWriter.println(key + "=" + val);
-        }
-
-        try {
-            settingsWriter.close();
-        } catch (final Exception e) {
+        } catch( final Exception e ) {
             logger.log(Level.SEVERE, "Exception thrown in writeSettingsFile", e);
             return false;
         }
@@ -751,6 +799,23 @@ public class SettingsClass implements ExitSavable {
         return settingsHash.get(key);
     }
 
+    public Color getColorValue(final String key, final Color fallbackColor) {
+        final Object value = settingsHash.get(key);
+        if( value instanceof Color ) {
+            return (Color)value;
+        } else {
+            return fallbackColor;
+        }
+    }
+    public Color getColorValue(final String key) { // defaults to black if key isn't a color
+        final Object value = settingsHash.get(key);
+        if( value instanceof Color ) {
+            return (Color)value;
+        } else {
+            return Color.BLACK;
+        }
+    }
+
     public String[] getArrayValue(final String key) {
         final String str = (String) settingsHash.get(key);
         if (str == null) {
@@ -878,7 +943,7 @@ public class SettingsClass implements ExitSavable {
         defaults = new Hashtable<String,Object>();
         final File fn = File.listRoots()[0];
 
-		defaults.put(DOWNLOAD_ENABLED_DEFAULT, "true"); //SF_EDIT
+		defaults.put(FREENETCOMPATMANAGER_USERMODES, "");
 
         defaults.put(MIGRATE_VERSION, "0");
 
@@ -890,6 +955,7 @@ public class SettingsClass implements ExitSavable {
 
         defaults.put(DB_CLEANUP_INTERVAL, "5");
         defaults.put(DB_CLEANUP_LASTRUN, "0");
+        defaults.put(DB_CLEANUP_FORCESTART, "false");
 
         defaults.put(DB_CLEANUP_REMOVEOFFLINEFILEWITHKEY, "true");
         defaults.put(DB_CLEANUP_OFFLINEFILESMAXDAYSOLD, "30");
@@ -903,7 +969,7 @@ public class SettingsClass implements ExitSavable {
         defaults.put(DIR_LAST_USED, "." + fs);
 
         defaults.put(FILESHARING_DISABLE, "true");
-        defaults.put(FILESHARING_IGNORE_CHECK_AND_BELOW, "true");
+        defaults.put(FILESHARING_IGNORE_NEUTRAL_AND_BELOW, "true");
         defaults.put(DISABLE_SPLASHSCREEN, "false");
 
         defaults.put(STORAGE_STORE_INVALID_MESSAGES, "false");
@@ -915,7 +981,7 @@ public class SettingsClass implements ExitSavable {
         defaults.put(FCP2_USE_PERSISTENCE, "true");
         defaults.put(FCP2_USE_ONE_CONNECTION_FOR_MESSAGES, "true");
 
-        defaults.put(FCP2_DEFAULT_PRIO_MESSAGE_UPLOAD, "2");
+        defaults.put(FCP2_DEFAULT_PRIO_MESSAGE_UPLOAD, "0");
         defaults.put(FCP2_DEFAULT_PRIO_MESSAGE_DOWNLOAD, "2");
         defaults.put(FCP2_DEFAULT_PRIO_FILE_UPLOAD, "3");
         defaults.put(FCP2_DEFAULT_PRIO_FILE_DOWNLOAD, "3");
@@ -931,9 +997,15 @@ public class SettingsClass implements ExitSavable {
         defaults.put(BOARD_AUTOUPDATE_CONCURRENT_UPDATES, "6"); // no. of concurrent updating boards in auto update
         defaults.put(BOARD_AUTOUPDATE_MIN_INTERVAL, "45"); // time in min to wait between start of updates for 1 board
 
+        /* Colors, stored in frost.ini as "type.color(R,G,B)" */
         defaults.put(BOARD_UPDATE_VISUALIZATION_ENABLED, "true");
-        defaults.put(BOARD_UPDATE_VISUALIZATION_BGCOLOR_NOT_SELECTED, new Color(233, 233, 233)); // "type.color(233,233,233)"
-        defaults.put(BOARD_UPDATE_VISUALIZATION_BGCOLOR_SELECTED, new Color(137, 137, 191)); // "type.color(137,137,191)"
+        defaults.put(COLORS_BOARD_UPDATE_VISUALIZATION_BACKGROUND_NOTSELECTED, new Color(233, 233, 233)); // light gray
+        defaults.put(COLORS_BOARD_UPDATE_VISUALIZATION_BACKGROUND_SELECTED, new Color(75, 163, 249)); // sky blue
+        defaults.put(COLORS_MESSAGE_NORMALMSG, new Color(2, 44, 80)); // very dark, calming blue which almost looks black
+        defaults.put(COLORS_MESSAGE_PRIVMSG, new Color(254, 71, 188)); // soft pink
+        defaults.put(COLORS_MESSAGE_PRIVEDITOR, new Color(3, 90, 165)); // dark blue (distinct from normal black yet still easy to read)
+        defaults.put(COLORS_MESSAGE_WITHATTACHMENTS, new Color(19, 167, 246)); // slightly-dirty sky blue
+        defaults.put(COLORS_MESSAGE_UNSIGNEDMSG, new Color(145, 145, 145)); // faded, gray color to distinguish from encrypted messages
 
         defaults.put(MESSAGE_BLOCK_SUBJECT, "");
         defaults.put(MESSAGE_BLOCK_SUBJECT_ENABLED, "false");
@@ -944,17 +1016,18 @@ public class SettingsClass implements ExitSavable {
 
         defaults.put(MESSAGE_HIDE_UNSIGNED, "false");
         defaults.put(MESSAGE_HIDE_BAD, "false");
-        defaults.put(MESSAGE_HIDE_CHECK, "false");
-        defaults.put(MESSAGE_HIDE_OBSERVE, "false");
+        defaults.put(MESSAGE_HIDE_NEUTRAL, "false");
+        defaults.put(MESSAGE_HIDE_GOOD, "false");
         defaults.put(MESSAGE_HIDE_COUNT, "0");
         defaults.put(MESSAGE_HIDE_COUNT_EXCLUDE_PRIVATE, "true");
 
-        defaults.put(JUNK_HIDE_JUNK_MESSAGES, "false");
-
-        defaults.put(KNOWNBOARDS_BLOCK_FROM_UNSIGNED, "false");
+        defaults.put(KNOWNBOARDS_BLOCK_FROM_UNSIGNED, "true");
         defaults.put(KNOWNBOARDS_BLOCK_FROM_BAD, "true");
-        defaults.put(KNOWNBOARDS_BLOCK_FROM_CHECK, "false");
-        defaults.put(KNOWNBOARDS_BLOCK_FROM_OBSERVE, "false");
+        defaults.put(KNOWNBOARDS_BLOCK_FROM_NEUTRAL, "false");
+        defaults.put(KNOWNBOARDS_BLOCK_FROM_GOOD, "false");
+
+        defaults.put(UPLOAD_ENABLED_DEFAULT, "true");
+        defaults.put(DOWNLOAD_ENABLED_DEFAULT, "true");
 
         defaults.put(DOWNLOAD_MAX_THREADS, "3");
         defaults.put(DOWNLOADING_ACTIVATED, "true");
@@ -962,9 +1035,12 @@ public class SettingsClass implements ExitSavable {
         defaults.put(DOWNLOAD_MAX_RETRIES, "25");
         defaults.put(DOWNLOAD_WAITTIME, "5");
 
-        defaults.put(MAX_MESSAGE_DISPLAY, "90");
+        // NOTE: the reason for "9999" is that frost always displays unread messages in non-threaded
+        // mode but removes them after a reload if they're older than the max days, so displaying
+        // 9999 days solves the "bug" of messages "vanishing". people can lower it if they want to.
+        defaults.put(MAX_MESSAGE_DISPLAY, "9999");
         defaults.put(MAX_MESSAGE_DOWNLOAD, "30");
-        defaults.put(MAX_MESSAGE_FAILURE, "2"); //SF_EDIT
+        defaults.put(MAX_MESSAGE_DOWNLOADDATE_FAILURES, "2"); // stop grabbing a day's messages after 2 missing msgs
         defaults.put(ALWAYS_DOWNLOAD_MESSAGES_BACKLOAD, "false");
 
         defaults.put(MIN_DAYS_BEFORE_FILE_RESHARE, "5"); // reshare all 5 days
@@ -981,14 +1057,14 @@ public class SettingsClass implements ExitSavable {
 
         defaults.put(SEARCH_MAX_RESULTS, "10000");
         defaults.put(SEARCH_HIDE_BAD, "true");
-        defaults.put(SEARCH_HIDE_CHECK, "false");
-        defaults.put(SEARCH_HIDE_OBSERVE, "false");
+        defaults.put(SEARCH_HIDE_NEUTRAL, "false");
+        defaults.put(SEARCH_HIDE_GOOD, "false");
         defaults.put(SEARCH_HIDE_FILES_WITHOUT_CHK, "false");
 
         defaults.put(GQ_SHOW_EXTERNAL_ITEMS_DOWNLOAD, "false");
         defaults.put(GQ_SHOW_EXTERNAL_ITEMS_UPLOAD, "false");
 
-        defaults.put(COMPRESS_UPLOADS, "true");
+        defaults.put(UPLOAD_QUICKHEAL_MODE, "false");
 
         defaults.put(BOARDLIST_LAST_SELECTED_BOARD, "0");
         defaults.put(UPLOAD_MAX_THREADS, "3");
@@ -1000,23 +1076,25 @@ public class SettingsClass implements ExitSavable {
         defaults.put(FILEEXTENSION_EXECUTABLE, ".exe;.vbs;.jar;.sh;.bat;.bin");
         defaults.put(FILEEXTENSION_ARCHIVE, ".zip;.rar;.jar;.gz;.arj;.ace;.bz;.tar;.tgz;.tbz");
         defaults.put(FILEEXTENSION_IMAGE, ".jpeg;.jpg;.jfif;.gif;.png;.tif;.tiff;.bmp;.xpm");
-        defaults.put(AUTO_SAVE_INTERVAL, "60");
+        defaults.put(AUTO_SAVE_INTERVAL, "30");
         defaults.put(AUTO_SAVE_LOCAL_IDENTITIES, "true");
 
         defaults.put(MESSAGE_UPLOAD_DISABLED, "false");
+        defaults.put(MESSAGE_UPLOAD_QUICKSEND, "true");
 
-        defaults.put(MESSAGE_EXPIRE_DAYS, "90");
+        defaults.put(MESSAGE_EXPIRE_DAYS, "365");
         defaults.put(MESSAGE_EXPIRATION_MODE, "KEEP"); // KEEP or ARCHIVE or DELETE, default KEEP
         defaults.put(ARCHIVE_KEEP_FLAGGED_AND_STARRED, "true");
         defaults.put(ARCHIVE_KEEP_UNREAD, "false");
 
         defaults.put(LANGUAGE_LOCALE, "default");
 
-        defaults.put(MAINFRAME_LAST_WIDTH, "700"); // "lastFrameWidth"
-        defaults.put(MAINFRAME_LAST_HEIGHT, "500"); // "lastFrameHeight"
-        defaults.put(MAINFRAME_LAST_X, "50"); // "lastFramePosX"
-        defaults.put(MAINFRAME_LAST_Y, "50"); // "lastFramePosY"
-        defaults.put(MAINFRAME_LAST_MAXIMIZED, "false"); // "lastFrameMaximized"
+        // size and position of the main window; the -1 values here cause them to be auto-calculated on first startup
+        defaults.put(MAINFRAME_LAST_WIDTH, "-1");
+        defaults.put(MAINFRAME_LAST_HEIGHT, "-1");
+        defaults.put(MAINFRAME_LAST_X, "-1");
+        defaults.put(MAINFRAME_LAST_Y, "-1");
+        defaults.put(MAINFRAME_LAST_MAXIMIZED, "false");
 
         defaults.put(BOARD_TREE_FONT_NAME, "Tahoma");
         defaults.put(BOARD_TREE_FONT_STYLE, new Integer(Font.PLAIN).toString());
@@ -1032,7 +1110,7 @@ public class SettingsClass implements ExitSavable {
         defaults.put(FILE_LIST_FONT_SIZE, "11");
 
         defaults.put(MESSAGE_BODY_ANTIALIAS, "false");
-        defaults.put(MSGTABLE_MULTILINE_SELECT, "false");
+        defaults.put(MSGTABLE_MULTILINE_SELECT, "true");
         defaults.put(MSGTABLE_SCROLL_HORIZONTAL, "false");
         defaults.put(MSGTABLE_SHOW_COLLAPSED_THREADS, "false");
         defaults.put(MSGTABLE_DOUBLE_CLICK_SHOWS_MESSAGE, "true");
@@ -1057,7 +1135,7 @@ public class SettingsClass implements ExitSavable {
 
         defaults.put(UPLOAD_MAX_RETRIES, "5");
         defaults.put(UPLOAD_WAITTIME, "5");
-        defaults.put(UPLOAD_REMOVE_NOT_EXISTING_FILES, "true");
+        defaults.put(UPLOAD_EXTRA_INSERTS, ExtraInserts.DEFAULT);
 
         defaults.put(SHOW_THREADS, "true");
         defaults.put(HANDLE_OWN_MESSAGES_AS_NEW_DISABLED, "false");
@@ -1065,36 +1143,51 @@ public class SettingsClass implements ExitSavable {
         defaults.put(SORT_THREADROOTMSGS_ASCENDING, "false");
 
         defaults.put(INDICATE_LOW_RECEIVED_MESSAGES, "true");
-        defaults.put(INDICATE_LOW_RECEIVED_MESSAGES_COUNT_RED, "1");
-        defaults.put(INDICATE_LOW_RECEIVED_MESSAGES_COUNT_LIGHTRED, "5");
+        defaults.put(INDICATE_LOW_RECEIVED_MESSAGES_COUNT_RED, "10");
+        defaults.put(INDICATE_LOW_RECEIVED_MESSAGES_COUNT_BLUE, "20");
 
         defaults.put(SHOW_COLORED_ROWS, "true");
+        defaults.put(TREE_EXPANSION_ICON, "Options.display.treeExpansionIcon.style0");
         defaults.put(SHOW_SMILEYS, "true");
         defaults.put(SHOW_KEYS_AS_HYPERLINKS, "true");
 
         defaults.put(LOG_DOWNLOADS_ENABLED, "false");
         defaults.put(LOG_UPLOADS_ENABLED, "false");
-        defaults.put(TRACK_DOWNLOADS_ENABLED, "false");
+        defaults.put(TRACK_DOWNLOADS_ENABLED, "true");
         defaults.put(USE_BOARDNAME_DOWNLOAD_SUBFOLDER_ENABLED, "false");
 
 
+        defaults.put(WARN_NO_IMAGES_TO_OPEN, "true");
+        defaults.put(CONFIRM_ENABLE_UPLOAD_COMPRESSION, "true");
+        defaults.put(CONFIRM_SEND_UNSIGNED_MSG, "true");
         defaults.put(CONFIRM_MARK_ALL_MSGS_READ, "true");
         defaults.put(CONFIRM_FILESHARING_IS_ENABLED, "true");
 
-        defaults.put(PERST_PAGEPOOLSIZE_FILES,              "512");
-        defaults.put(PERST_PAGEPOOLSIZE_INDEXSLOTS,         "512");
-        defaults.put(PERST_PAGEPOOLSIZE_SHAREDFILESCHKKEYS, "1024");
-        defaults.put(PERST_PAGEPOOLSIZE_FILELIST,           "1024");
-        defaults.put(PERST_PAGEPOOLSIZE_IDENTITIES,         "1024");
-        defaults.put(PERST_PAGEPOOLSIZE_MESSAGEARCHIVE,     "1024");
-        defaults.put(PERST_PAGEPOOLSIZE_MESSAGES,           "6144");
-        defaults.put(PERST_PAGEPOOLSIZE_MESSAGECONTENTS,    "1024");
+        // key conversion utility defaults
+        defaults.put(KEYCONVERSIONUTILITY_FORMAT, KeyConversionUtility.FORMAT_DEFAULT);
+        defaults.put(KEYCONVERSIONUTILITY_ADDSPACE, "false");
+
+        // hash blocklist defaults
+        defaults.put(HASHBLOCKLIST_ENABLED, "false");
+        defaults.put(HASHBLOCKLIST_MD5FILE, "hashes/files.md5");
+
+        // default to the most common Freenet node address, so that the "open in browser" feature works
+        defaults.put(BROWSER_ADDRESS, "http://127.0.0.1:8888/");
+
+        // Frost-Next uses larger memory buffers for Perst, which greatly improves the database performance; all sizes are in kilobytes
+        defaults.put(PERST_PAGEPOOLSIZE_FILES,              "2048"); // Legacy Frost: 512
+        defaults.put(PERST_PAGEPOOLSIZE_INDEXSLOTS,         "1024"); // 512
+        defaults.put(PERST_PAGEPOOLSIZE_SHAREDFILESCHKKEYS, "1024"); // 1024
+        defaults.put(PERST_PAGEPOOLSIZE_TRACKDOWNLOADKEYS,  "1024"); // Legacy Frost: Did not exist, used "SHAREDFILESCHKKEYS" value
+        defaults.put(PERST_PAGEPOOLSIZE_HASHBLOCKLIST,      "2048"); // New Frost-Next feature; up to 2 MiB of pages in memory
+        defaults.put(PERST_PAGEPOOLSIZE_FILELIST,           "1024"); // 1024
+        defaults.put(PERST_PAGEPOOLSIZE_IDENTITIES,         "2048"); // 1024
+        defaults.put(PERST_PAGEPOOLSIZE_MESSAGEARCHIVE,     "2048"); // 1024
+        defaults.put(PERST_PAGEPOOLSIZE_MESSAGES,           "12288"); // 6144 - extremely important for fast board re-opening
+        defaults.put(PERST_PAGEPOOLSIZE_MESSAGECONTENTS,    "4096"); // 1024
 
         defaults.put(PERST_COMPACT_STORAGES, "false");
         defaults.put(PERST_EXPORT_STORAGES,  "false");
-
-		defaults.put(SNOWFLAKE_HACK_WRITE_LAST_DAY, "false");
-		defaults.put(DOWNLOAD_TODAY_DAYS_BACK,"1");
 
         settingsHash.putAll(defaults);
     }
@@ -1109,7 +1202,7 @@ public class SettingsClass implements ExitSavable {
         if (updaters != null) {
             final Enumeration<SettingsUpdater> enumeration = updaters.elements();
             while (enumeration.hasMoreElements()) {
-                enumeration.nextElement().updateSettings();
+                (enumeration.nextElement()).updateSettings();
             }
         }
         if (!writeSettingsFile()) {

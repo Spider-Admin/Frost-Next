@@ -36,22 +36,26 @@ public class Identity extends Persistent implements XMLizable {
 
     private static transient final Logger logger = Logger.getLogger(Identity.class.getName());
 
-    private static transient final int GOOD    = 1;
-    private static transient final int CHECK   = 2;
-    private static transient final int OBSERVE = 3;
-    private static transient final int BAD     = 4;
+    private static transient final int BAD       = 10;
+    private static transient final int NEUTRAL   = 11;
+    private static transient final int GOOD      = 12;
+    private static transient final int FRIEND    = 13;
 
-    private static transient final String GOOD_STRING    = "GOOD";
-    private static transient final String CHECK_STRING   = "CHECK";
-    private static transient final String OBSERVE_STRING = "OBSERVE";
-    private static transient final String BAD_STRING     = "BAD";
+    private static transient final String BAD_STRING       = "BAD";
+    private static transient final String NEUTRAL_STRING   = "NEUTRAL";
+    private static transient final String GOOD_STRING      = "GOOD";
+    private static transient final String FRIEND_STRING    = "FRIEND";
 
     private String uniqueName;
     private long lastSeenTimestamp = -1;
     private int receivedMessageCount = 0;
 
-    private int state = CHECK;
-    private transient String stateString = CHECK_STRING;
+    /**
+     * OLD, LEGACY FROST DATABASES USED VALUES IN THE RANGE OF 1-4 TO DENOTE THE STATE;
+     * IF WE DETECT SUCH A VALUE ON LOAD, WE'LL MIGRATE THE STATE TO THE FROST-NEXT RANGE
+     * WHICH STARTS AT 10 AND ABOVE.
+     */
+    private int state = NEUTRAL;
 
     private transient String publicKey;
 
@@ -85,27 +89,26 @@ public class Identity extends Persistent implements XMLizable {
         uniqueName = uname;
         publicKey = pubkey;
         lastSeenTimestamp = lseen;
-        state = s;
-        updateStateString();
+        setUpgradedState(s); // ensures we use FROST-NEXT state numbers
 
         uniqueName = Mixed.makeFilename(uniqueName);
     }
 
     /**
-     * If a LocalIdentity is deleted, we ceate a GOOD Identity for the deleted LocalIdentity
+     * If a LocalIdentity is deleted, we create a FRIEND Identity for the deleted LocalIdentity
+     * (the FRIEND state is set in source/frost/gui/ManageLocalIdentitiesDialog.java)
      */
     public Identity(final LocalIdentity li) {
         uniqueName = li.getUniqueName();
         publicKey = li.getPublicKey();
         lastSeenTimestamp = li.getLastSeenTimestamp();
         receivedMessageCount = li.getReceivedMessageCount();
-        updateStateString();
     }
 
     /**
      * Create a new Identity from the specified uniqueName and publicKey.
      * If uniqueName does not contain an '@', this method creates a new digest
-     * for the publicKey and appens it to the uniqueName.
+     * for the publicKey and appends it to the uniqueName.
      * Finally Mixed.makeFilename() is called for the uniqueName.
      */
     protected Identity(String name, final String key, final boolean createNew) {
@@ -192,7 +195,33 @@ public class Identity extends Persistent implements XMLizable {
 
     @Override
     public void onLoad() {
-        updateStateString();
+        // MIGRATION: if we're loading an old legacy Frost state (range 1-4), then we need to
+        // upgrade it to a Frost-Next state (range 10+). we do NOT need to write anything
+        // to the database, since database writes will happen automatically if the user
+        // changes their state, or if any ID properties (such as received message count)
+        // are updated. so we can simply load + convert the old state, and then let Frost
+        // lazy-save the new state whenever some aspect of the identity changes.
+        if( state < 10 ) {
+            setUpgradedState(state);
+        }
+    }
+
+    /**
+     * Upgrades a legacy Frost state (range 1-4) to a Frost-Next state (10+).
+     * Doesn't write anything to the database, since that choice is up to the caller.
+     */
+    private void setUpgradedState(final int oldState) {
+        int newState = NEUTRAL;
+        if( oldState == 4 ) { // LEGACY FROST: "BAD"
+            newState = BAD;
+        } else if( oldState == 2 ) { // LEGACY FROST: "CHECK"
+            newState = NEUTRAL;
+        } else if( oldState == 3 ) { // LEGACY FROST: "OBSERVE"
+            newState = GOOD;
+        } else if( oldState == 1 ) { // LEGACY FROST: "GOOD"
+            newState = FRIEND;
+        }
+        state = newState;
     }
 
     public Element getXMLElement(final Document doc)  {
@@ -321,73 +350,62 @@ public class Identity extends Persistent implements XMLizable {
         return getUniqueName();
     }
 
-    public boolean isGOOD() {
-        return state==GOOD;
-    }
-    public boolean isCHECK() {
-        return state==CHECK;
-    }
-    public boolean isOBSERVE() {
-        return state==OBSERVE;
-    }
     public boolean isBAD() {
         return state==BAD;
     }
+    public boolean isNEUTRAL() {
+        return state==NEUTRAL;
+    }
+    public boolean isGOOD() {
+        return state==GOOD;
+    }
+    public boolean isFRIEND() {
+        return state==FRIEND;
+    }
 
-    public void setGOOD() {
-        state=GOOD;
-        updateStateString();
-        updateIdentitiesStorage();
-    }
-    public void setCHECK() {
-        state=CHECK;
-        updateStateString();
-        updateIdentitiesStorage();
-    }
-    public void setOBSERVE() {
-        state=OBSERVE;
-        updateStateString();
-        updateIdentitiesStorage();
-    }
     public void setBAD() {
         state=BAD;
-        updateStateString();
+        updateIdentitiesStorage();
+    }
+    public void setNEUTRAL() {
+        state=NEUTRAL;
+        updateIdentitiesStorage();
+    }
+    public void setGOOD() {
+        state=GOOD;
+        updateIdentitiesStorage();
+    }
+    public void setFRIEND() {
+        state=FRIEND;
         updateIdentitiesStorage();
     }
 
-    public void setGOODWithoutUpdate() {
-        state=GOOD;
-        updateStateString();
-    }
-    public void setCHECKWithoutUpdate() {
-        state=CHECK;
-        updateStateString();
-    }
-    public void setOBSERVEWithoutUpdate() {
-        state=OBSERVE;
-        updateStateString();
-    }
     public void setBADWithoutUpdate() {
         state=BAD;
-        updateStateString();
     }
-
-    private void updateStateString() {
-        if( isCHECK() ) {
-            stateString = CHECK_STRING;
-        } else if( isOBSERVE() ) {
-            stateString = OBSERVE_STRING;
-        } else if( isGOOD() ) {
-            stateString = GOOD_STRING;
-        } else if( isBAD() ) {
-            stateString = BAD_STRING;
-        } else {
-            stateString = "*ERR*";
-        }
+    public void setNEUTRALWithoutUpdate() {
+        state=NEUTRAL;
+    }
+    public void setGOODWithoutUpdate() {
+        state=GOOD;
+    }
+    public void setFRIENDWithoutUpdate() {
+        state=FRIEND;
     }
 
     public String getStateString() {
-        return stateString;
+        // check states in order of popularity, to return quickly
+        if( isNEUTRAL() ) {
+            return NEUTRAL_STRING;
+        } else if( isGOOD() ) {
+            return GOOD_STRING;
+        } else if( isFRIEND() ) {
+            return FRIEND_STRING;
+        } else if( isBAD() ) {
+            return BAD_STRING;
+        } else {
+            return "*ERR*";
+        }
     }
 
     protected boolean updateIdentitiesStorage() {

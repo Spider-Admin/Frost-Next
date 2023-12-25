@@ -39,29 +39,35 @@ import frost.util.*;
  */
 public class MessageThread extends BoardUpdateThreadObject implements BoardUpdateThread, MessageUploaderCallback {
 
-    private final Board board;
-    private final int maxMessageDownload;
     private final boolean downloadToday;
-    private final int startDay; // SF_EDIT
-    private int daysBack; // SF_EDIT
-	private final SettingsClass config;
-	
+    private final Board board;
+    private int maxDaysBack;
+    private int startDay;
+    private int lastAllDayStarted;
+    private volatile boolean stopUpdatingFlag = false;
+
     private static final Logger logger = Logger.getLogger(MessageThread.class.getName());
 
-    public MessageThread(final boolean downloadToday, final Board boa, final int maxmsgdays, final int startDay) {
-        super(boa);
+    public MessageThread(final boolean downloadToday, final Board board, final int maxDaysBack, final int startDay) {
+        super(board);
         this.downloadToday = downloadToday;
-        this.board = boa;
-        this.maxMessageDownload = maxmsgdays;
-		this.daysBack = 0;
-		this.startDay = startDay;
-		config = new SettingsClass();
+        this.board = board;
+        this.maxDaysBack = maxDaysBack;
+        this.startDay = startDay;
+        this.lastAllDayStarted = -1;
     }
 
-	//SF_EDIT
-    public int getDaysBack()
+    /**
+     * Nothing uses this function, and it's pretty pointless since we're already directly updating
+     * the global "last all-day scan day started" setting whenever we perform an all-days thread.
+     *
+     * @return  -1 if the message downloading has not yet begun or if this is just a "today" thread,
+     *     otherwise a number from 0 and up representing what "all days back" day it has currently
+     *     started downloading (0 (today), 1 (yesterday), 2, etc).
+     */
+    public int getLastAllDayStarted()
     {
-		return startDay + daysBack;
+        return lastAllDayStarted;
     }
 
     public int getThreadType() {
@@ -72,6 +78,18 @@ public class MessageThread extends BoardUpdateThreadObject implements BoardUpdat
         }
     }
 
+    /**
+     * If set to true, the thread will stop downloading messages
+     * after it's done with the current day it's working on.
+     */
+    public void setStopUpdatingFlag(final boolean flag) {
+        stopUpdatingFlag = flag;
+    }
+
+    public boolean isStopUpdatingFlag() {
+        return stopUpdatingFlag;
+    }
+
     @Override
     public void run() {
 
@@ -80,9 +98,9 @@ public class MessageThread extends BoardUpdateThreadObject implements BoardUpdat
         try {
             String tofType;
             if (downloadToday) {
-                tofType = "TOF Download";
+                tofType = "TOF Download (TODAY)";
             } else {
-                tofType = "TOF Download Back";
+                tofType = "TOF Download (ALLDAYS)";
             }
 
             // wait a max. of 5 seconds between start of threads
@@ -90,85 +108,133 @@ public class MessageThread extends BoardUpdateThreadObject implements BoardUpdat
 
             logger.info("TOFDN: " + tofType + " Thread started for board " + board.getName());
 
-            if (isInterrupted()) {
+            // NOTE: despite the isInterrupted() checks here and below, there's
+            // actually no code in Frost which interrupts the threads manually.
+            // it's only done automatically by Java at Frost's GUI shutdown.
+            // but there IS code which sets the "stopUpdating" flag, which tells
+            // the thread to stop downloading messages and abort as soon as possible.
+            if( isInterrupted() || isStopUpdatingFlag() ) {
                 notifyThreadFinished(this);
                 return;
             }
 
-            LocalDate localDate = new LocalDate(DateTimeZone.UTC);
-            final int boardId = board.getPerstFrostBoardObject().getBoardId();
-            // start a thread if allowed,
-            if (this.downloadToday) {
-				int maxMessageToday = config.getIntValue(SettingsClass.DOWNLOAD_TODAY_DAYS_BACK);
-				if (maxMessageToday > 5)
-					maxMessageToday = 5;
-				
-				while(!isInterrupted() && daysBack < maxMessageToday) {
-					daysBack++;
-					logger.info(board.getName() + ": TOF Download: downloading day: " + daysBack);
-					
-					// get IndexSlot for today
-					final long dateMillis = localDate.toDateMidnight(DateTimeZone.UTC).getMillis();
-                    final IndexSlot gis = IndexSlotsStorage.inst().getSlotForDate(boardId, dateMillis);
-					final BoardUpdateInformation todayBui = downloadDate(localDate, gis, dateMillis);
-
-					// after update, check if there are messages for upload and upload them
-					// ... but only when we didn't stop because of too much invalid messages
-					if( todayBui.isBoardUpdateAllowed() && daysBack == 1) {
-						logger.info(board.getName() + ": TOF Download: uploading messages.");
-						uploadMessages(gis); // doesn't get a message when message upload is disabled
-					}
-					localDate = localDate.minusDays(1);
-				}
+            // #MIDNIGHTBUGFIX 1 of 2: allowing active conversations at UTC midnight.
+            // if we're doing a "today" scan, we will download today (0) plus yesterday (1).
+            // this solves the huge problem that conversations at midnight completely die,
+            // because as soon as the day switches over, Frost used to only load messages
+            // for the new day, so any messages sent near midnight would not be seen by anybody
+            // until their clients ran an "all days back" scan (which by default only happens
+            // every 12 hours). this fix ensures that we do a QUICK "any new messages after
+            // yesterday's last index?" check after we're done grabbing today's actual messages.
+            // we don't limit this additional "yesterday" check to any specific time; we always do it,
+            // for protection against clock skew, etc. it's a fast check, so it doesn't matter.
+            if( this.downloadToday ) {
+                // "today" scan grabs today (0) + yesterday (1)
+                startDay = 0;
+                maxDaysBack = 2;
             } else {
-				localDate = localDate.minusDays(startDay);
-                // download up to maxMessages days to the past
-                while (!isInterrupted() && daysBack < maxMessageDownload) {
-					if(board.getStopUpdating())
-					{
-						board.setStopUpdating(false);
-						break;
-						
-					}
-					
-					board.setLastDayChecked(daysBack + startDay);
-					board.setLastDayBoardUpdated(new LocalDate(DateTimeZone.UTC));
-					
-					//Write a file for each updating board with value of daysback
-					if(config.getBoolValue(SettingsClass.SNOWFLAKE_HACK_WRITE_LAST_DAY) )
-					{
-						File outDir = new File("./localdata/boardupdates/");
-						if (!outDir.exists()) {
-							boolean result = outDir.mkdir();
-						}
-						
-						String boardName = board.getName();
-						Integer.toString(daysBack);
-						String filename= "./localdata/boardupdates/" + boardName + ".txt";
-						FileWriter fw = new FileWriter(filename,false);
-						try
-						{ 
-							fw.write(daysBack + "\n");
-							fw.close();
-						}
-						catch(IOException ioe)
-						{
-							System.err.println("IOException: " + ioe.getMessage());
-						}
-						finally
-						{
-							fw.close();
-						}
-					 }
-					 
-                    daysBack++;
-                    localDate = localDate.minusDays(startDay + daysBack);
-                    final long dateMillis = localDate.toDateMidnight(DateTimeZone.UTC).getMillis();
-                    final IndexSlot gis = IndexSlotsStorage.inst().getSlotForDate(boardId, dateMillis);
-                    downloadDate(localDate, gis, dateMillis);
-                    // Only after a complete backload run, remember finish time.
-                    // this ensures we always update the complete backload days.
-                    if( !isInterrupted() ) {
+                // "all days back" scans need to indicate that they're in progress (this is what
+                // makes the "Day x/y" GUI indicator appear; it's not used for regular day-updates).
+                board.setAllDaysUpdating(true);
+            }
+
+            // now just perform the today/all days message download:
+            // "startTime" = the exact time that the whole job began; cached to avoid slipping during jobs that take several days to complete
+            // "theDate" = constantly updated reference to the date we'll download each iteration
+            final DateTime startTime = new DateTime(DateTimeZone.UTC);
+            DateTime theDate = null;
+            final int boardId = board.getPerstFrostBoardObject().getBoardId();
+            for( int currentDay = startDay; currentDay < maxDaysBack; ++currentDay ) {
+                if( isInterrupted() || isStopUpdatingFlag() ) {
+                    break; // we've been told to stop downloading messages
+                }
+
+                // figure out which date we'll be downloading (such as "2015-11-04")
+                theDate = startTime.minusDays(currentDay).withTimeAtStartOfDay();
+                logger.info("TOF Download (" + (this.downloadToday ? "TODAY" : "ALLDAYS") + "): '" + board.getName() + "', downloading day: " + (currentDay + 1) + "/" + maxDaysBack + " (" + theDate.toString("yyyy-MM-dd") + ")"); // we add +1 to the current day for log-readability (so that 10/10 is the final day instead of 9/10), just like when we display days in the GUI.
+
+                // if this is an "all days back" scan, we'll set the current progress for GUI/resume purposes
+                if( !this.downloadToday ) {
+                    lastAllDayStarted = currentDay; // thread-local var not used anywhere, but we update it anyway
+
+                    // these are used in GUI as "Downloading Day x/y (yyyy-MM-dd)"
+                    board.setLastAllDayStarted(currentDay); // x
+                    board.setLastAllMaxDays(maxDaysBack); // y
+                    board.setLastAllDayStartedDate(theDate); // yyyy-MM-dd
+
+                    // if the message downloading was stopped without finishing all maxDays,
+                    // this is used for determining how long ago the scan was interrupted.
+                    // it's used in the "Resume"-offset calculations.
+                    board.setLastDayBoardUpdated(new DateTime(DateTimeZone.UTC));
+                }
+
+                // get slot-index for the current day's date
+                final long dateMillis = theDate.withTimeAtStartOfDay().getMillis();
+                final IndexSlot gis = IndexSlotsStorage.inst().getSlotForDateMidnightMillis(boardId, dateMillis);
+
+                // download the messages for the current day (updates the slotindex)
+                final BoardUpdateInformation bui = downloadDate(theDate, gis, dateMillis);
+
+                // do special post-processing *only* if the day-download was completed without interruption
+                if( !isInterrupted() && !isStopUpdatingFlag() ) {
+                    // if we just finished loading the messages for "today" (day 0), regardless
+                    // of whether this is a "today" scan or an "all days back" scan, we should
+                    // now try uploading messages (if allowed). we need to send messages *now*
+                    // since having downloaded today means we know which slot indexes are open.
+                    if( bui.isBoardUpdateAllowed() && currentDay == 0 ) {
+                        logger.info("TOF Download (" + (this.downloadToday ? "TODAY" : "ALLDAYS") + "): '" + board.getName() + "', uploading today's messages...");
+
+                        // #MIDNIGHTBUGFIX 2 of 2:
+                        // this will now ONLY upload messages while it's STILL the
+                        // same day as the index slot. so if the user updated
+                        // the board near midnight (so that it finished grabbing
+                        // "today"'s messages *after* midnight), or if they sent
+                        // multiple messages near midnight, then one or more of
+                        // the messages may be skipped and have to wait until the
+                        // next board refresh instead. in the past, the messages
+                        // used to be uploaded anyway, but with yesterday's ("today")
+                        // slotindex above, which meant they may be uploaded with
+                        // extremely high slot indexes, and if nobody posted enough
+                        // messages to reach that index, the message would be lost
+                        // forever. it was a very rare occurrence since most people
+                        // stopped talking at midnight, but with #MIDNIGHTBUGFIX1
+                        // taking care of talking at midnight, it became extra
+                        // critical to take care of this "black hole" midnight bug too.
+                        final int result = uploadMessages(gis); // NOTE: doesn't tell us if message upload is disabled
+                        if( result == UPLOADMESSAGES_NEED_UPDATED_SLOTINDEX ) {
+                            // okay... so... the slotindex for "today" is too old,
+                            // which means that the board refresh has taken long
+                            // enough to push the clock past midnight, *or* that
+                            // multiple messages were queued and the uploading
+                            // of the first message(s) delayed the remaining messages
+                            // past midnight, so they've refused to use the old slotindex...
+                            //
+                            // we could now wait until next board refresh, or we *could*
+                            // forcibly start a separate "today" board update thread,
+                            // but here's an even better idea:
+                            //
+                            // - let's get the latest timestamp and download today's
+                            //   latest slotindex *right now* and try *ONE* more time
+                            //   to upload the messages that were meant for today.
+                            // - it causes some code duplication, but the benefits are great:
+                            //   no need to start extra threads, no need to wait until
+                            //   the next board refresh, *and* of course the fact that
+                            //   this method has an *extremely* high chance of successfully
+                            //   updating "today" and uploading *all* remaining messages.
+                            logger.log(Level.SEVERE, "We tried to upload messages for '" + board.getName() + "' using an outdated slotindex; we'll try downloading today's latest slotindex again and try one more time... otherwise, the uploads will be deferred until next board refresh...");
+                            final DateTime nowDate = new DateTime(DateTimeZone.UTC).withTimeAtStartOfDay();
+                            final long nowDateMillis = nowDate.getMillis();
+                            final IndexSlot nowGis = IndexSlotsStorage.inst().getSlotForDateMidnightMillis(boardId, nowDateMillis);
+                            final BoardUpdateInformation nowBui = downloadDate(nowDate, nowGis, nowDateMillis);
+                            uploadMessages(nowGis); // try to upload again, and ignore return code
+                        }
+                    }
+
+                    // if this is an "all days back" scan and we finished at least 1 day without
+                    // interruption, we'll store the current time as the "last time an all days
+                    // back scan ran". this is used for the code that checks "has it been 12+ hours
+                    // since the last 'all days' scan? then run an all days back scan".
+                    if( !this.downloadToday ) {
                         board.setLastBackloadUpdateFinishedMillis(System.currentTimeMillis());
                     }
                 }
@@ -176,6 +242,9 @@ public class MessageThread extends BoardUpdateThreadObject implements BoardUpdat
             logger.info("TOFDN: " + tofType + " Thread stopped for board " + board.getName());
         } catch (final Throwable t) {
             logger.log(Level.SEVERE, Thread.currentThread().getName() + ": Oo. Exception in MessageDownloadThread:", t);
+        }
+        if( !this.downloadToday ) { // indicate to the GUI that we're done with the "all days" scan
+            board.setAllDaysUpdating(false);
         }
         notifyThreadFinished(this);
     }
@@ -210,9 +279,9 @@ public class MessageThread extends BoardUpdateThreadObject implements BoardUpdat
         return downKey;
     }
 
-    protected BoardUpdateInformation downloadDate(final LocalDate localDate, final IndexSlot gis, final long dateMillis) {
+    protected BoardUpdateInformation downloadDate(final DateTime theDate, final IndexSlot gis, final long dateMillis) {
 
-        final String dirDateString = DateFun.FORMAT_DATE.print(localDate);
+        final String dirDateString = DateFun.FORMAT_DATE.print(theDate);
 
         final BoardUpdateInformation boardUpdateInformation = board.getOrCreateBoardUpdateInformationForDay(dirDateString, dateMillis);
 
@@ -221,14 +290,17 @@ public class MessageThread extends BoardUpdateThreadObject implements BoardUpdat
 
         int index = -1;
         int failures = 0;
-        int configMaxFailures = config.getIntValue(SettingsClass.MAX_MESSAGE_FAILURE);
-        if(configMaxFailures > 5)
-			configMaxFailures = 5;
-        final int maxFailures = configMaxFailures; // skip a maximum of 2 empty slots at the end of known indices
+        int configMaxFailures = Core.frostSettings.getIntValue(SettingsClass.MAX_MESSAGE_DOWNLOADDATE_FAILURES); // default: 2
+        if( configMaxFailures > 5 ) {
+            configMaxFailures = 5;
+        } else if( configMaxFailures < 2 ) {
+            configMaxFailures = 2;
+        }
+        final int maxFailures = configMaxFailures; // skip a maximum of 2-5 empty slots at the end of known message indices for that day
 
         while (failures < maxFailures) {
 
-            if (isInterrupted()) {
+            if( isInterrupted() || isStopUpdatingFlag() ) {
                 break;
             }
 
@@ -310,13 +382,13 @@ public class MessageThread extends BoardUpdateThreadObject implements BoardUpdat
 
                 if( mdResult.isFailure() ) {
                     // some error occured, don't try this file again
-                    receivedInvalidMessage(board, localDate, index, mdResult.getErrorMessage());
+                    receivedInvalidMessage(board, theDate, index, mdResult.getErrorMessage());
                     boardUpdateInformation.incCountInvalid(); notifyBoardUpdateInformationChanged(this, boardUpdateInformation);
                 } else if( mdResult.getMessage() != null ) {
                     // message is loaded, delete underlying received file
                     mdResult.getMessage().getFile().delete();
                     // basic validation, isValid() of FrostMessageObject was already called during instanciation of MessageXmlFile
-                    if (isValidFormat(mdResult.getMessage(), localDate, board)) {
+                    if (isValidFormat(mdResult.getMessage(), theDate, board)) {
                         receivedValidMessage(
                                 mdResult.getMessage(),
                                 mdResult.getOwner(),
@@ -328,7 +400,7 @@ public class MessageThread extends BoardUpdateThreadObject implements BoardUpdat
 
                         notifyBoardUpdateInformationChanged(this, boardUpdateInformation);
                     } else {
-                        receivedInvalidMessage(board, localDate, index, MessageDownloaderResult.INVALID_MSG);
+                        receivedInvalidMessage(board, theDate, index, MessageDownloaderResult.INVALID_MSG);
                         logger.warning("TOFDN: Message was dropped, format validation failed: "+logInfo);
                         boardUpdateInformation.incCountInvalid(); notifyBoardUpdateInformationChanged(this, boardUpdateInformation);
                     }
@@ -349,8 +421,8 @@ public class MessageThread extends BoardUpdateThreadObject implements BoardUpdat
         return boardUpdateInformation;
     }
 
-    private void receivedInvalidMessage(final Board b, final LocalDate calDL, final int index, final String reason) {
-        TOF.getInstance().receivedInvalidMessage(b, calDL.toDateTimeAtMidnight(), index, reason);
+    private void receivedInvalidMessage(final Board b, final DateTime calDL, final int index, final String reason) {
+        TOF.getInstance().receivedInvalidMessage(b, calDL.withTimeAtStartOfDay(), index, reason);
     }
 
     private void receivedValidMessage(
@@ -369,7 +441,7 @@ public class MessageThread extends BoardUpdateThreadObject implements BoardUpdat
     /**
      * First time verify.
      */
-    public boolean isValidFormat(final MessageXmlFile mo, final LocalDate dirDate, final Board b) {
+    public boolean isValidFormat(final MessageXmlFile mo, final DateTime dirDate, final Board b) {
         try {
             final DateTime dateTime;
             try {
@@ -386,9 +458,9 @@ public class MessageThread extends BoardUpdateThreadObject implements BoardUpdat
             }
 
             // ensure that time/date of msg is max. 1 day before/after dirDate
-            final DateMidnight dm = dateTime.toDateMidnight();
-            if( dm.isAfter(dirDate.plusDays(1).toDateMidnight(DateTimeZone.UTC))
-                    || dm.isBefore(dirDate.minusDays(1).toDateMidnight(DateTimeZone.UTC)) )
+            final DateTime dm = dateTime.withTimeAtStartOfDay();
+            if( dm.isAfter(dirDate.plusDays(1).withTimeAtStartOfDay())
+                    || dm.isBefore(dirDate.minusDays(1).withTimeAtStartOfDay()) )
             {
                 logger.log(Level.SEVERE, "Invalid date - skipping Message: "+dirDate+";"+dateTime);
                 return false;
@@ -413,15 +485,18 @@ public class MessageThread extends BoardUpdateThreadObject implements BoardUpdat
         return true;
     }
 
+    private static final int UPLOADMESSAGES_OK = 0;
+    private static final int UPLOADMESSAGES_NEED_UPDATED_SLOTINDEX = 1;
+
     /**
      * Upload pending messages for this board.
      */
-    protected void uploadMessages(final IndexSlot gis) {
+    private int uploadMessages(final IndexSlot gis) {
 
         FrostUnsentMessageObject unsendMsg = UnsentMessagesManager.getUnsentMessage(board);
         if( unsendMsg == null ) {
             // currently no msg to send for this board
-            return;
+            return UPLOADMESSAGES_OK;
         }
 
         final String fromName = unsendMsg.getFromName();
@@ -441,18 +516,45 @@ public class MessageThread extends BoardUpdateThreadObject implements BoardUpdat
 
             UnsentMessagesManager.incRunningMessageUploads();
 
-            uploadMessage(unsendMsg, recipient, gis);
+            final int result = uploadMessage(unsendMsg, recipient, gis);
+            boolean skipRemainingUploads = false;
+            if( result == UPLOADMESSAGE_FAILED_SLOTINDEX_OUTDATED ) {
+                // #MIDNIGHTBUGFIX 2 of 2:
+                // this is the only unrecoverable failure! if we've got an outdated
+                // slotindex (for another day than "now"'s timestamp) then we CANNOT
+                // upload ANY messages for this board without waiting for a fresh
+                // index for TODAY instead.
+                logger.severe("Cannot upload messages for board '" + board.getName() + "', the slotindex is outdated and doesn't match today's date. Deferring upload until next board refresh...");
+                skipRemainingUploads = true;
+            }
 
             UnsentMessagesManager.decRunningMessageUploads();
+
+            if( skipRemainingUploads ) {
+                return UPLOADMESSAGES_NEED_UPDATED_SLOTINDEX;
+            }
 
             Mixed.waitRandom(5000); // wait some time
 
             // get next message to upload
             unsendMsg = UnsentMessagesManager.getUnsentMessage(board, fromName);
         }
+
+        return UPLOADMESSAGES_OK;
     }
 
-    private void uploadMessage(final FrostUnsentMessageObject mo, final Identity recipient, final IndexSlot gis) {
+    // everything went ok
+    private static final int UPLOADMESSAGE_OK = 0;
+    // there was some fatal error during upload
+    private static final int UPLOADMESSAGE_FAILED = 1;
+    // the slotindex is not for the "now" timestamp; we can't upload any messages
+    // using that old index, we need a new one for "now" (today).
+    private static final int UPLOADMESSAGE_FAILED_SLOTINDEX_OUTDATED = 2;
+    // the user has deleted the identity used to send the message; we cannot send
+    // it, so we've simply deleted the message.
+    private static final int UPLOADMESSAGE_FAILED_IDENTITY_MISSING = 3;
+
+    private int uploadMessage(final FrostUnsentMessageObject mo, final Identity recipient, final IndexSlot gis) {
 
         logger.info("Preparing upload of message to board '" + board.getName() + "'");
 
@@ -471,13 +573,47 @@ public class MessageThread extends BoardUpdateThreadObject implements BoardUpdat
                     logger.severe("The LocalIdentity used to write this unsent msg was deleted: "+mo.getFromName());
                     mo.setCurrentUploadThread(null); // must be marked as not uploading before delete!
                     UnsentMessagesManager.deleteMessage(mo);
-                    return;
+                    return UPLOADMESSAGE_FAILED_IDENTITY_MISSING;
                 }
             }
 
+            // turns the message into an XML file; the actual "envelope date"
+            // of the message will be set further down...
             final MessageXmlFile message = new MessageXmlFile(mo);
 
+            // #MIDNIGHTBUGFIX 2 of 2: we'll get the "now" timestamp
+            // and stamp the message envelope with that time. however,
+            // if the slotindex we've got is for another day (not for "now"'s
+            // day), then we can't and WON'T do anything, since we don't
+            // want to upload "now"'s message using another day's index
+            // (which was the cause of the serious "black hole" midnight bug).
             final DateTime now = new DateTime(DateTimeZone.UTC);
+            final long nowMidnight = now.withTimeAtStartOfDay().getMillis();
+            final long slotMidnight = gis.getMsgDate(); // the millis at start of day for the slotindex date
+            if( slotMidnight != nowMidnight ) {
+                logger.severe("Aborted attempt to upload message using outdated slotindex!");
+                mo.setCurrentUploadThread(null); // must be marked as not uploading before we return!
+                return UPLOADMESSAGE_FAILED_SLOTINDEX_OUTDATED;
+            }
+
+            // #MIDNIGHTBUGFIX 2 of 2:
+            // alright, everything is fine; we'll be uploading it with the "now"
+            // timestamp as the envelope date (which determines what day it's going
+            // to be uploaded under), and the current slotindex (which determines
+            // which slot it's uploaded under for that day).
+            //
+            // NOTE: NOTHING else modifies the envelope date after this, which
+            // ensures that the message *will* be uploaded to THAT exact date and
+            // the next free slot in the given slotindex.
+            //
+            // NOTE: the MessageUploader will call composeUploadKey(), which composes
+            // a key from the message's "now" date-string (such as 2015-11-19),
+            // and the next free "index" slot for the slotindex associated with the
+            // MessageUploader.uploadMessage() "work area" object. so, what happens
+            // is that the uploader will try consecutive indexes for the envelope-date
+            // and slotindex it was given, until it finds a free slot. It will never
+            // try any other days or other indexes. So we can be sure that it never
+            // messes with the envelope-date or its associated slotindex for that day.
             message.setDateAndTime(now);
 
             final File unsentMessageFile = FileAccess.createTempFile("unsendMsg", ".xml");
@@ -485,7 +621,7 @@ public class MessageThread extends BoardUpdateThreadObject implements BoardUpdat
             if (!message.save()) {
                 logger.severe("This was a HARD error and the file to upload is lost, please report to a dev!");
                 mo.setCurrentUploadThread(null); // must be marked as not uploading before delete!
-                return;
+                return UPLOADMESSAGE_FAILED;
             }
             unsentMessageFile.deleteOnExit();
 
@@ -513,7 +649,7 @@ public class MessageThread extends BoardUpdateThreadObject implements BoardUpdat
                     // user choosed to retry after next startup, dequeue message now and find it again on next startup
                     UnsentMessagesManager.dequeueMessage(mo);
                 }
-                return;
+                return UPLOADMESSAGE_FAILED;
             }
 
             // success, store used slot
@@ -550,10 +686,13 @@ public class MessageThread extends BoardUpdateThreadObject implements BoardUpdat
 
         } catch (final Throwable t) {
             logger.log(Level.SEVERE, "Catched exception", t);
+            return UPLOADMESSAGE_FAILED;
+        } finally { // NOTE: "finally" execs on both success and failure (catch)
+            mo.setCurrentUploadThread(null); // paranoia
         }
-        mo.setCurrentUploadThread(null); // paranoia
 
         logger.info("Message upload finished");
+        return UPLOADMESSAGE_OK;
     }
 
     /**

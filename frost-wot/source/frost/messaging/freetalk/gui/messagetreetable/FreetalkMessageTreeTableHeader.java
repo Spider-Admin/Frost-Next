@@ -27,6 +27,8 @@ import javax.swing.table.*;
 
 import frost.util.gui.*;
 
+// NOTE: the message list is a custom sortable table, and doesn't use any of the other types of sortable
+// table implementations in Frost. that's why we have to implement the custom sorting behavior here.
 public class FreetalkMessageTreeTableHeader extends JTableHeader {
 
     private final FreetalkMessageTreeTable messageTreeTable;
@@ -67,11 +69,16 @@ public class FreetalkMessageTreeTableHeader extends JTableHeader {
                 //This translation is done so the real column number is used when the user moves columns around.
                 final int modelIndex = lColumnModel.getColumn(columnNumber).getModelIndex();
 
+                // if the user clicks the same column then toggle ascending/descending,
+                // if the user clicks another column then use that column's default order.
                 if( FreetalkMessageTreeTableSortStateBean.getSortedColumn() == modelIndex ) {
                     // toggle ascending
                     FreetalkMessageTreeTableSortStateBean.setAscending( !FreetalkMessageTreeTableSortStateBean.isAscending() );
                 } else {
+                    // switch to sorting by a different column and use its default sort order
                     FreetalkMessageTreeTableSortStateBean.setSortedColumn(modelIndex);
+                    boolean sortAscending = FreetalkMessageTreeTableSortStateBean.columnDefaultAscendingStates[modelIndex];
+                    FreetalkMessageTreeTableSortStateBean.setAscending( sortAscending );
                 }
 
                 messageTreeTable.resortTable();

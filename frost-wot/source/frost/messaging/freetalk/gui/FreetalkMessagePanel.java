@@ -40,6 +40,7 @@ import frost.messaging.frost.boards.*;
 import frost.messaging.frost.gui.messagetreetable.*;
 import frost.storage.perst.messages.*;
 import frost.util.*;
+import frost.util.SingleTaskWorker;
 import frost.util.gui.*;
 import frost.util.gui.search.*;
 import frost.util.gui.translation.*;
@@ -56,12 +57,12 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
 
 //    private boolean indicateLowReceivedMessages;
 //    private int indicateLowReceivedMessagesCountRed;
-//    private int indicateLowReceivedMessagesCountLightRed;
+//    private int indicateLowReceivedMessagesCountBlue;
 
     private final MainFrame mainFrame;
     private final FreetalkMessageTab ftMessageTab;
 
-    public static enum IdentityState { GOOD, CHECK, OBSERVE, BAD };
+    public static enum IdentityState { BAD, NEUTRAL, GOOD, FRIEND };
     public static enum BooleanState { FLAGGED, STARRED, JUNK };
 
     private class Listener
@@ -72,6 +73,7 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
         TreeSelectionListener,
         LanguageListener
     {
+        private final SingleTaskWorker delayedSelectionReactor = new SingleTaskWorker();
 
         public Listener() {
             super();
@@ -88,14 +90,14 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
                 getMessageTextPane().saveMessageButton_actionPerformed();
             } else if (e.getSource() == nextUnreadMessageButton) {
                 selectNextUnreadMessage();
-            } else if (e.getSource() == setGoodButton) {
-                setTrustState_actionPerformed(IdentityState.GOOD);
-            } else if (e.getSource() == setBadButton) {
+            } else if (e.getSource() == setFRIENDButton) {
+                setTrustState_actionPerformed(IdentityState.FRIEND);
+            } else if (e.getSource() == setBADButton) {
                 setTrustState_actionPerformed(IdentityState.BAD);
-            } else if (e.getSource() == setCheckButton) {
-                setTrustState_actionPerformed(IdentityState.CHECK);
-            } else if (e.getSource() == setObserveButton) {
-                setTrustState_actionPerformed(IdentityState.OBSERVE);
+            } else if (e.getSource() == setNEUTRALButton) {
+                setTrustState_actionPerformed(IdentityState.NEUTRAL);
+            } else if (e.getSource() == setGOODButton) {
+                setTrustState_actionPerformed(IdentityState.GOOD);
             } else if (e.getSource() == toggleShowUnreadOnly) {
                 toggleShowUnreadOnly_actionPerformed(e);
             } else if (e.getSource() == toggleShowThreads) {
@@ -165,7 +167,18 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
         }
 
         public void valueChanged(final ListSelectionEvent e) {
-            messageTable_itemSelected(e);
+            // Filters the TreeTable's JTree<->JTable desync fluttering.
+            // See "source/frost/messaging/frost/gui/MessagePanel.java" for details.
+            delayedSelectionReactor.schedule(25, new Runnable() {
+                public void run() {
+                    // we must invokeLater the message loading since the worker is a non-GUI thread
+                    SwingUtilities.invokeLater(new Runnable() {
+                        public void run() {
+                            messageTable_itemSelected(e);
+                        }
+                    });
+                }
+            });
         }
 
         public void valueChanged(final TreeSelectionEvent e) {
@@ -223,10 +236,10 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
         private final JMenuItem markSelectedMessagesUnreadItem = new JMenuItem();
         private final JMenuItem markThreadReadItem = new JMenuItem();
         private final JMenuItem markMessageUnreadItem = new JMenuItem();
-        private final JMenuItem setBadItem = new JMenuItem();
-        private final JMenuItem setCheckItem = new JMenuItem();
-        private final JMenuItem setGoodItem = new JMenuItem();
-        private final JMenuItem setObserveItem = new JMenuItem();
+        private final JMenuItem setBADItem = new JMenuItem();
+        private final JMenuItem setNEUTRALItem = new JMenuItem();
+        private final JMenuItem setFRIENDItem = new JMenuItem();
+        private final JMenuItem setGOODItem = new JMenuItem();
 
         private final JMenuItem deleteItem = new JMenuItem();
         private final JMenuItem undeleteItem = new JMenuItem();
@@ -266,14 +279,14 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
                 getMessageTable().expandThread(true, selectedMessage);
             } else if (e.getSource() == collapseThreadItem) {
                 getMessageTable().expandThread(false, selectedMessage);
-            } else if (e.getSource() == setGoodItem) {
-                setTrustState_actionPerformed(IdentityState.GOOD);
-            } else if (e.getSource() == setBadItem) {
+            } else if (e.getSource() == setFRIENDItem) {
+                setTrustState_actionPerformed(IdentityState.FRIEND);
+            } else if (e.getSource() == setBADItem) {
                 setTrustState_actionPerformed(IdentityState.BAD);
-            } else if (e.getSource() == setCheckItem) {
-                setTrustState_actionPerformed(IdentityState.CHECK);
-            } else if (e.getSource() == setObserveItem) {
-                setTrustState_actionPerformed(IdentityState.OBSERVE);
+            } else if (e.getSource() == setNEUTRALItem) {
+                setTrustState_actionPerformed(IdentityState.NEUTRAL);
+            } else if (e.getSource() == setGOODItem) {
+                setTrustState_actionPerformed(IdentityState.GOOD);
             }
         }
 
@@ -285,10 +298,10 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
             markSelectedMessagesReadItem.addActionListener(this);
             markSelectedMessagesUnreadItem.addActionListener(this);
             markThreadReadItem.addActionListener(this);
-            setGoodItem.addActionListener(this);
-            setBadItem.addActionListener(this);
-            setCheckItem.addActionListener(this);
-            setObserveItem.addActionListener(this);
+            setFRIENDItem.addActionListener(this);
+            setBADItem.addActionListener(this);
+            setNEUTRALItem.addActionListener(this);
+            setGOODItem.addActionListener(this);
             deleteItem.addActionListener(this);
             undeleteItem.addActionListener(this);
             expandAllItem.addActionListener(this);
@@ -307,10 +320,10 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
             markSelectedMessagesReadItem.setText(language.getString("MessagePane.messageTable.popupmenu.markSelectedMessagesReadItem"));
             markSelectedMessagesUnreadItem.setText(language.getString("MessagePane.messageTable.popupmenu.markSelectedMessagesUnreadItem"));
             markThreadReadItem.setText(language.getString("MessagePane.messageTable.popupmenu.markThreadRead"));
-            setGoodItem.setText(language.getString("MessagePane.messageTable.popupmenu.setToGood"));
-            setBadItem.setText(language.getString("MessagePane.messageTable.popupmenu.setToBad"));
-            setCheckItem.setText(language.getString("MessagePane.messageTable.popupmenu.setToCheck"));
-            setObserveItem.setText(language.getString("MessagePane.messageTable.popupmenu.setToObserve"));
+            setFRIENDItem.setText(language.getString("MessagePane.messageTable.popupmenu.setToFRIEND"));
+            setBADItem.setText(language.getString("MessagePane.messageTable.popupmenu.setToBAD"));
+            setNEUTRALItem.setText(language.getString("MessagePane.messageTable.popupmenu.setToNEUTRAL"));
+            setGOODItem.setText(language.getString("MessagePane.messageTable.popupmenu.setToGOOD"));
             deleteItem.setText(language.getString("MessagePane.messageTable.popupmenu.deleteMessage"));
             undeleteItem.setText(language.getString("MessagePane.messageTable.popupmenu.undeleteMessage"));
             expandAllItem.setText(language.getString("MessagePane.messageTable.popupmenu.expandAll"));
@@ -339,18 +352,18 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
                     add(deleteItem);
                     add(undeleteItem);
                     addSeparator();
-                    add(setGoodItem);
-                    add(setObserveItem);
-                    add(setCheckItem);
-                    add(setBadItem);
+                    add(setFRIENDItem);
+                    add(setGOODItem);
+                    add(setNEUTRALItem);
+                    add(setBADItem);
 
                     deleteItem.setEnabled(true);
                     undeleteItem.setEnabled(true);
 
-                    setGoodItem.setEnabled(true);
-                    setObserveItem.setEnabled(true);
-                    setCheckItem.setEnabled(true);
-                    setBadItem.setEnabled(true);
+                    setFRIENDItem.setEnabled(true);
+                    setGOODItem.setEnabled(true);
+                    setNEUTRALItem.setEnabled(true);
+                    setBADItem.setEnabled(true);
 
                     super.show(invoker, x, y);
                     return;
@@ -379,35 +392,35 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
                 if( itemAdded ) {
                     addSeparator();
                 }
-                add(setGoodItem);
-                add(setObserveItem);
-                add(setCheckItem);
-                add(setBadItem);
-                setGoodItem.setEnabled(false);
-                setObserveItem.setEnabled(false);
-                setCheckItem.setEnabled(false);
-                setBadItem.setEnabled(false);
+                add(setFRIENDItem);
+                add(setGOODItem);
+                add(setNEUTRALItem);
+                add(setBADItem);
+                setFRIENDItem.setEnabled(false);
+                setGOODItem.setEnabled(false);
+                setNEUTRALItem.setEnabled(false);
+                setBADItem.setEnabled(false);
 
 //                if (messageTable.getSelectedRow() > -1 && selectedMessage != null) {
 //                    if( identities.isMySelf(selectedMessage.getFromName()) ) {
 //                        // keep all off
-//                    } else if (selectedMessage.isMessageStatusGOOD()) {
-//                        setObserveItem.setEnabled(true);
-//                        setCheckItem.setEnabled(true);
-//                        setBadItem.setEnabled(true);
-//                    } else if (selectedMessage.isMessageStatusCHECK()) {
-//                        setObserveItem.setEnabled(true);
-//                        setGoodItem.setEnabled(true);
-//                        setBadItem.setEnabled(true);
+//                    } else if (selectedMessage.isMessageStatusFRIEND()) {
+//                        setGOODItem.setEnabled(true);
+//                        setNEUTRALItem.setEnabled(true);
+//                        setBADItem.setEnabled(true);
+//                    } else if (selectedMessage.isMessageStatusNEUTRAL()) {
+//                        setGOODItem.setEnabled(true);
+//                        setFRIENDItem.setEnabled(true);
+//                        setBADItem.setEnabled(true);
 //                    } else if (selectedMessage.isMessageStatusBAD()) {
-//                        setObserveItem.setEnabled(true);
-//                        setGoodItem.setEnabled(true);
-//                        setCheckItem.setEnabled(true);
-//                    } else if (selectedMessage.isMessageStatusOBSERVE()) {
-//                        setGoodItem.setEnabled(true);
-//                        setCheckItem.setEnabled(true);
-//                        setBadItem.setEnabled(true);
-//                    } else if (selectedMessage.isMessageStatusOLD()) {
+//                        setGOODItem.setEnabled(true);
+//                        setFRIENDItem.setEnabled(true);
+//                        setNEUTRALItem.setEnabled(true);
+//                    } else if (selectedMessage.isMessageStatusGOOD()) {
+//                        setFRIENDItem.setEnabled(true);
+//                        setNEUTRALItem.setEnabled(true);
+//                        setBADItem.setEnabled(true);
+//                    } else if (selectedMessage.isMessageStatusNONE()) {
 //                        // keep all buttons disabled
 //                    } else if (selectedMessage.isMessageStatusTAMPERED()) {
 //                        // keep all buttons disabled
@@ -455,14 +468,14 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
     //  new JButton(Mixed.loadImageIcon("/data/attachmentBoard.gif"));
     private final JButton newMessageButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/mail-message-new.png"));
     private final JButton replyButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/mail-reply-sender.png"));
-    private final JButton saveMessageButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/document-save-as.png"));
-    protected JButton nextUnreadMessageButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/go-next.png"));
+    private final JButton saveMessageButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/document-save.png"));
+    protected JButton nextUnreadMessageButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/mail-goto-unread.png"));
     private final JButton updateBoardButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/view-refresh.png"));
 
-    private final JButton setGoodButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/weather-clear.png"));
-    private final JButton setObserveButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/weather-few-clouds.png"));
-    private final JButton setCheckButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/weather-overcast.png"));
-    private final JButton setBadButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/weather-storm.png"));
+    private final JButton setFRIENDButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/weather-clear.png"));
+    private final JButton setGOODButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/weather-few-clouds.png"));
+    private final JButton setNEUTRALButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/weather-overcast.png"));
+    private final JButton setBADButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/weather-storm.png"));
 
     private final JToggleButton toggleShowUnreadOnly = new JToggleButton("");
 
@@ -490,24 +503,24 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
         MiscToolkit.configureButton(replyButton, "MessagePane.toolbar.tooltip.reply", language);
         MiscToolkit.configureButton(saveMessageButton, "MessagePane.toolbar.tooltip.saveMessage", language);
         MiscToolkit.configureButton(nextUnreadMessageButton, "MessagePane.toolbar.tooltip.nextUnreadMessage", language);
-        MiscToolkit.configureButton(setGoodButton, "MessagePane.toolbar.tooltip.setToGood", language);
-        MiscToolkit.configureButton(setBadButton, "MessagePane.toolbar.tooltip.setToBad", language);
-        MiscToolkit.configureButton(setCheckButton, "MessagePane.toolbar.tooltip.setToCheck", language);
-        MiscToolkit.configureButton(setObserveButton, "MessagePane.toolbar.tooltip.setToObserve", language);
+        MiscToolkit.configureButton(setFRIENDButton, "MessagePane.toolbar.tooltip.setToFRIEND", language);
+        MiscToolkit.configureButton(setBADButton, "MessagePane.toolbar.tooltip.setToBAD", language);
+        MiscToolkit.configureButton(setNEUTRALButton, "MessagePane.toolbar.tooltip.setToNEUTRAL", language);
+        MiscToolkit.configureButton(setGOODButton, "MessagePane.toolbar.tooltip.setToGOOD", language);
         // MiscToolkit.configureButton(downloadAttachmentsButton,"Download attachment(s)","/data/attachment_rollover.gif",language);
         // MiscToolkit.configureButton(downloadBoardsButton,"Add Board(s)","/data/attachmentBoard_rollover.gif",language);
 
         replyButton.setEnabled(false);
         saveMessageButton.setEnabled(false);
-        setGoodButton.setEnabled(false);
-        setCheckButton.setEnabled(false);
-        setBadButton.setEnabled(false);
-        setObserveButton.setEnabled(false);
+        setFRIENDButton.setEnabled(false);
+        setNEUTRALButton.setEnabled(false);
+        setBADButton.setEnabled(false);
+        setGOODButton.setEnabled(false);
 
         ImageIcon icon;
 
         toggleShowUnreadOnly.setSelected(Core.frostSettings.getBoolValue(SettingsClass.FREETALK_SHOW_UNREAD_ONLY));
-        icon = MiscToolkit.loadImageIcon("/data/toolbar/software-update-available.png");
+        icon = MiscToolkit.loadImageIcon("/data/newmessages.png");
         toggleShowUnreadOnly.setIcon(icon);
         toggleShowUnreadOnly.setRolloverEnabled(true);
         toggleShowUnreadOnly.setRolloverIcon(MiscToolkit.createRolloverIcon(icon));
@@ -537,7 +550,7 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
         toggleShowSmileys.setToolTipText(language.getString("MessagePane.toolbar.tooltip.toggleShowSmileys"));
 
         toggleShowHyperlinks.setSelected(Core.frostSettings.getBoolValue(SettingsClass.FREETALK_SHOW_KEYS_AS_HYPERLINKS));
-        icon = MiscToolkit.loadImageIcon("/data/togglehyperlinks.gif");
+        icon = MiscToolkit.loadImageIcon("/data/toolbar/toggle-hyperlinks.gif");
         toggleShowHyperlinks.setIcon(icon);
         toggleShowHyperlinks.setRolloverEnabled(true);
         toggleShowHyperlinks.setRolloverIcon(MiscToolkit.createRolloverIcon(icon));
@@ -575,10 +588,10 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
     //  buttonsToolbar.add(Box.createRigidArea(blankSpace));
     //  buttonsToolbar.addSeparator();
         buttonsToolbar.add(Box.createRigidArea(blankSpace));
-        buttonsToolbar.add(setGoodButton);
-        buttonsToolbar.add(setObserveButton);
-        buttonsToolbar.add(setCheckButton);
-        buttonsToolbar.add(setBadButton);
+        buttonsToolbar.add(setFRIENDButton);
+        buttonsToolbar.add(setGOODButton);
+        buttonsToolbar.add(setNEUTRALButton);
+        buttonsToolbar.add(setBADButton);
         buttonsToolbar.add(Box.createRigidArea(blankSpace));
         buttonsToolbar.addSeparator();
         buttonsToolbar.add(Box.createRigidArea(blankSpace));
@@ -607,10 +620,10 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
     //  downloadBoardsButton.addActionListener(listener);
         saveMessageButton.addActionListener(listener);
         nextUnreadMessageButton.addActionListener(listener);
-        setGoodButton.addActionListener(listener);
-        setCheckButton.addActionListener(listener);
-        setBadButton.addActionListener(listener);
-        setObserveButton.addActionListener(listener);
+        setFRIENDButton.addActionListener(listener);
+        setNEUTRALButton.addActionListener(listener);
+        setBADButton.addActionListener(listener);
+        setGOODButton.addActionListener(listener);
         toggleShowUnreadOnly.addActionListener(listener);
         toggleShowThreads.addActionListener(listener);
         toggleShowSmileys.addActionListener(listener);
@@ -653,14 +666,14 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
 
 //            indicateLowReceivedMessages = Core.frostSettings.getBoolValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES);
 //            indicateLowReceivedMessagesCountRed = Core.frostSettings.getIntValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_RED);
-//            indicateLowReceivedMessagesCountLightRed = Core.frostSettings.getIntValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_LIGHTRED);
+//            indicateLowReceivedMessagesCountBlue = Core.frostSettings.getIntValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_BLUE);
 
             Core.frostSettings.addPropertyChangeListener(SettingsClass.SORT_THREADROOTMSGS_ASCENDING, this);
             Core.frostSettings.addPropertyChangeListener(SettingsClass.MSGTABLE_MULTILINE_SELECT, this);
             Core.frostSettings.addPropertyChangeListener(SettingsClass.MSGTABLE_SCROLL_HORIZONTAL, this);
             Core.frostSettings.addPropertyChangeListener(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES, this);
             Core.frostSettings.addPropertyChangeListener(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_RED, this);
-            Core.frostSettings.addPropertyChangeListener(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_LIGHTRED, this);
+            Core.frostSettings.addPropertyChangeListener(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_BLUE, this);
 
             // build messages list scroll pane
             final FreetalkMessageTreeTableModel messageTableModel = new FreetalkMessageTreeTableModel(new DefaultMutableTreeNode());
@@ -699,7 +712,7 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
 
             int dividerLoc = Core.frostSettings.getIntValue(SettingsClass.FREETALK_MSGTABLE_MSGTEXT_DIVIDER_LOCATION);
             if( dividerLoc < 10 ) {
-                dividerLoc = 160;
+                dividerLoc = 180;
             }
             msgTableAndMsgTextSplitpane.setDividerLocation(dividerLoc);
 
@@ -722,10 +735,22 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
         }
     }
 
+    /**
+     * This fantastically named function is explained in:
+     * source/frost/messaging/freetalk/boards/FreetalkBoardTree.java:processKeyEvent()
+     *
+     * Basically, it just ensures that when the JTree receives an alphanumeric
+     * keypress, it's forwarded to this function which in turn calls our own
+     * key handler as if the key was pressed on our News tab. That's part of what
+     * allows all of our keyboard shortcuts to work in the message list, message
+     * viewer at the bottom of the window, AND in the JTree board list to the left.
+     */
+    public void forwardedAlphanumericKeyEventFromTree(final KeyEvent e) {
+        processKeyEvent(e);
+    }
+
     private void assignHotkeys() {
 
-//        // TODO: also check TofTree.processKeyEvent() which forwards the hotkeys!
-//
 //    // assign F5 key - start board update
 //        final Action boardUpdateAction = new AbstractAction() {
 //            public void actionPerformed(final ActionEvent event) {
@@ -737,87 +762,98 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
 //                tofTree.updateBoard(selectedBoard);
 //            }
 //        };
-//        frostMessageTab.setKeyActionForNewsTab(boardUpdateAction, "UPDATE_BOARD", KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0));
+//        frostMessageTab.setKeyActionForNewsTab(boardUpdateAction, "UPDATE_BOARD", KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0, true));
 //
-//
-//    // assign DELETE key - delete message
+//        // assign DELETE key - delete message and SHIFT+DELETE - undelete message
 //        final Action deleteMessageAction = new AbstractAction() {
 //            public void actionPerformed(final ActionEvent event) {
 //                deleteSelectedMessage();
 //            }
 //        };
-//        frostMessageTab.setKeyActionForNewsTab(deleteMessageAction, "DEL_MSG", KeyStroke.getKeyStroke(KeyEvent.VK_DELETE, 0));
-//        frostMessageTab.setKeyActionForNewsTab(deleteMessageAction, "DEL_MSG", KeyStroke.getKeyStroke(KeyEvent.VK_BACK_SPACE, 0));
+//        final Action undeleteMessageAction = new AbstractAction() {
+//            public void actionPerformed(final ActionEvent event) {
+//                undeleteSelectedMessage();
+//            }
+//        };
+//        frostMessageTab.setKeyActionForNewsTab(deleteMessageAction, "DEL_MSG", KeyStroke.getKeyStroke(KeyEvent.VK_DELETE, 0, true));
+//        frostMessageTab.setKeyActionForNewsTab(deleteMessageAction, "DEL_MSG", KeyStroke.getKeyStroke(KeyEvent.VK_BACK_SPACE, 0, true));
+//        frostMessageTab.setKeyActionForNewsTab(undeleteMessageAction, "UNDEL_MSG", KeyStroke.getKeyStroke(KeyEvent.VK_DELETE, InputEvent.SHIFT_MASK, true));
+//        frostMessageTab.setKeyActionForNewsTab(undeleteMessageAction, "UNDEL_MSG", KeyStroke.getKeyStroke(KeyEvent.VK_BACK_SPACE, InputEvent.SHIFT_MASK, true));
 //
-//    // remove ENTER assignment from table
-//        messageTable.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).getParent().remove(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER,0));
+//        // remove all default ENTER assignments from table (default assignment makes enter select the next row)
+//        messageTable.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).getParent().remove(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0));
 //    // assign ENTER key - open message viewer
 //        final Action openMessageAction = new AbstractAction() {
 //            public void actionPerformed(final ActionEvent event) {
 //                showCurrentMessagePopupWindow();
 //            }
 //        };
-//        frostMessageTab.setKeyActionForNewsTab(openMessageAction, "OPEN_MSG", KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0));
+//        frostMessageTab.setKeyActionForNewsTab(openMessageAction, "OPEN_MSG", KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0, true));
 //
-//    // assign N key - next unread (to whole news panel, including tree)
+//    // assign N key - next unread message in current board
 //        final Action nextUnreadAction = new AbstractAction() {
 //            public void actionPerformed(final ActionEvent event) {
 //                selectNextUnreadMessage();
 //            }
 //        };
-//        frostMessageTab.setKeyActionForNewsTab(nextUnreadAction, "NEXT_MSG", KeyStroke.getKeyStroke(KeyEvent.VK_N, 0));
+//        frostMessageTab.setKeyActionForNewsTab(nextUnreadAction, "NEXT_MSG", KeyStroke.getKeyStroke(KeyEvent.VK_N, 0, true));
 //
-//    // assign B key - set BAD
-//        this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_B, 0), "SET_BAD");
-//        this.getActionMap().put("SET_BAD", new AbstractAction() {
+//        // we assign these four shortcuts in the same order as the toolbar row of state icons, to avoid confusion
+//        // assign 1/NUMPAD1 key - set FRIEND
+//        this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_1, 0, true), "SET_FRIEND");
+//        this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_NUMPAD1, 0, true), "SET_FRIEND");
+//        this.getActionMap().put("SET_FRIEND", new AbstractAction() {
 //            public void actionPerformed(final ActionEvent event) {
-//                setTrustState_actionPerformed(IdentityState.BAD);
+//                setTrustState_actionPerformed(IdentityState.FRIEND);
 //            }
 //        });
 //
-//    // assign G key - set GOOD
-//        this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_G, 0), "SET_GOOD");
+//        // assign 2/NUMPAD2 key - set GOOD
+//        this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_2, 0, true), "SET_GOOD");
+//        this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_NUMPAD2, 0, true), "SET_GOOD");
 //        this.getActionMap().put("SET_GOOD", new AbstractAction() {
 //            public void actionPerformed(final ActionEvent event) {
 //                setTrustState_actionPerformed(IdentityState.GOOD);
 //            }
 //        });
 //
-//    // assign C key - set CHECK
-//        this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_C, 0), "SET_CHECK");
-//        this.getActionMap().put("SET_CHECK", new AbstractAction() {
+//        // assign 3/NUMPAD3 key - set NEUTRAL
+//        this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_3, 0, true), "SET_NEUTRAL");
+//        this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_NUMPAD3, 0, true), "SET_NEUTRAL");
+//        this.getActionMap().put("SET_NEUTRAL", new AbstractAction() {
 //            public void actionPerformed(final ActionEvent event) {
-//                setTrustState_actionPerformed(IdentityState.CHECK);
+//                setTrustState_actionPerformed(IdentityState.NEUTRAL);
 //            }
 //        });
 //
-//    // assign O key - set OBSERVE
-//        this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_O, 0), "SET_OBSERVE");
-//        this.getActionMap().put("SET_OBSERVE", new AbstractAction() {
+//        // assign 4/NUMPAD4 key - set BAD
+//        this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_4, 0, true), "SET_BAD");
+//        this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_NUMPAD4, 0, true), "SET_BAD");
+//        this.getActionMap().put("SET_BAD", new AbstractAction() {
 //            public void actionPerformed(final ActionEvent event) {
-//                setTrustState_actionPerformed(IdentityState.OBSERVE);
+//                setTrustState_actionPerformed(IdentityState.BAD);
 //            }
 //        });
 //
-//    // assign F key - toggle FLAGGED
-//        this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_F, 0), "TOGGLE_FLAGGED");
-//        this.getActionMap().put("TOGGLE_FLAGGED", new AbstractAction() {
+//        // assign F key - mark FLAGGED
+//        this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_F, 0, true), "MARK_FLAGGED");
+//        this.getActionMap().put("MARK_FLAGGED", new AbstractAction() {
 //            public void actionPerformed(final ActionEvent event) {
 //                updateBooleanState(BooleanState.FLAGGED);
 //            }
 //        });
 //
-//    // assign S key - toggle STARRED
-//        this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_S, 0), "TOGGLE_STARRED");
-//        this.getActionMap().put("TOGGLE_STARRED", new AbstractAction() {
+//        // assign S key - mark STARRED
+//        this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_S, 0, true), "MARK_STARRED");
+//        this.getActionMap().put("MARK_STARRED", new AbstractAction() {
 //            public void actionPerformed(final ActionEvent event) {
 //                updateBooleanState(BooleanState.STARRED);
 //            }
 //        });
 //
-//    // assign J key - toggle JUNK
-//        this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_J, 0), "TOGGLE_JUNK");
-//        this.getActionMap().put("TOGGLE_JUNK", new AbstractAction() {
+//        // assign J key - mark JUNK
+//        this.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_J, 0, true), "MARK_JUNK");
+//        this.getActionMap().put("MARK_JUNK", new AbstractAction() {
 //            public void actionPerformed(final ActionEvent event) {
 //                updateBooleanState(BooleanState.JUNK);
 //            }
@@ -912,10 +948,10 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
 
         final AbstractFreetalkNode selectedNode = ftMessageTab.getTreeModel().getSelectedNode();
         if (selectedNode.isFolder()) {
-            setGoodButton.setEnabled(false);
-            setCheckButton.setEnabled(false);
-            setBadButton.setEnabled(false);
-            setObserveButton.setEnabled(false);
+            setFRIENDButton.setEnabled(false);
+            setNEUTRALButton.setEnabled(false);
+            setBADButton.setEnabled(false);
+            setGOODButton.setEnabled(false);
             replyButton.setEnabled(false);
             saveMessageButton.setEnabled(false);
             return;
@@ -938,10 +974,10 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
 //            if( selectedMessage.isDummy() ) {
 //                getMessageTextPane().update_boardSelected();
 //                clearSubjectTextLabel();
-//                setGoodButton.setEnabled(false);
-//                setCheckButton.setEnabled(false);
-//                setBadButton.setEnabled(false);
-//                setObserveButton.setEnabled(false);
+//                setFRIENDButton.setEnabled(false);
+//                setNEUTRALButton.setEnabled(false);
+//                setBADButton.setEnabled(false);
+//                setGOODButton.setEnabled(false);
 //                replyButton.setEnabled(false);
 //                saveMessageButton.setEnabled(false);
 //                return;
@@ -952,35 +988,35 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
             replyButton.setEnabled(true);
 
 //            if( identities.isMySelf(selectedMessage.getFromName()) ) {
-//                setGoodButton.setEnabled(false);
-//                setCheckButton.setEnabled(false);
-//                setBadButton.setEnabled(false);
-//                setObserveButton.setEnabled(false);
-//            } else if (selectedMessage.isMessageStatusCHECK()) {
-//                setCheckButton.setEnabled(false);
-//                setGoodButton.setEnabled(true);
-//                setBadButton.setEnabled(true);
-//                setObserveButton.setEnabled(true);
-//            } else if (selectedMessage.isMessageStatusGOOD()) {
-//                setGoodButton.setEnabled(false);
-//                setCheckButton.setEnabled(true);
-//                setBadButton.setEnabled(true);
-//                setObserveButton.setEnabled(true);
+//                setFRIENDButton.setEnabled(false);
+//                setNEUTRALButton.setEnabled(false);
+//                setBADButton.setEnabled(false);
+//                setGOODButton.setEnabled(false);
+//            } else if (selectedMessage.isMessageStatusNEUTRAL()) {
+//                setNEUTRALButton.setEnabled(false);
+//                setFRIENDButton.setEnabled(true);
+//                setBADButton.setEnabled(true);
+//                setGOODButton.setEnabled(true);
+//            } else if (selectedMessage.isMessageStatusFRIEND()) {
+//                setFRIENDButton.setEnabled(false);
+//                setNEUTRALButton.setEnabled(true);
+//                setBADButton.setEnabled(true);
+//                setGOODButton.setEnabled(true);
 //            } else if (selectedMessage.isMessageStatusBAD()) {
-//                setBadButton.setEnabled(false);
-//                setGoodButton.setEnabled(true);
-//                setCheckButton.setEnabled(true);
-//                setObserveButton.setEnabled(true);
-//            } else if (selectedMessage.isMessageStatusOBSERVE()) {
-//                setObserveButton.setEnabled(false);
-//                setGoodButton.setEnabled(true);
-//                setCheckButton.setEnabled(true);
-//                setBadButton.setEnabled(true);
+//                setBADButton.setEnabled(false);
+//                setFRIENDButton.setEnabled(true);
+//                setNEUTRALButton.setEnabled(true);
+//                setGOODButton.setEnabled(true);
+//            } else if (selectedMessage.isMessageStatusGOOD()) {
+//                setGOODButton.setEnabled(false);
+//                setFRIENDButton.setEnabled(true);
+//                setNEUTRALButton.setEnabled(true);
+//                setBADButton.setEnabled(true);
 //            } else {
-                setGoodButton.setEnabled(false);
-                setCheckButton.setEnabled(false);
-                setBadButton.setEnabled(false);
-                setObserveButton.setEnabled(false);
+                setFRIENDButton.setEnabled(false);
+                setNEUTRALButton.setEnabled(false);
+                setBADButton.setEnabled(false);
+                setGOODButton.setEnabled(false);
 //            }
 
             getMessageTextPane().update_messageSelected(selectedMessage);
@@ -999,10 +1035,10 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
             replyButton.setEnabled(false);
             saveMessageButton.setEnabled(false);
 
-            setGoodButton.setEnabled(false);
-            setCheckButton.setEnabled(false);
-            setBadButton.setEnabled(false);
-            setObserveButton.setEnabled(false);
+            setFRIENDButton.setEnabled(false);
+            setNEUTRALButton.setEnabled(false);
+            setBADButton.setEnabled(false);
+            setGOODButton.setEnabled(false);
         }
     }
 
@@ -1020,7 +1056,8 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
             return;
         }
         final FreetalkMessageFrame newMessageFrame = new FreetalkMessageFrame(settings, mainFrame);
-        newMessageFrame.composeNewMessage(targetBoard, "No subject", "");
+        // NOTE: we now default to an empty subject (arg2) and refuse to post until the user has filled it in.
+        newMessageFrame.composeNewMessage(targetBoard, "", "");
     }
 
     public void setTrustState_actionPerformed(final IdentityState idState) {
@@ -1030,22 +1067,25 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
             return;
         }
 
-        // set all selected messages unread
+        // set the trust state of all selected identities
+        final Set<Identity> selectedIds = new HashSet<Identity>();
         final int[] rows = messageTable.getSelectedRows();
-        boolean idChanged = false;
-        for(final FrostMessageObject targetMessage  : selectedMessages ) {
+        for( final FrostMessageObject targetMessage : selectedMessages ) {
             final Identity id = getSelectedMessageFromIdentity(targetMessage);
-            if( id == null ) {
-                continue;
+            if( id != null ) {
+                selectedIds.add(id);
             }
-            if( idState == IdentityState.GOOD && !id.isGOOD() ) {
+        }
+        boolean idChanged = false;
+        for( final Identity id : selectedIds ) {
+            if( idState == IdentityState.FRIEND && !id.isFRIEND() ) {
+                id.setFRIEND();
+                idChanged = true;
+            } else if( idState == IdentityState.GOOD && !id.isGOOD() ) {
                 id.setGOOD();
                 idChanged = true;
-            } else if( idState == IdentityState.OBSERVE && !id.isOBSERVE() ) {
-                id.setOBSERVE();
-                idChanged = true;
-            } else if( idState == IdentityState.CHECK && !id.isCHECK() ) {
-                id.setCHECK();
+            } else if( idState == IdentityState.NEUTRAL && !id.isNEUTRAL() ) {
+                id.setNEUTRAL();
                 idChanged = true;
             } else if( idState == IdentityState.BAD && !id.isBAD() ) {
                 id.setBAD();
@@ -1057,10 +1097,10 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
             updateTableAfterChangeOfIdentityState();
             if( rows.length == 1 ) {
                 // keep msg selected, change toolbar buttons
-                setGoodButton.setEnabled( !(idState == IdentityState.GOOD) );
-                setCheckButton.setEnabled( !(idState == IdentityState.CHECK) );
-                setBadButton.setEnabled( !(idState == IdentityState.BAD) );
-                setObserveButton.setEnabled( !(idState == IdentityState.OBSERVE) );
+                setFRIENDButton.setEnabled( !(idState == IdentityState.FRIEND) );
+                setNEUTRALButton.setEnabled( !(idState == IdentityState.NEUTRAL) );
+                setBADButton.setEnabled( !(idState == IdentityState.BAD) );
+                setGOODButton.setEnabled( !(idState == IdentityState.GOOD) );
             }
 //            else {
 //                messageTable.removeRowSelectionInterval(0, messageTable.getRowCount() - 1);
@@ -1103,10 +1143,10 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
         replyButton.setToolTipText(language.getString("MessagePane.toolbar.tooltip.reply"));
         saveMessageButton.setToolTipText(language.getString("MessagePane.toolbar.tooltip.saveMessage"));
         nextUnreadMessageButton.setToolTipText(language.getString("MessagePane.toolbar.tooltip.nextUnreadMessage"));
-        setGoodButton.setToolTipText(language.getString("MessagePane.toolbar.tooltip.setToGood"));
-        setBadButton.setToolTipText(language.getString("MessagePane.toolbar.tooltip.setToBad"));
-        setCheckButton.setToolTipText(language.getString("MessagePane.toolbar.tooltip.setToCheck"));
-        setObserveButton.setToolTipText(language.getString("MessagePane.toolbar.tooltip.setToObserve"));
+        setFRIENDButton.setToolTipText(language.getString("MessagePane.toolbar.tooltip.setToFRIEND"));
+        setBADButton.setToolTipText(language.getString("MessagePane.toolbar.tooltip.setToBAD"));
+        setNEUTRALButton.setToolTipText(language.getString("MessagePane.toolbar.tooltip.setToNEUTRAL"));
+        setGOODButton.setToolTipText(language.getString("MessagePane.toolbar.tooltip.setToGOOD"));
         updateBoardButton.setToolTipText(language.getString("MessagePane.toolbar.tooltip.update"));
         toggleShowUnreadOnly.setToolTipText(language.getString("MessagePane.toolbar.tooltip.toggleShowUnreadOnly"));
         toggleShowThreads.setToolTipText(language.getString("MessagePane.toolbar.tooltip.toggleShowThreads"));
@@ -1134,7 +1174,7 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
         if( targetBoard == null ) {
             final String title = language.getString("MessagePane.missingBoardError.title");
             final String txt = language.formatMessage("MessagePane.missingBoardError.text", origMessage.getBoard().getName());
-            JOptionPane.showMessageDialog(parent, txt, title, JOptionPane.ERROR);
+            MiscToolkit.showMessageDialog(parent, txt, title, MiscToolkit.ERROR_MESSAGE);
             return;
         }
 
@@ -1160,7 +1200,7 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
 //            if( origMessage.getFromIdentity() == null ) {
 //                final String title = language.getString("MessagePane.unknownRecipientError.title");
 //                final String txt = language.formatMessage("MessagePane.unknownRecipientError.text", origMessage.getFromName());
-//                JOptionPane.showMessageDialog(parent, txt, title, JOptionPane.ERROR_MESSAGE);
+//                MiscToolkit.showMessageDialog(parent, txt, title, MiscToolkit.ERROR_MESSAGE);
 //                return;
 //            }
 //            LocalIdentity senderId = null;
@@ -1173,7 +1213,7 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
 //                if( senderId == null ) {
 //                    final String title = language.getString("MessagePane.missingLocalIdentityError.title");
 //                    final String txt = language.formatMessage("MessagePane.missingLocalIdentityError.text", origMessage.getRecipientName());
-//                    JOptionPane.showMessageDialog(parent, txt, title, JOptionPane.ERROR_MESSAGE);
+//                    MiscToolkit.showMessageDialog(parent, txt, title, MiscToolkit.ERROR_MESSAGE);
 //                    return;
 //                }
 //            }
@@ -1295,7 +1335,7 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
 
         // set all selected messages unread
         final ArrayList<FrostMessageObject> saveMessages = new ArrayList<FrostMessageObject>();
-        final DefaultTreeModel model = (DefaultTreeModel)MainFrame.getInstance().getMessagePanel().getMessageTable().getTree().getModel();
+        final DefaultTreeModel model = (DefaultTreeModel)MainFrame.getInstance().getMessageTreeModel();
         for(final FrostMessageObject targetMessage : selectedMessages ) {
             if( markRead ) {
                 // mark read
@@ -1399,7 +1439,7 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
 
         // set all selected messages deleted
         final ArrayList<FrostMessageObject> saveMessages = new ArrayList<FrostMessageObject>();
-        final DefaultTreeModel model = (DefaultTreeModel)MainFrame.getInstance().getMessagePanel().getMessageTable().getTree().getModel();
+        final DefaultTreeModel model = (DefaultTreeModel)MainFrame.getInstance().getMessageTreeModel();
         for( final FrostMessageObject targetMessage : selectedMessages ) {
             targetMessage.setDeleted(true);
             if( targetMessage.isNew() ) {
@@ -1437,7 +1477,7 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
 
         // set all selected messages deleted
         final ArrayList<FrostMessageObject> saveMessages = new ArrayList<FrostMessageObject>();
-        final DefaultTreeModel model = (DefaultTreeModel)MainFrame.getInstance().getMessagePanel().getMessageTable().getTree().getModel();
+        final DefaultTreeModel model = (DefaultTreeModel)MainFrame.getInstance().getMessageTreeModel();
         for( final FrostMessageObject targetMessage : selectedMessages ) {
             if( !targetMessage.isDeleted() ) {
                 continue;
@@ -1504,8 +1544,8 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
 //        } else if (node.isBoard()) {
 //            int allMessages = 0;
 //            final FreetalkMessage rootNode = (FreetalkMessage)MainFrame.getInstance().getMessageTreeModel().getRoot();
-//            for(final Enumeration e=rootNode.depthFirstEnumeration(); e.hasMoreElements(); ) {
-//                final FreetalkMessage mo = (FreetalkMessage)e.nextElement();
+//            for(final Enumeration<FreetalkMessage> e=rootNode.depthFirstEnumeration(); e.hasMoreElements(); ) {
+//                final FreetalkMessage mo = e.nextElement();
 //                if( !mo.isDummy() ) {
 //                    allMessages++;
 //                }
@@ -1550,7 +1590,7 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
     }
 
     public void updateTableAfterChangeOfIdentityState() {
-        // walk through shown messages and remove unneeded (e.g. if hideBad)
+        // walk through shown messages and remove unneeded (e.g. if hideBAD)
         // remember selected msg and select next
         final AbstractFreetalkNode node = ftMessageTab.getTreeModel().getSelectedNode();
         if( node == null || !node.isBoard() ) {
@@ -1558,9 +1598,9 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
         }
         // a board is selected and shown
         final DefaultTreeModel model = getMessageTreeModel();
-        final DefaultMutableTreeNode rootnode = (DefaultMutableTreeNode)model.getRoot();
+        final FreetalkMessage rootNode = (FreetalkMessage)model.getRoot();
 
-        final Enumeration<FreetalkMessage> freetalkMessageEnumeration = rootnode.depthFirstEnumeration();
+        final Enumeration<FreetalkMessage> freetalkMessageEnumeration = rootNode.depthFirstEnumeration();
         while( freetalkMessageEnumeration.hasMoreElements() ) {
             final FreetalkMessage freetalkMessage = freetalkMessageEnumeration.nextElement();
             if( !(freetalkMessage instanceof FreetalkMessage) ) {
@@ -1604,9 +1644,9 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
 //            				break;
 //            			}
 //
-//            			final Enumeration children = message.children();
+//            			final Enumeration<FreetalkMessage> children = message.children();
 //            			while( children.hasMoreElements() ) {
-//                            final FreetalkMessage t = (FreetalkMessage) children.nextElement();
+//                            final FreetalkMessage t = children.nextElement();
 //            				if( !path_list.contains(t) ) {
 //            					queue.add(t);
 //            				}
@@ -1616,10 +1656,10 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
 //            }
 //        }
 //        if( nextMessage == null ) {
-//            for( final Enumeration e = ((DefaultMutableTreeNode) tableModel.getRoot()).depthFirstEnumeration();
+//            for( final Enumeration<FreetalkMessage> e = ((DefaultMutableTreeNode) tableModel.getRoot()).depthFirstEnumeration();
 //                 e.hasMoreElements(); )
 //            {
-//                final FreetalkMessage message = (FreetalkMessage) e.nextElement();
+//                final FreetalkMessage message = e.nextElement();
 //                if( message.isNew() ) {
 //                    if( nextMessage == null ) {
 //                        nextMessage = message;
@@ -1671,15 +1711,15 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
             default: return;
         }
 
-        final List<Identity> identitiesToMarkBad;
+        final Set<Identity> identitiesToMarkBAD;
         if( state == BooleanState.JUNK
                 && Core.frostSettings.getBoolValue(SettingsClass.JUNK_MARK_JUNK_IDENTITY_BAD)
                 && doEnable )
         {
-            // we set junk to true and we want to set all junk senders to bad
-            identitiesToMarkBad = new ArrayList<Identity>();
+            // we set junk to true and we want to set all junk senders to BAD
+            identitiesToMarkBAD = new HashSet<Identity>();
         } else {
-            identitiesToMarkBad = null;
+            identitiesToMarkBAD = null;
         }
 
         for( final FrostMessageObject message : msgs ) {
@@ -1694,12 +1734,12 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
                 getMessageTableModel().fireTableRowsUpdated(row, row);
             }
 
-            if( identitiesToMarkBad != null ) {
+            if( identitiesToMarkBAD != null ) {
                 final Identity id = message.getFromIdentity();
                 if( id != null
-                        && id.isCHECK() )
+                        && id.isNEUTRAL() )
                 {
-                    identitiesToMarkBad.add(id);
+                    identitiesToMarkBAD.add(id);
                 }
             }
 
@@ -1720,7 +1760,7 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
             // update flagged/starred indicators in board tree
             boolean hasStarredWork = false;
             boolean hasFlaggedWork = false;
-            final DefaultMutableTreeNode rootNode = (DefaultMutableTreeNode)firstMessage.getRoot();
+            final FrostMessageObject rootNode = (FrostMessageObject)firstMessage.getRoot();
             for(final Enumeration<FrostMessageObject> frostMessageObjectEnumeration = rootNode.depthFirstEnumeration(); frostMessageObjectEnumeration.hasMoreElements(); ) {
                 final FrostMessageObject frostMessageObject = frostMessageObjectEnumeration.nextElement();
                 if( !hasStarredWork && frostMessageObject.isStarred() ) {
@@ -1739,21 +1779,21 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
             MainFrame.getInstance().updateTofTree(board);
         }
 
-        // maybe set identities to bad
-        if( identitiesToMarkBad != null
-                && !identitiesToMarkBad.isEmpty() )
+        // maybe set identities to BAD
+        if( identitiesToMarkBAD != null
+                && !identitiesToMarkBAD.isEmpty() )
         {
-            for( final Identity id : identitiesToMarkBad ) {
+            for( final Identity id : identitiesToMarkBAD ) {
                 id.setBAD();
             }
 
             updateTableAfterChangeOfIdentityState();
             if( msgs.size() == 1 ) {
                 // keep msg selected, change toolbar buttons
-                setGoodButton.setEnabled( true );
-                setCheckButton.setEnabled( true );
-                setBadButton.setEnabled( false );
-                setObserveButton.setEnabled( true );
+                setFRIENDButton.setEnabled( true );
+                setNEUTRALButton.setEnabled( true );
+                setBADButton.setEnabled( false );
+                setGOODButton.setEnabled( true );
             }
 //            else {
 //                messageTable.removeRowSelectionInterval(0, messageTable.getRowCount() - 1);
@@ -1793,7 +1833,7 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
 //                final int receivedMsgCount = fromId.getReceivedMessageCount();
 //                if( receivedMsgCount <= indicateLowReceivedMessagesCountRed ) {
 //                    iconToSet = MainFrame.getInstance().getMessageTreeTable().receivedOneMessage;
-//                } else if( receivedMsgCount <= indicateLowReceivedMessagesCountLightRed ) {
+//                } else if( receivedMsgCount <= indicateLowReceivedMessagesCountBlue ) {
 //                    iconToSet = MainFrame.getInstance().getMessageTreeTable().receivedFiveMessages;
 //                }
 //            }
@@ -1849,8 +1889,8 @@ public class FreetalkMessagePanel extends JPanel implements PropertyChangeListen
 //            indicateLowReceivedMessages = Core.frostSettings.getBoolValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES);
 //        } else if (evt.getPropertyName().equals(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_RED)) {
 //            indicateLowReceivedMessagesCountRed = Core.frostSettings.getIntValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_RED);
-//        } else if (evt.getPropertyName().equals(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_LIGHTRED)) {
-//            indicateLowReceivedMessagesCountLightRed = Core.frostSettings.getIntValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_LIGHTRED);
+//        } else if (evt.getPropertyName().equals(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_BLUE)) {
+//            indicateLowReceivedMessagesCountBlue = Core.frostSettings.getIntValue(SettingsClass.INDICATE_LOW_RECEIVED_MESSAGES_COUNT_BLUE);
 //        }
     }
 }

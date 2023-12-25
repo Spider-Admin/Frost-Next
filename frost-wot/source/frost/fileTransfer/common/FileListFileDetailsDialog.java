@@ -99,21 +99,15 @@ public class FileListFileDetailsDialog extends JDialog {
         int lastHeight = Core.frostSettings.getIntValue("FileListFileDetailsDialog.height");
         int lastWidth = Core.frostSettings.getIntValue("FileListFileDetailsDialog.width");
 
-        final Dimension scrSize = Toolkit.getDefaultToolkit().getScreenSize();
-
-        if (lastWidth < 100) {
+	// resize to default dimensions if the user made the window too small last time, or if this is the first launch
+        if (lastWidth < 200) {
             lastWidth = 600;
         }
-        if (lastWidth > scrSize.width) {
-            lastWidth = scrSize.width;
-        }
-
-        if (lastHeight < 100) {
+        if (lastHeight < 200) {
             lastHeight = 370;
         }
-        if (lastHeight > scrSize.height) {
-            lastWidth = scrSize.height;
-        }
+
+        // NOTE: we don't set any x/y coordinates, since we'll be centering this dialog relative to the parent frame
         setSize(lastWidth, lastHeight);
     }
 
@@ -211,10 +205,10 @@ public class FileListFileDetailsDialog extends JDialog {
 
         private final JMenuItem showOwnerFilesItem = new JMenuItem();
 
-        private final JMenuItem setBadItem = new JMenuItem();
-        private final JMenuItem setCheckItem = new JMenuItem();
-        private final JMenuItem setGoodItem = new JMenuItem();
-        private final JMenuItem setObserveItem = new JMenuItem();
+        private final JMenuItem setBADItem = new JMenuItem();
+        private final JMenuItem setNEUTRALItem = new JMenuItem();
+        private final JMenuItem setFRIENDItem = new JMenuItem();
+        private final JMenuItem setGOODItem = new JMenuItem();
 
         public PopupMenu() {
             super();
@@ -228,10 +222,10 @@ public class FileListFileDetailsDialog extends JDialog {
 
             copyKeysAndNamesItem.addActionListener(this);
             showOwnerFilesItem.addActionListener(this);
-            setGoodItem.addActionListener(this);
-            setBadItem.addActionListener(this);
-            setCheckItem.addActionListener(this);
-            setObserveItem.addActionListener(this);
+            setFRIENDItem.addActionListener(this);
+            setBADItem.addActionListener(this);
+            setNEUTRALItem.addActionListener(this);
+            setGOODItem.addActionListener(this);
         }
 
         private void refreshLanguage() {
@@ -240,38 +234,41 @@ public class FileListFileDetailsDialog extends JDialog {
             copyToClipboardMenu.setText(language.getString("Common.copyToClipBoard") + "...");
 
             showOwnerFilesItem.setText(language.getString("FileListFileDetailsDialog.popupmenu.searchFilesOfOwner"));
-            setGoodItem.setText(language.getString("MessagePane.messageTable.popupmenu.setToGood"));
-            setBadItem.setText(language.getString("MessagePane.messageTable.popupmenu.setToBad"));
-            setCheckItem.setText(language.getString("MessagePane.messageTable.popupmenu.setToCheck"));
-            setObserveItem.setText(language.getString("MessagePane.messageTable.popupmenu.setToObserve"));
+            setFRIENDItem.setText(language.getString("MessagePane.messageTable.popupmenu.setToFRIEND"));
+            setBADItem.setText(language.getString("MessagePane.messageTable.popupmenu.setToBAD"));
+            setNEUTRALItem.setText(language.getString("MessagePane.messageTable.popupmenu.setToNEUTRAL"));
+            setGOODItem.setText(language.getString("MessagePane.messageTable.popupmenu.setToGOOD"));
         }
 
         public void actionPerformed(final ActionEvent e) {
             if (e.getSource() == copyKeysAndNamesItem) {
-                CopyToClipboard.copyKeysAndFilenames(modelTable.getSelectedItems().toArray());
+                final List<FileListFileDetailsItem> selectedItems = modelTable.getSelectedItems();
+                if( selectedItems == null ) { return; }
+                CopyToClipboard.copyKeysAndFilenames(selectedItems.toArray());
             } else if (e.getSource() == showOwnerFilesItem) {
                 searchFilesOfOwner();
-            } else if (e.getSource() == setGoodItem) {
-                changeTrustState(IdentityState.GOOD);
-            } else if (e.getSource() == setBadItem) {
+            } else if (e.getSource() == setFRIENDItem) {
+                changeTrustState(IdentityState.FRIEND);
+            } else if (e.getSource() == setBADItem) {
                 changeTrustState(IdentityState.BAD);
-            } else if (e.getSource() == setCheckItem) {
-                changeTrustState(IdentityState.CHECK);
-            } else if (e.getSource() == setObserveItem) {
-                changeTrustState(IdentityState.OBSERVE);
+            } else if (e.getSource() == setNEUTRALItem) {
+                changeTrustState(IdentityState.NEUTRAL);
+            } else if (e.getSource() == setGOODItem) {
+                changeTrustState(IdentityState.GOOD);
             }
         }
 
         private void changeTrustState(final IdentityState is) {
             final List<FileListFileDetailsItem> selectedItems = modelTable.getSelectedItems();
+            if( selectedItems == null ) { return; }
             if (selectedItems.size() == 1) {
                 final FileListFileDetailsItem item =  selectedItems.get(0);
-                if( is == IdentityState.GOOD ) {
+                if( is == IdentityState.FRIEND ) {
+                    item.getOwnerIdentity().setFRIEND();
+                } else if( is == IdentityState.NEUTRAL ) {
+                    item.getOwnerIdentity().setNEUTRAL();
+                } else if( is == IdentityState.GOOD ) {
                     item.getOwnerIdentity().setGOOD();
-                } else if( is == IdentityState.CHECK ) {
-                    item.getOwnerIdentity().setCHECK();
-                } else if( is == IdentityState.OBSERVE ) {
-                    item.getOwnerIdentity().setOBSERVE();
                 } else if( is == IdentityState.BAD ) {
                     item.getOwnerIdentity().setBAD();
                 }
@@ -283,6 +280,7 @@ public class FileListFileDetailsDialog extends JDialog {
 
         private void searchFilesOfOwner() {
             final List<FileListFileDetailsItem> selectedItems = modelTable.getSelectedItems();
+            if( selectedItems == null ) { return; }
             if (selectedItems.size() == 1) {
                 final FileListFileDetailsItem item = selectedItems.get(0);
                 final String owner = item.getOwnerIdentity().getUniqueName();
@@ -303,7 +301,7 @@ public class FileListFileDetailsDialog extends JDialog {
 
             final List<FileListFileDetailsItem> selectedItems = modelTable.getSelectedItems();
 
-            if( selectedItems.size() == 0 ) {
+            if( selectedItems == null || selectedItems.size() == 0 ) {
                 return;
             }
 
@@ -314,36 +312,36 @@ public class FileListFileDetailsDialog extends JDialog {
 
                 addSeparator();
 
-                add(setGoodItem);
-                add(setObserveItem);
-                add(setCheckItem);
-                add(setBadItem);
-                setGoodItem.setEnabled(false);
-                setObserveItem.setEnabled(false);
-                setCheckItem.setEnabled(false);
-                setBadItem.setEnabled(false);
+                add(setFRIENDItem);
+                add(setGOODItem);
+                add(setNEUTRALItem);
+                add(setBADItem);
+                setFRIENDItem.setEnabled(false);
+                setGOODItem.setEnabled(false);
+                setNEUTRALItem.setEnabled(false);
+                setBADItem.setEnabled(false);
 
                 final FileListFileDetailsItem item =  selectedItems.get(0);
                 final Identity ownerId = item.getOwnerIdentity();
 
                 if( ownerId instanceof LocalIdentity ) {
                     // keep all off
-                } else if (ownerId.isGOOD()) {
-                    setObserveItem.setEnabled(true);
-                    setCheckItem.setEnabled(true);
-                    setBadItem.setEnabled(true);
-                } else if (ownerId.isCHECK()) {
-                    setObserveItem.setEnabled(true);
-                    setGoodItem.setEnabled(true);
-                    setBadItem.setEnabled(true);
+                } else if (ownerId.isFRIEND()) {
+                    setGOODItem.setEnabled(true);
+                    setNEUTRALItem.setEnabled(true);
+                    setBADItem.setEnabled(true);
+                } else if (ownerId.isNEUTRAL()) {
+                    setGOODItem.setEnabled(true);
+                    setFRIENDItem.setEnabled(true);
+                    setBADItem.setEnabled(true);
                 } else if (ownerId.isBAD()) {
-                    setObserveItem.setEnabled(true);
-                    setGoodItem.setEnabled(true);
-                    setCheckItem.setEnabled(true);
-                } else if (ownerId.isOBSERVE()) {
-                    setGoodItem.setEnabled(true);
-                    setCheckItem.setEnabled(true);
-                    setBadItem.setEnabled(true);
+                    setGOODItem.setEnabled(true);
+                    setFRIENDItem.setEnabled(true);
+                    setNEUTRALItem.setEnabled(true);
+                } else if (ownerId.isGOOD()) {
+                    setFRIENDItem.setEnabled(true);
+                    setNEUTRALItem.setEnabled(true);
+                    setBADItem.setEnabled(true);
                 } else {
                     // keep all off
                 }

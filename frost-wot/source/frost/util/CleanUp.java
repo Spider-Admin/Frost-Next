@@ -63,15 +63,18 @@ public class CleanUp {
         cleanPerstStorages(boardList);
 
         // cleanup and archive all X days
+        final boolean forceCleanupThisStartup = Core.frostSettings.getBoolValue(SettingsClass.DB_CLEANUP_FORCESTART);
         final int cleanupDatabaseInterval = Core.frostSettings.getIntValue(SettingsClass.DB_CLEANUP_INTERVAL);
         final long lastCleanupTime = Core.frostSettings.getLongValue(SettingsClass.DB_CLEANUP_LASTRUN);
         final long now = System.currentTimeMillis();
+        final long timeSinceCleanup = now - lastCleanupTime; // at first startup, last is 0, so a cleanup *will* happen
         final long intervalMillis = (cleanupDatabaseInterval) * 24L * 60L * 60L * 1000L; // interval days into millis
 
         // when last cleanup was before the chosen interval days then run cleanup and archiving
-        if( lastCleanupTime < (now - intervalMillis) ) {
+        if( forceCleanupThisStartup || (timeSinceCleanup > intervalMillis) ) {
             cleanStorages(boardList);
             Core.frostSettings.setValue(SettingsClass.DB_CLEANUP_LASTRUN, now);
+            Core.frostSettings.setValue(SettingsClass.DB_CLEANUP_FORCESTART, false); // we've executed a cleanup
         }
     }
 

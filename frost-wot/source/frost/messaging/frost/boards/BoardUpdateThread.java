@@ -27,8 +27,10 @@ public interface BoardUpdateThread
     public final static int MSG_DNLOAD_BACK   = 2;
 
     int getThreadType();
+    public void setStopUpdatingFlag(final boolean flag);
+    public boolean isStopUpdatingFlag();
     
-    int getDaysBack(); //SF_EDIT
+    int getLastAllDayStarted();
     
     // FrostBoard getTargetBoard()
     public Board getTargetBoard();

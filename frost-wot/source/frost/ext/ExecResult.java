@@ -18,13 +18,9 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 package frost.ext;
 
-/**
- * @author saces
- */
 public class ExecResult {
-	public Process proc = null;
-	public int retcode = -1;
-	public StringBuilder stdOut = null;
-	public StringBuilder stdErr = null;
-	public Throwable error = null;
+    public int returnCode = -1;
+    public StringBuilder stdOut = null;
+    public StringBuilder stdErr = null;
+    public Throwable error = null;
 }

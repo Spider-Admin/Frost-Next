@@ -55,11 +55,13 @@ class UploadThread extends Thread {
         FcpResultPut result = null;
         try {
             result = FcpHandler.inst().putFile(
-                    FcpHandler.TYPE_FILE,
-                    "CHK@",
-                    uploadItem.getFile(),
-                    doMime,
-                    uploadItem); // provide the uploadItem to indicate that this upload is contained in table
+                    FcpHandler.TYPE_FILE, // we're dealing with a file (not a message)
+                    "CHK@", // we want a CHK-type key
+                    uploadItem.getFile(), // the filesystem path to the file we're uploading
+                    doMime, // always true for regular files; always false for files added under the "My Shared Files" tab
+                    uploadItem); // provide the uploadItem to indicate that the file is in the
+                                 // uploadTable and so that we can retrieve things like the
+                                 // compatmode, cryptokey and compression settings...
         } catch(final Throwable t) {
             logger.log(Level.SEVERE, "Exception thrown in putFile()", t);
         }

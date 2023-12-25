@@ -68,10 +68,10 @@ public class FreetalkMessageTreeTableModel extends DefaultTreeModel implements F
     public final static int COLUMN_INDEX_STARRED = 1;
     public final static int COLUMN_INDEX_SUBJECT = 2;
     public final static int COLUMN_INDEX_FROM    = 3;
-    public final static int COLUMN_INDEX_INDEX   = 4;
-    public final static int COLUMN_INDEX_JUNK    = 5;
-    public final static int COLUMN_INDEX_SIG     = 6;
-    public final static int COLUMN_INDEX_DATE    = 7;
+    public final static int COLUMN_INDEX_SIG     = 4;
+    public final static int COLUMN_INDEX_DATE    = 5;
+    public final static int COLUMN_INDEX_JUNK    = 6;
+    public final static int COLUMN_INDEX_INDEX   = 7;
 
     public final static int MAX_COLUMN_INDEX     = 7;
 
@@ -97,10 +97,10 @@ public class FreetalkMessageTreeTableModel extends DefaultTreeModel implements F
         columnNames[COLUMN_INDEX_STARRED] = "*";
         columnNames[COLUMN_INDEX_SUBJECT] = language.getString("MessagePane.messageTable.subject");
         columnNames[COLUMN_INDEX_FROM]    = language.getString("MessagePane.messageTable.from");
-        columnNames[COLUMN_INDEX_INDEX]   = language.getString("MessagePane.messageTable.index");
-        columnNames[COLUMN_INDEX_JUNK]    = "J";
         columnNames[COLUMN_INDEX_SIG]     = language.getString("MessagePane.messageTable.sig");
         columnNames[COLUMN_INDEX_DATE]    = language.getString("MessagePane.messageTable.date");
+        columnNames[COLUMN_INDEX_JUNK]    = "J";
+        columnNames[COLUMN_INDEX_INDEX]   = language.getString("MessagePane.messageTable.index");
 
         try {
             final TableColumnModel tcm = MainFrame.getInstance().getMessagePanel().getMessageTable().getTableHeader().getColumnModel();
@@ -189,22 +189,24 @@ public class FreetalkMessageTreeTableModel extends DefaultTreeModel implements F
 //                    case COLUMN_INDEX_STARRED: return Boolean.FALSE;
 //                    // 2 is tree+subject column
 //                    case COLUMN_INDEX_FROM: return "";
-//                    case COLUMN_INDEX_INDEX: return "";
-//                    case COLUMN_INDEX_JUNK: return Boolean.FALSE;
 //                    case COLUMN_INDEX_SIG: return "";
 //                    case COLUMN_INDEX_DATE: return "";
+//                    case COLUMN_INDEX_JUNK: return Boolean.FALSE;
+//                    case COLUMN_INDEX_INDEX: return "";
 //                    default: return "*ERR*";
 //                }
 //            } else {
                 switch(column) {
                     case COLUMN_INDEX_FLAGGED: return Boolean.FALSE;
                     case COLUMN_INDEX_STARRED: return Boolean.FALSE;
-                    // 2 is tree+subject column
+                    // 2 is tree+subject column; is queried by the JTable but not rendered,
+                    // so the only reason we return the real value is so subject Ctrl+F search works
+                    case COLUMN_INDEX_SUBJECT: return mo.getTitle();
                     case COLUMN_INDEX_FROM: return mo.getAuthor();
-                    case COLUMN_INDEX_INDEX: return Integer.toString(mo.getMsgIndex());
-                    case COLUMN_INDEX_JUNK: return Boolean.FALSE;
                     case COLUMN_INDEX_SIG: return "---";
                     case COLUMN_INDEX_DATE: return mo.getDateAndTimeString();
+                    case COLUMN_INDEX_JUNK: return Boolean.FALSE;
+                    case COLUMN_INDEX_INDEX: return Integer.toString(mo.getMsgIndex());
                     default: return "*ERR*";
                 }
 //            }

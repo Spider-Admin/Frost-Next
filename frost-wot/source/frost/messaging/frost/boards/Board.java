@@ -28,6 +28,7 @@ import frost.util.*;
 import frost.util.gui.*;
 import frost.util.gui.translation.*;
 import org.joda.time.*;
+import org.joda.time.format.*;
 import java.util.logging.*;
 
 /**
@@ -36,22 +37,23 @@ import java.util.logging.*;
 @SuppressWarnings("serial")
 public class Board extends AbstractNode {
 
-    private static final Logger logger = Logger.getLogger(Board.class.getName());
-
     private static Language language = Language.getInstance();
 
     private PerstFrostBoardObject perstFrostBoardObject = null;
 
-    private Integer startDaysBack = null; //SF_EDIT Day to start downloading backlog at
-    private Integer lastDayChecked = null; // SF_EDIT 
-    private boolean stopUpdating = false;
+    private Integer startDaysBack = null; // day to start downloading backlog from (allows user to skip recent days)
+    private Integer lastAllDayStarted = null; // current day we've *started* downloading during "all days" scan
+    private int lastAllMaxDays = 0; // the "max days" count of the current "all days" scan (used for GUI)
+    private DateTime lastAllDayStartedDate = null; // the actual DateTime of the date lastAllDayStarted refers to
+    private boolean allDaysUpdating = false; // true if doing "all days" scan; means we'll show the "Day x/y" GUI indicator
     
     private boolean autoUpdateEnabled = true; // must apply, no default
     private String boardDescription = null;
     private final String boardFileName;
-    private Boolean hideBad = null;
-    private Boolean hideCheck = null;
-    private Boolean hideObserve = null;
+    private Boolean hideUnsigned = null;
+    private Boolean hideBAD = null;
+    private Boolean hideNEUTRAL = null;
+    private Boolean hideGOOD = null;
     private Integer hideMessageCount = null;
     private Boolean hideMessageCountExcludePrivate = null;
 
@@ -72,7 +74,6 @@ public class Board extends AbstractNode {
     private String privateKey = null;
 
     private String publicKey = null;
-    private Boolean showSignedOnly = null;
 
     private boolean spammed = false;
 
@@ -81,7 +82,7 @@ public class Board extends AbstractNode {
     private boolean hasFlaggedMessages = false;
     private boolean hasStarredMessages = false;
 
-	private LocalDate lastDayBoardUpdated = null;
+	private DateTime lastDayBoardUpdated = null;
 
     // Long is the dateMillis used in MessageThread, a unique String per day
     private final Hashtable<Long,BoardUpdateInformation> boardUpdateInformations = new Hashtable<Long,BoardUpdateInformation>();
@@ -118,7 +119,7 @@ public class Board extends AbstractNode {
      */
     public Board(final String name, final String pubKey, final String privKey, final String description) {
         super(name);
-        boardDescription = description;
+        setDescription(description);
         boardFileName = Mixed.makeFilename(getNameLowerCase());
         setPublicKey(pubKey);
         setPrivateKey(privKey);
@@ -159,6 +160,7 @@ public class Board extends AbstractNode {
         return numberBlocked;
     }
 
+    // returns a sanitized version of the board name (as opposed to getName() which is the real name)
     public String getBoardFilename() {
         return boardFileName;
     }
@@ -167,8 +169,11 @@ public class Board extends AbstractNode {
         return boardDescription;
     }
 
+    // IMPORTANT: this is the only function that is allowed to set the boardDescription variable!
+    // it cleans up the string so that the first encountered alphabetical character is uppercase,
+    // and so that the string ends in a period if no valid end-of-sentence punctuation exists.
     public void setDescription(final String desc) {
-        boardDescription = desc;
+        boardDescription = Mixed.makeCleanString(desc, true); // true = accept smileys
     }
 
     public boolean getStoreSentMessages() {
@@ -183,40 +188,52 @@ public class Board extends AbstractNode {
         return storeSentMessages;
     }
 
-    public boolean getHideBad() {
-        if (!isConfigured() || hideBad == null) {
+    public boolean getHideUnsigned() {
+        if (!isConfigured() || hideUnsigned == null) {
+            // return default
+            return Core.frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_UNSIGNED);
+        }
+        return hideUnsigned.booleanValue();
+    }
+
+    public Boolean getHideUnsignedObj() {
+        return hideUnsigned;
+    }
+
+    public boolean getHideBAD() {
+        if (!isConfigured() || hideBAD == null) {
             // return default
             return Core.frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_BAD);
         }
-        return hideBad.booleanValue();
+        return hideBAD.booleanValue();
     }
 
-    public Boolean getHideBadObj() {
-        return hideBad;
+    public Boolean getHideBADObj() {
+        return hideBAD;
     }
 
-    public boolean getHideCheck() {
-        if (!isConfigured() || hideCheck == null) {
+    public boolean getHideNEUTRAL() {
+        if (!isConfigured() || hideNEUTRAL == null) {
             // return default
-            return Core.frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_CHECK);
+            return Core.frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_NEUTRAL);
         }
-        return hideCheck.booleanValue();
+        return hideNEUTRAL.booleanValue();
     }
 
-    public Boolean getHideCheckObj() {
-        return hideCheck;
+    public Boolean getHideNEUTRALObj() {
+        return hideNEUTRAL;
     }
 
-    public boolean getHideObserve() {
-        if (!isConfigured() || hideObserve == null) {
+    public boolean getHideGOOD() {
+        if (!isConfigured() || hideGOOD == null) {
             // return default
-            return Core.frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_OBSERVE);
+            return Core.frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_GOOD);
         }
-        return hideObserve.booleanValue();
+        return hideGOOD.booleanValue();
     }
 
-    public Boolean getHideObserveObj() {
-        return hideObserve;
+    public Boolean getHideGOODObj() {
+        return hideGOOD;
     }
 
     public int getHideMessageCount() {
@@ -288,18 +305,6 @@ public class Board extends AbstractNode {
         return publicKey;
     }
 
-    public boolean getShowSignedOnly() {
-        if (!isConfigured() || showSignedOnly == null) {
-            // return default
-            return Core.frostSettings.getBoolValue(SettingsClass.MESSAGE_HIDE_UNSIGNED);
-        }
-        return showSignedOnly.booleanValue();
-    }
-
-    public Boolean getShowSignedOnlyObj() {
-        return showSignedOnly;
-    }
-
     public String getStateString() {
         if (isReadAccessBoard()) {
             return language.getString("Board.boardState.readAccess");
@@ -341,72 +346,74 @@ public class Board extends AbstractNode {
         return boardIcon;
     }
 
-    // SF_EDIT
-    
-    public Boolean getStopUpdating()
-    {
-		return stopUpdating;
-	}
-    
-    //Number of days backwards to start downloading from
-    public int getStartDaysBack()
-    {
-      if (!isConfigured() || startDaysBack == null)
-		return 0;
+    // number of days backwards to start downloading an "all days backwards" scan
+    // from (allows us to skip recent days). range is 1 (today) to max days to download.
+    public int getStartDaysBack() {
+      if( !isConfigured() || startDaysBack == null )
+          return 1;
       else
-		return startDaysBack;
+          return startDaysBack;
     }
 
-    public Integer getStartDaysBackObj()
-    {
-		return startDaysBack;
+    public Integer getStartDaysBackObj() {
+        return startDaysBack;
     }
-    
-    //Number of days back we are currently at
-    public int getLastDayChecked()
-    {
-		//logger.log(Level.INFO, getName() + ": getLastDayChecked: " + lastDayChecked);
-		if(lastDayChecked != null)
-			return lastDayChecked;
-		else return 0;
-	}
-	
-	public Integer getLastDayCheckedObj()
-	{
-		return lastDayChecked;
-	}
-	
-	// The most recent day that the board was updating
-	public String getLastDayBoardUpdated()
-	{
-		logger.info(getName() + ": getLastDayBoardUpdated: " + lastDayBoardUpdated);
-		if (lastDayBoardUpdated != null)
-			return lastDayBoardUpdated.toString();
-		else
-			return "never";
-	}
-	
-	public LocalDate getLastDayBoardUpdatedObj()
-	{
-		logger.info(getName() + ": getLastDayBoardUpdatedObj: " + lastDayBoardUpdated);
-		return lastDayBoardUpdated;
-	}
-	
-	/**
-	 * Backload updating can be resumed
-	 */
-	public boolean isResumeable()
-	{
-		boolean resumable = false;
-		
-		if ( (lastDayBoardUpdated != null) && (!isUpdating()) )
-			if( (lastDayChecked != null) && (lastDayChecked < getMaxMessageDownload()) )
-				resumable = true;
-				
-		return ( resumable );
-	}
-	
-    // END EDIT
+
+    // number of days back we are currently at in our All Days Backwards scan
+    public int getLastAllDayStarted() {
+        if( lastAllDayStarted != null )
+            return lastAllDayStarted;
+        else return 0;
+    }
+
+    public Integer getLastAllDayStartedObj() {
+        return lastAllDayStarted;
+    }
+
+    // the most recent date of when we've performed an "all days" board update
+    public String getLastDayBoardUpdated() {
+        if( lastDayBoardUpdated != null )
+            return lastDayBoardUpdated.toString("yyyy-MM-dd"); // return the date in "2008-12-24" ISO format
+        else
+            return "never";
+    }
+
+    public DateTime getLastDayBoardUpdatedObj() {
+        return lastDayBoardUpdated;
+    }
+
+    /**
+     * true if "all days backwards" scan was interrupted/stopped and can be resumed
+     */
+    public boolean isResumeable() {
+        boolean resumable = false;
+
+        /**
+         * Resumable criteria:
+         * - Board is not currently updating.
+         * - We've got a known date of having last started/performed an "all days" scan.
+         * - We know about the last day we started downloading during that "all days" scan.
+         * - They hadn't yet *started* the *final* day (started must be less than maxdays-1)
+         *   during that scan. If they had *started* the final day, we treat it as completed,
+         *   since there is no way to interrupt an ongoing day-scan except by closing Frost,
+         *   so in almost 100% of circumstances they would have finished that final day.
+         *   NOTE: The reason for -1 is that dayStarted is 0-indexed and maxDays isn't.
+         *   So started == 0 means that day 1 was started (day 1 is "today", and is a
+         *   "days backwards" offset of 0, hence the need for this conversion). Meanwhile,
+         *   the maxDays value is 1-indexed (so day 1 means today). Subtracting 1 turns
+         *   the "maxDays" value into the correct "final day" value in "startedDay" terms.
+         */
+        if( !isUpdating()
+                && (lastDayBoardUpdated != null)
+                && (lastAllDayStarted != null)
+                && (lastAllDayStarted < (getMaxMessageDownload() - 1))
+        ) {
+            resumable = true;
+        }
+
+        return resumable;
+    }
+
     
     //////////////////////////////////////////////
     // From BoardStats
@@ -473,16 +480,20 @@ public class Board extends AbstractNode {
         storeSentMessages = val;
     }
 
-    public void setHideBad(final Boolean val) {
-        hideBad = val;
+    public void setHideUnsigned(final Boolean val) {
+        hideUnsigned = val;
     }
 
-    public void setHideCheck(final Boolean val) {
-        hideCheck = val;
+    public void setHideBAD(final Boolean val) {
+        hideBAD = val;
     }
 
-    public void setHideObserve(final Boolean val) {
-        hideObserve = val;
+    public void setHideNEUTRAL(final Boolean val) {
+        hideNEUTRAL = val;
+    }
+
+    public void setHideGOOD(final Boolean val) {
+        hideGOOD = val;
     }
 
     public void setHideMessageCount(final Integer val) {
@@ -532,10 +543,6 @@ public class Board extends AbstractNode {
         publicKey = val;
     }
 
-    public void setShowSignedOnly(final Boolean val) {
-        showSignedOnly = val;
-    }
-
     public void setSpammed(final boolean val) {
         spammed = val;
     }
@@ -544,42 +551,50 @@ public class Board extends AbstractNode {
         isUpdating = val;
     }
 
-	//SF_EDIT
-	
-	public void setStopUpdating(boolean stop)
-	{
-		stopUpdating = stop;
-	}
-	
     //Number of days backwards to start downloading from
-    public void setStartDaysBack(final Integer val)
-    {
-		startDaysBack = val;
+    //Range is 1 (today) to max days to download
+    public void setStartDaysBack(final Integer val) {
+        startDaysBack = val;
+    }
+
+    //Number of days back we are currently at
+    public void setLastAllDayStarted(final Integer val) {
+        lastAllDayStarted = val;
+    }
+
+    public void setLastAllMaxDays(final int val) {
+        lastAllMaxDays = val;
+    }
+    public int getLastAllMaxDays() {
+        return lastAllMaxDays;
+    }
+    public void setLastAllDayStartedDate(final DateTime val) {
+        lastAllDayStartedDate = val;
+    }
+    public DateTime getLastAllDayStartedDate() {
+        return lastAllDayStartedDate;
+    }
+    public void setAllDaysUpdating(final boolean val) {
+        allDaysUpdating = val;
+    }
+    public boolean isAllDaysUpdating() { // true if an "All days backwards" scan is running
+        return allDaysUpdating;
     }
     
-    //Number of days back we are currently at
-    public void setLastDayChecked(final Integer val)
-    {
-		lastDayChecked = val;
-		logger.log(Level.INFO, getName() + ": setLastDayChecked: " + val);
-	}
-    
     // The most recent day that the board was updating
-    public void setLastDayBoardUpdated(String day)
-    {
-		logger.log(Level.INFO, getName() + ": setLastDayBoardUpdated: " + day);
-		if (day.equals("never"))
-			lastDayBoardUpdated = null;
-		else
-			lastDayBoardUpdated = LocalDate.parse(day);
-	}
-	
-	public void setLastDayBoardUpdated(LocalDate day)
-	{
-		lastDayBoardUpdated = day;
-		logger.log(Level.INFO, getName() + ": setLastDayBoardUpdated: " + day);
-	}
-    
+    public void setLastDayBoardUpdated(String day) {
+        if( day.equals("never") ) {
+            lastDayBoardUpdated = null;
+        } else {
+            DateTimeFormatter df = DateTimeFormat.forPattern("yyyy-MM-dd").withZone(DateTimeZone.UTC); // ISO date format, i.e. "2008-12-24", treated as UTC time
+            lastDayBoardUpdated = DateTime.parse(day, df);
+        }
+    }
+
+    public void setLastDayBoardUpdated(DateTime day) {
+        lastDayBoardUpdated = day;
+    }
+
     /**
      * Returns true if board is allowed to be updated.
      * If a board is already updating only not running threads will be started.

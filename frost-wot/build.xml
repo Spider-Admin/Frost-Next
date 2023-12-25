@@ -1,37 +1,59 @@
 <?xml version="1.0"?>
 <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
-<!-- Build file for Frost-wot                                          -->
+<!-- Build file for Frost-Next                                         -->
 <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
 <project name="frost" default="main" basedir=".">
 
-  <!-- Prefix of the name of the distribution files to create -->
-  <property name="distZipNamePrefix" value="frost-"/>
-  <property name="distJarNamePrefix" value="frost-"/>
-  <property name="distSourceZipNamePrefix" value="frost-source-"/>
+  <!--  Prefix of the name of the distribution files to create -->
+  <property name="distZipNamePrefix" value="Frost-Next"/>
 
-  <!-- Give user a chance to override without editing this file
-       (and without typing -D each time it compiles it) -->
-  <property file=".ant.properties" />                 <!-- ignored by atomative -->
-  <property file="${user.home}/.ant.properties" />    <!-- ignored by atomative -->
+  <!--  Current Frost-Next version number. -->
+  <property name="zipRevision" value=""/> <!-- no longer used; previously appended to zip-file names -->
+  <property name="displayRevision" value="5.0.0"/> <!-- no longer used, Next has no version number; previously displayed in the application -->
 
-  <!-- Don't use systems CLASSPATH, use only the CLASSPATH set in this build file -->
+  <!--  Don't use systems CLASSPATH, use only the CLASSPATH set in this build file -->
   <property name="build.sysclasspath" value="ignore"/>
 
   <!--  General project properties -->
   <property name="Name" value="Frost"/>
   <property name="jarName" value="frost.jar"/>
+  <property name="jarName.UpdateMD5" value="UpdateMD5.jar"/>
 
   <!--  javac compiler options -->
-  <property name="debug" value="true" />
-  <property name="debuglevel" value="source,lines,vars" />
-  <property name="deprecation" value="true" />
-  <property name="verbose" value="false" />
-  <property name="optimize" value="true" />
-  <property name="source" value="1.6" />         <!-- overwritten by atomative -->
-  <property name="target" value="1.6" />         <!-- overwritten by atomative -->
+  <property name="debug" value="true"/>
+  <property name="debuglevel" value="source,lines,vars"/>
+  <property name="deprecation" value="true"/>
+  <property name="verbose" value="false"/>
+  <property name="optimize" value="true"/>
+  <property name="source" value="1.8"/> <!-- the source/target Java version for the main source code -->
+  <property name="target" value="1.8"/>
 
-  <!-- moved to target main, the old one should keep alive. :)  -->
-  <!-- property name="revision" value="${NOW.DATE}"/ --> <!-- overwritten by atomative -->
+  <!--  Javac code compilation executables; these MUST be specified properly,
+        because if we simply used the system's default javac compiler then
+        we have no control over the compiler and it'd just use whatever random
+        default version on your system, which may be older or newer than the
+        desired javac version. If it's older, then it wouldn't compile at all,
+        and if it's newer it'll generate code which follows the *syntax* rules
+        of the target version, but which links against *new* versions of the
+        built-in Java libraries, which means that references to non-existent
+        functions can get included by accident.
+
+        In that case, the code wouldn't run on old Java versions as intended.
+
+        The safest way to compile for intended versions is to use their own
+        exact compilers, as recommended by Oracle, so that's what we're doing.
+
+        Linux users can easily install multiple compilers. Windows users are
+        on their own, and should probably leave compilation to professionals.
+        The standard linux paths are specified below and are usually correct.
+
+        See HOWTO-BUILD.txt for more information.
+
+        1.6: used for the launcher, main: used for the rest of the program. -->
+  <property name="javac.exe.1.6" value="/usr/lib/jvm/java-6-oracle/bin/javac"/>
+  <property name="javac.exe.1.7" value="/usr/lib/jvm/java-7-oracle/bin/javac"/> <!-- not used by us -->
+  <property name="javac.exe.1.8" value="/usr/lib/jvm/java-8-oracle/bin/javac"/>
+  <property name="javac.exe.main" value="${javac.exe.1.8}"/>
 
   <!--  Set the properties related to the source tree -->
   <property name="src.dir" value="source"/>
@@ -42,12 +64,12 @@
 
   <!--  Set the properties for the build area  -->
   <property name="build.dir" value="build"/>
-  <property name="build.classes" value="${build.dir}/classes"/>
-  <property name="build.classes.feclib" value="${build.dir}/classes_feclib"/>
-  <property name="build.classes.genchklib" value="${build.dir}/classes_genchklib"/>
+  <property name="build.classes" value="${build.dir}/classes_frost"/>
+  <property name="build.classes.UpdateMD5" value="${build.dir}/classes_updatemd5"/>
 
   <!--  Set up properties for the distribution area -->
   <property name="dist.dir" value="${build.dir}/dist"/>
+  <property name="dist.dir.hashutils" value="${build.dir}/dist/hashes"/>
   <property name="release.dir" value="${build.dir}/release"/>
 
   <!--  Set up properties for the frost help -->
@@ -57,19 +79,25 @@
   <!--  Set up properties for the frost javadoc -->
   <property name="docs"    value="docs/api"/>
 
+  <!--  Set up properties for all 3rd party library paths -->
+  <property name="lib.path.bouncycastle" value="${lib.dir}/BCastle.jar"/>
+  <property name="lib.path.perst" value="${lib.dir}/perst15.jar"/>
+  <property name="lib.path.jodatime" value="${lib.dir}/joda-time.jar"/>
+  <property name="lib.path.jcalendar" value="${lib.dir}/jcalendar.jar"/>
+
   <!--  The CLASSPATH to use for compilation. -->
   <path id="classpath">
-    <pathelement location="${lib.dir}/BCastle.jar"/>
-    <pathelement location="${lib.dir}/perst15.jar"/>
-    <pathelement location="${lib.dir}/joda-time.jar"/>
-    <pathelement location="${lib.dir}/jcalendar.jar"/>
+    <pathelement location="${lib.path.bouncycastle}"/>
+    <pathelement location="${lib.path.perst}"/>
+    <pathelement location="${lib.path.jodatime}"/>
+    <pathelement location="${lib.path.jcalendar}"/>
   </path>
 
-  <!--  Specify logfile name -->
+  <!--  Where to log the build messages -->
   <property name="logfilename" value="build.log"/>
 
   <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
-  <!--  Output some messages and set DATE,TIME variables                 -->
+  <!--  "ant startmsg": Output some messages and set DATE,TIME variables (DO NOT CALL MANUALLY!)  -->
   <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
   <target name="startmsg"
           description="--> outputs message">
@@ -79,6 +107,8 @@
 Date       : ${DSTAMP}
 Time       : ${TSTAMP}
 JVM version: ${java.version} of '${java.vendor}' in '${java.home}'
+Source ver : ${source}
+Target ver : ${target}
 Ant project: ${ant.project.name}
 Ant version: ${ant.version}
 Build OS   : ${os.name} ${os.version} (${os.arch})
@@ -88,39 +118,92 @@ Build log  : ${logfilename}</echo>
   </target>
 
   <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
-  <!--  Build the code  -->
+  <!--  "ant clean": Erase all compiled class files for a clean compilation  -->
   <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
-  <target name="cleanclass"
+  <target name="clean"
           depends="startmsg"
           description="--> cleans the directories containing .class files">
     <mkdir dir="${build.dir}"/>
 
     <delete quiet="true" dir="${build.classes}"/>
+    <delete quiet="true" dir="${build.classes.UpdateMD5}"/>
 
   </target>
 
   <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
-  <!--  Build the code  -->
+  <!--  "ant build": Compile the class files (DO NOT CALL MANUALLY!)  -->
   <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
   <target name="build"
           depends="startmsg"
           description="--> compiles the source code">
     <mkdir dir="${build.dir}"/>
     <mkdir dir="${build.classes}"/>
+    <mkdir dir="${build.classes.UpdateMD5}"/>
 
-    <javac srcdir="${src.dir}"
+    <!-- Compile FrostLauncher.java (the version-check) for Java 1.6 support, so that -->
+    <!-- even Java 1.6 users can start the app (and be told to upgrade Java)... -->
+    <echo>Compiling backwards-compatible Frost launcher using Java 1.6...</echo>
+    <javac executable="${javac.exe.1.6}" fork="yes"
+           srcdir="${src.dir}"
            destdir="${build.classes}"
-    	   encoding="UTF8"
-	   	   debug="${debug}"		   debuglevel="${debuglevel}" 		deprecation="${deprecation}"
-	  	   verbose="${verbose}"    optimize="${optimize}"
-	  	   source="${source}"	   target="${target}">
-      <classpath refid="classpath" />
+           encoding="UTF8"
+           debug="${debug}"       debuglevel="${debuglevel}"    deprecation="${deprecation}"
+           verbose="${verbose}"   optimize="${optimize}"
+           source="1.6"           target="1.6">
+        <include name="frost/FrostLauncher.java"/>
+        <classpath refid="classpath"/>
+        <compilerarg value="-Xlint:unchecked"/>
+    </javac>
+
+    <!-- Compile the general source using the desired Java version -->
+    <!-- NOTE: forking here (and above) is vital, because otherwise it ignores "executable" -->
+    <!-- and tries compiling using the same javac version as the VM that is running "ant". -->
+    <echo>Compiling main program using Java ${target}...</echo>
+    <javac executable="${javac.exe.main}" fork="yes"
+           srcdir="${src.dir}"
+           destdir="${build.classes}"
+           encoding="UTF8"
+           debug="${debug}"       debuglevel="${debuglevel}"    deprecation="${deprecation}"
+           verbose="${verbose}"   optimize="${optimize}"
+           source="${source}"     target="${target}">
+        <include name="frost/**/*.java"/>
+        <exclude name="frost/FrostLauncher.java"/>
+        <classpath refid="classpath"/>
+        <compilerarg value="-Xlint:unchecked"/>
+    </javac>
+
+    <!-- Also create a launcher for UpdateMD5... -->
+    <echo>Compiling backwards-compatible UpdateMD5 launcher using Java 1.6...</echo>
+    <javac executable="${javac.exe.1.6}" fork="yes"
+           srcdir="${src.dir}"
+           destdir="${build.classes.UpdateMD5}"
+           encoding="UTF8"
+           debug="${debug}"       debuglevel="${debuglevel}"    deprecation="${deprecation}"
+           verbose="${verbose}"   optimize="${optimize}"
+           source="1.6"           target="1.6">
+        <include name="updatemd5/UpdateMD5Launcher.java"/>
+        <compilerarg value="-Xlint:unchecked"/>
+    </javac>
+
+    <!-- Compile the UpdateMD5 utility using the same Java version as the main program -->
+    <echo>Compiling UpdateMD5 utility using Java ${target}...</echo>
+    <javac executable="${javac.exe.main}" fork="yes"
+           srcdir="${src.dir}"
+           destdir="${build.classes.UpdateMD5}"
+           encoding="UTF8"
+           debug="${debug}"       debuglevel="${debuglevel}"    deprecation="${deprecation}"
+           verbose="${verbose}"   optimize="${optimize}"
+           source="${source}"     target="${target}">
+        <include name="updatemd5/**/*.java"/>
+        <exclude name="updatemd5/UpdateMD5Launcher.java"/>
+        <include name="com/**/*.java"/>
+        <compilerarg value="-Xlint:unchecked"/>
     </javac>
 
   </target>
 
   <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
-  <!--  Create the jar file  -->
+  <!--  "ant jar": Create the jar file (DO NOT CALL MANUALLY!)  -->
   <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
   <target name="jar"
           depends="build"
@@ -129,46 +212,57 @@ Build log  : ${logfilename}</echo>
     <delete quiet="true" file="${dist.dir}/${jarName}"/>
     <mkdir dir="${dist.dir}"/>
 
-	<!--  Modify the version and copy the manifest -->
-  	<filter token="VERSION_FROM_ANT" value="${displayRevision}"/>
-	<!-- filter token="VERSION_FROM_ANT" value="${NOW.DATE} dev"/ -->
-<!--	<filter token="VERSION_FROM_ANT" value="20-Oct-2005 dev"/>-->
-	<copy
-		file="${src.dir}/frost.manifest"
-		todir="${dist.dir}"
-		filtering="true"/>
+    <!--  Modify the version and classpath while copying the manifest -->
+    <copy
+        file="${src.dir}/frost.manifest"
+        todir="${dist.dir}">
+        <filterset>
+            <!--<filter token="VERSION_FROM_ANT" value="${displayRevision}"/>-->
+            <filter token="CLASSPATH_FROM_ANT" value="${lib.path.bouncycastle} ${lib.path.perst} ${lib.path.jodatime} ${lib.path.jcalendar} . ${jarName}"/>
+        </filterset>
+    </copy>
 
-    <!--  Build the jar file.  -->
+    <!--  Build the Frost jar file.  -->
     <jar jarfile="${dist.dir}/${jarName}"
          manifest="${dist.dir}/frost.manifest">
-      <fileset dir="${build.classes}">
-        <include name="**/*.class"/>
-      </fileset>
-      <fileset dir="${src.dir}">
-        <include name="**/*.properties"/>
-      </fileset>
-      <fileset dir="${res.dir}">
-        <include name="**"/>
-      </fileset>
+        <fileset dir="${build.classes}">
+            <include name="**/*.class"/>
+        </fileset>
+        <fileset dir="${src.dir}">
+            <include name="**/*.properties"/>
+        </fileset>
+        <fileset dir="${res.dir}">
+            <include name="**"/>
+        </fileset>
     </jar>
 
     <delete quiet="true" file="${dist.dir}/frost.manifest"/>
 
     <mkdir dir="${dist.dir}/lib"/>
 
+    <!--  Build the UpdateMD5 jar file -->
+    <delete quiet="true" file="${dist.dir.hashutils}/${jarName.UpdateMD5}"/>
+    <mkdir dir="${dist.dir.hashutils}"/>
+    <jar jarfile="${dist.dir.hashutils}/${jarName.UpdateMD5}"
+         manifest="${src.dir}/updatemd5/UpdateMD5.manifest">
+        <fileset dir="${build.classes.UpdateMD5}">
+            <include name="**/*.class"/>
+        </fileset>
+    </jar>
+
   </target>
 
   <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
-  <!-- Prepare the distribution (zip, source zip and jar)				 -->
+  <!--  "ant distro": Prepare the distribution (zip, source zip and jar) (DO NOT CALL MANUALLY!) -->
   <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
   <target name="distro"
           depends="jar"
           description="--> prepares the distribution.">
 
-	<!-- Prepares the zip -->
+    <!-- Prepares the zip -->
 
     <copy todir="${dist.dir}">
-      <fileset dir="${bin.dir}"/>
+        <fileset dir="${bin.dir}"/>
     </copy>
 
     <copy todir="${dist.dir}/lib">
@@ -182,47 +276,38 @@ Build log  : ${logfilename}</echo>
     <!-- create the help-zip -->
     <antcall target="helpzip"/>
 
+    <!-- mark all .sh files under the dist dir (for developers) as readable and executable -->
+    <chmod dir="${dist.dir}" perm="ugo+rx" includes="**/*.sh"/>
+
    </target>
 
-   <target name ="release"
-   	depends = "main"
-	description="--> prepares .jar and source.zip for release">
+  <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+  <!--  "ant release": CALL THIS SINGLE TARGET TO COMPILE *AND* ZIP FROST-NEXT!  -->
+  <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+  <target name="release"
+          depends="main"
+          description="--> prepares .jar and source.zip for release">
 
-	<echo>Preparing files for release..
-	</echo>
+    <echo>Preparing files for release..
+    </echo>
 
     <mkdir dir="${release.dir}"/>
-    <delete quiet="true" file="${release.dir}/${distZipNamePrefix}${revision}.zip"/>
-    <zip basedir="${dist.dir}" destfile="${release.dir}/${distZipNamePrefix}${revision}.zip"/>
-<!--
-    <copy todir="${release.dir}">
-      <fileset dir="${dist.dir}">
-      	<filename name="${jarName}"/>
-      </fileset>
-   </copy>
-
-    <delete quiet="true" file="${release.dir}/${distJarNamePrefix}${NOW.DATE}.jar"/>
-    <delete quiet="true" file="${release.dir}/${distJarNamePrefix}latest.jar"/>
-
-    <move file="${release.dir}/${jarName}" tofile="${release.dir}/${distJarNamePrefix}${NOW.DATE}.jar"/>
-
-    <copy todir="${release.dir}">
-          <fileset dir="${dist.dir}">
-	          <filename name="${jarName}"/>
-	</fileset>
-   </copy>
-   <move file="${release.dir}/${jarName}" tofile="${release.dir}/${distJarNamePrefix}latest.jar"/>
--->
+    <delete quiet="true" file="${release.dir}/${distZipNamePrefix}${zipRevision}.zip"/>
+    <zip destfile="${release.dir}/${distZipNamePrefix}${zipRevision}.zip">
+        <zipfileset dir="${dist.dir}" includes="**/*" excludes="**/*.sh" prefix="frost-next"/>
+        <!-- ensure that all .sh files are executable for linux/mac/unix users -->
+        <zipfileset dir="${dist.dir}" includes="**/*.sh" filemode="755" prefix="frost-next"/>
+    </zip>
 
     <!-- Prepares the source zip (exclude the library jars) -->
 
-    <delete quiet="true" file="${release.dir}/${distZipNamePrefix}${revision}-source.zip"/>
-    <zip destfile="${release.dir}/${distZipNamePrefix}${revision}-source.zip" filesonly="true">
-    	<zipfileset dir="."
-    				prefix = "frost"
-    				excludes=".* **/CVS/*"
-    				includes="${src.dir}/**/* ${bin.dir}/**/* ${res.dir}/**/*
-    						  ${lib.dir}/**/* ${specs.dir}/**/* ${helpsrc.dir}/**/*
+    <delete quiet="true" file="${release.dir}/${distZipNamePrefix}${zipRevision}-source.zip"/>
+    <zip destfile="${release.dir}/${distZipNamePrefix}${zipRevision}-source.zip" filesonly="true">
+        <zipfileset dir="."
+                    prefix = "frost-next"
+                    excludes=".* **/CVS/*"
+                    includes="${src.dir}/**/* ${bin.dir}/**/* ${res.dir}/**/*
+                              ${lib.dir}/**/* ${specs.dir}/**/* ${helpsrc.dir}/**/*
                               build.xml HOWTO-BUILD.txt"/>
     </zip>
 
@@ -231,33 +316,27 @@ Build log  : ${logfilename}</echo>
   </target>
 
   <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
-  <!-- Clean -->
+  <!--  "ant cleanall": Clean up everything by deleting the entire build folder -->
   <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
-  <target name="clean" description="--> clean the build files.">
-    <!-- delete quiet="true" dir="${build.dir}"/ -->
-  	<delete dir="${build.dir}"/>
+  <target name="cleanall" description="--> clean the build files.">
+    <delete dir="${build.dir}"/>
   </target>
 
   <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
-  <!-- Building help.zip -->
+  <!--  "ant helpzip": Building help.zip (DO NOT CALL MANUALLY!) -->
   <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
   <target name="helpzip" description="--> build the help.zip">
-	<delete quiet="true" file="${helpbin.dir}/help.zip"/>
+    <delete quiet="true" file="${helpbin.dir}/help.zip"/>
     <mkdir dir="${helpbin.dir}"/>
-	<zip destfile="${helpbin.dir}/help.zip">
-		<zipfileset dir="${helpsrc.dir}" excludes="/**/CVS/*"/>
-    	</zip>
+    <zip destfile="${helpbin.dir}/help.zip">
+        <zipfileset dir="${helpsrc.dir}" excludes="/**/CVS/*"/>
+        </zip>
   </target>
 
   <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
-  <!-- Building the frost documentation -->
+  <!--  "ant javadoc": Building the frost source documentation (useless and broken) -->
   <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
-
   <target name="javadoc">
-    <!-- javadoc packagenames="fecimpl.*"
-             sourcepath="${src.dir.feclib}"
-             destdir="${docs}"
-             windowtitle="FECLib Documentation"/ -->
     <javadoc packagenames="frost.*"
              sourcepath="${src.dir}"
              destdir="${docs}"
@@ -265,24 +344,22 @@ Build log  : ${logfilename}</echo>
   </target>
 
   <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
-  <!-- Main target - runs dist by default -->
+  <!--  "ant main": CALL THIS SINGLE TARGET TO COMPILE FROST-NEXT TO ./dist, BUT NO ZIP FILE!  -->
   <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
   <target name="main" description="--> creates the distribution in ./dist">
 
     <record name="${logfilename}" action="start"/>
 
-	<tstamp>
-		<format property="NOW.DATE" pattern="dd-MMM-yyyy" locale="en"/>
-		<format property="NOW.TIME" pattern="HH:mm:ss" locale="en" />
-	</tstamp>
-	<property name="revision" value="${NOW.DATE}"/> <!-- overwritten by atomative -->
-	<property name="displayRevision" value="${revision} (dev)"/> <!-- overwritten by atomative -->
+    <tstamp>
+        <format property="NOW.DATE" pattern="dd-MMM-yyyy" locale="en"/>
+        <format property="NOW.TIME" pattern="HH:mm:ss" locale="en"/>
+    </tstamp>
 
-  <antcall target="distro"/>
+    <antcall target="distro"/>
 
     <echo>Finished build of ${Name}
-			Date : ${NOW.DATE}
-			Time : ${NOW.TIME}</echo>
+            Date : ${NOW.DATE}
+            Time : ${NOW.TIME}</echo>
 
     <record name="${logfilename}" action="stop"/>
 

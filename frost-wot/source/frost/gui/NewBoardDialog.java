@@ -169,11 +169,31 @@ public class NewBoardDialog extends JDialog {
     }
 
     private void addButton_actionPerformed() {
-        
+        // verify the new board name before accepting it.
+        // do not allow anyone to create any "no subject" boards, since they're only
+        // spammed as message attachments by losers with too much time on their hands.
         boardName = nameTextField.getText().trim();
-        boardDescription = descriptionTextArea.getText().trim();
-        
-        choice = CHOICE_ADD;
+        if( boardName.toLowerCase().contains("no subject") ) {
+            // show them a message using words ("retarded mongoloid") taken
+            // from their own extremely obnoxious board description.
+            MiscToolkit.showMessageDialog(
+                    this,
+                    "Don't be a retarded mongoloid. Spamming the \"no subject\" board\n"
+                    + "without contributing anything is much, much worse than newbies\n"
+                    + "who just accidentally skip their subject. Stop being a mongo.",
+                    "Congratulations! You are a mongoloid!",
+                    MiscToolkit.ERROR_MESSAGE);
+        } else if( boardName.toLowerCase().equals("frost-announce") ) {
+            // prevent re-adding the *dead* legacy Frost announcement board
+            MiscToolkit.showMessageDialog(
+                    this,
+                    "The \"frost-announce\" board is dead and discontinued and cannot be re-added.",
+                    "Invalid board name",
+                    MiscToolkit.ERROR_MESSAGE);
+        } else {
+            boardDescription = descriptionTextArea.getText().trim();
+            choice = CHOICE_ADD;
+        }
         dispose();
     }
     

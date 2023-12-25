@@ -126,8 +126,13 @@ public class TofTreeXmlIO {
         final List<Element> list = XMLTools.getChildElementsByTagName(boardFolder, "FrostBoardTreeEntry");
         for( final Element child : list ) {
 
+            // do not load the *dead* legacy Frost announcement board from the board XML file.
+            // furthermore, also avoid the obnoxious "no subject" spam-board, since nobody sane
+            // uses it. it's spammed as message attachments by losers with too much time on their
+            // hands. this removes that board from their board tree at every restart.
+            // oh and we also disallow null names. ;)
             final String nodename = getName(child);
-            if (nodename == null) {
+            if( nodename == null || nodename.toLowerCase().equals("frost-announce") || nodename.toLowerCase().contains("no subject") ) {
                 continue;
             }
 
@@ -204,23 +209,23 @@ public class TofTreeXmlIO {
 					}
                 }
 
-                // maybe restore lastDayChecked SF_EDIT
-                //logger.info(fbobj.getName() + ": Trying to restore lastDayChecked");
-                ltmp = XMLTools.getChildElementsByTagName(child, "lastDayChecked");
+                // maybe restore lastAllDayStarted SF_EDIT
+                //logger.info(fbobj.getName() + ": Trying to restore lastAllDayStarted");
+                ltmp = XMLTools.getChildElementsByTagName(child, "lastAllDayStarted");
                 if (ltmp.size() > 0) {
                     final Text txtname = (Text) ((Node) ltmp.get(0)).getFirstChild();
                     if (txtname != null) {
-                        int lastDayChecked = -1;
+                        int lastAllDayStarted = -1;
                         try {
-                            lastDayChecked = Integer.parseInt(txtname.getData());
-                            //logger.info(fbobj.getName() + ": getData: " + lastDayChecked);
+                            lastAllDayStarted = Integer.parseInt(txtname.getData());
+                            //logger.info(fbobj.getName() + ": getData: " + lastAllDayStarted);
                         } catch (final Exception e) {
                             ;
                         }
 
-                        if (lastDayChecked > 0) {
-							//logger.info(fbobj.getName() +": Setting lastDayChecked: lastDayChecked");
-                            fbobj.setLastDayChecked(lastDayChecked);
+                        if (lastAllDayStarted > 0) {
+							//logger.info(fbobj.getName() +": Setting lastAllDayStarted: lastAllDayStarted");
+                            fbobj.setLastAllDayStarted(lastAllDayStarted);
                         }
                     }
                 }
@@ -281,13 +286,6 @@ public class TofTreeXmlIO {
             board.setMaxMessageDownload( new Integer(val) );
         }
 
-        val = element.getAttribute("showSignedOnly");
-        if( val.length() == 0 ) {
-            board.setShowSignedOnly( null );
-        } else {
-            board.setShowSignedOnly( Boolean.valueOf(val) );
-        }
-
         val = element.getAttribute("storeSentMessages");
         if( val.length() == 0 ) {
             board.setStoreSentMessages( null );
@@ -295,25 +293,32 @@ public class TofTreeXmlIO {
             board.setStoreSentMessages( Boolean.valueOf(val) );
         }
 
-        val = element.getAttribute("hideBadMessages");
+        val = element.getAttribute("hideUnsignedMessages");
         if( val.length() == 0 ) {
-            board.setHideBad( null );
+            board.setHideUnsigned( null );
         } else {
-            board.setHideBad( Boolean.valueOf(val) );
+            board.setHideUnsigned( Boolean.valueOf(val) );
         }
 
-        val = element.getAttribute("hideCheckMessages");
+        val = element.getAttribute("hideBADMessages");
         if( val.length() == 0 ) {
-            board.setHideCheck( null );
+            board.setHideBAD( null );
         } else {
-            board.setHideCheck( Boolean.valueOf(val) );
+            board.setHideBAD( Boolean.valueOf(val) );
         }
 
-        val = element.getAttribute("hideObserveMessages");
+        val = element.getAttribute("hideNEUTRALMessages");
         if( val.length() == 0 ) {
-            board.setHideObserve( null );
+            board.setHideNEUTRAL( null );
         } else {
-            board.setHideObserve( Boolean.valueOf(val) );
+            board.setHideNEUTRAL( Boolean.valueOf(val) );
+        }
+
+        val = element.getAttribute("hideGOODMessages");
+        if( val.length() == 0 ) {
+            board.setHideGOOD( null );
+        } else {
+            board.setHideGOOD( Boolean.valueOf(val) );
         }
 
         val = element.getAttribute("hideMessageCount");
@@ -510,14 +515,14 @@ public class TofTreeXmlIO {
          //SF_EDIT
          if( board.getLastDayBoardUpdatedObj() != null ) {
              element = doc.createElement("lastDayBoardUpdated");
-             cdata = doc.createCDATASection(board.getLastDayBoardUpdated());
+             cdata = doc.createCDATASection(board.getLastDayBoardUpdated()); // this is returned as a string in "2008-12-24" ISO format
              element.appendChild( cdata );
              rootBoardElement.appendChild( element );
           }
           
-         if( board.getLastDayCheckedObj() != null ) {
-             element = doc.createElement("lastDayChecked");
-             cdata = doc.createCDATASection(Integer.toString(board.getLastDayChecked()));
+         if( board.getLastAllDayStartedObj() != null ) {
+             element = doc.createElement("lastAllDayStarted");
+             cdata = doc.createCDATASection(Integer.toString(board.getLastAllDayStarted())); // this is just a number such as "4"
              element.appendChild( cdata );
              rootBoardElement.appendChild( element );
           }
@@ -538,20 +543,20 @@ public class TofTreeXmlIO {
             if( board.getMaxMessageDownloadObj() != null ) {
                 element.setAttribute("maxMessageDownload", "" + board.getMaxMessageDownload());
             }
-            if( board.getShowSignedOnlyObj() != null ) {
-                element.setAttribute("showSignedOnly", "" + board.getShowSignedOnly());
-            }
             if( board.getStoreSentMessagesObj() != null ) {
                 element.setAttribute("storeSentMessages", "" + board.getStoreSentMessages());
             }
-            if( board.getHideBadObj() != null ) {
-                element.setAttribute("hideBadMessages", "" + board.getHideBad());
+            if( board.getHideUnsignedObj() != null ) {
+                element.setAttribute("hideUnsignedMessages", "" + board.getHideUnsigned());
             }
-            if( board.getHideCheckObj() != null ) {
-                element.setAttribute("hideCheckMessages", "" + board.getHideCheck());
+            if( board.getHideBADObj() != null ) {
+                element.setAttribute("hideBADMessages", "" + board.getHideBAD());
             }
-            if( board.getHideObserveObj() != null ) {
-                element.setAttribute("hideObserveMessages", "" + board.getHideObserve());
+            if( board.getHideNEUTRALObj() != null ) {
+                element.setAttribute("hideNEUTRALMessages", "" + board.getHideNEUTRAL());
+            }
+            if( board.getHideGOODObj() != null ) {
+                element.setAttribute("hideGOODMessages", "" + board.getHideGOOD());
             }
             if( board.getHideMessageCountObj() != null ) {
 	            element.setAttribute("hideMessageCount", "" + board.getHideMessageCount());

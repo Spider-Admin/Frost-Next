@@ -1,0 +1,240 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="Content-Style-Type" content="text/css">
+    <link rel="stylesheet" href="style.css" type="text/css">
+    <title>Feature Details (Frost-Next)</title>
+  </head>
+<body>
+<h1>Feature Details (Frost-Next)</h1>
+<p><a href="index.html">Back to Help Index</a></p>
+<h2># Searching for Messages</h2>
+<p>The message search system in Frost-Next has been completely revamped with the power of <i>regular expressions</i>. The search possibilities are now <i>literally</i> limitless, and you can perform extremely advanced queries in the Sender, Subject and Content fields of the search window.</p>
+<p>If you want to know more about regular expressions and how they work, you should look for tutorials online. The most important thing to note for beginners is that certain characters have special meaning. For instance, "." (period) matches <i>any</i> character, and there are countless other special meanings for characters. If you accidentally write an invalid regex query, Frost-Next will warn you about the syntax error.</p>
+<p>If you want to perform a normal, <i>non-regex</i>, plaintext search for an <i>exact</i> sequence of characters as-entered, then you <i>have to</i> "escape" the text with a leading "\Q" so that it doesn't get interpreted as a regular expression. Example:</p>
+<ul>
+  <li>"<b>Hi.</b>" = Matches "Hi" followed by <i>any</i> character (via regex "."), such as "His" and "Him" and "Hi," and "Hip" and so on.</li>
+  <li>"<b>\QHi.</b>" = Matches the literal sequence "Hi." and nothing else.</li>
+</ul>
+<p>You should therefore memorize the "\Q" trick, and also note that you can also perform a literal search within just <i>a specific section</i> of your input and then go back to using regular expressions for other sections, via the "\E" ("end literal escaped quote") marker. Example:</p>
+<ul>
+  <li>"<b>Hi.\QThere.\E\d</b>" = Matches "Hi" followed by <i>any</i> character ("."), followed by the literal sequence "There.", and finally back to regular-expression mode for "\d" (any digit). You can use these "\Qliteral\E" sections <i>anywhere</i> in your query.</li>
+</ul>
+<p>However, you don't <i>have to</i> use "\Q" to achieve literal meanings in regular expressions. Usually it's more convenient to only escape the <i>individual</i> characters that have special regex meanings, which is done by placing a "\" (backslash) before the character. The above query would act identically if written like this instead:</p>
+<ul>
+  <li>"<b>Hi.There\.\d</b>" = Same as above, since the "\." means a "literal period" (<i>instead of</i> being treated as a regular-expression "." (any character)).</li>
+</ul>
+<p>The most common things you'll need to escape are "\." (literal period instead of "any character"), "\(" and "\)" (literal parenthesis instead of being treated as regex-groups), "\+" (literal plus instead of being treated as the "one or more" regex repeat-quantifier, and the same has to be done for any asterisk to avoid the "zero or more" quantifier), and "\\" (a literal backslash; this is necessary since a <i>single</i> backslash is interpreted by the regex engine as a regex operator).</p>
+<p>Now for some actual regular expression examples, to give you some ideas of the power of the new search engine:</p>
+<ul>
+  <li>"<b>cat</b>" = Just a search for the word "cat", but it's not qualified with any limitations which means that the phrase is allowed to appear inside other words, such as "baccata".</li>
+  <li>"<b>\bcat\b</b>" = Matches the <i>exact</i> word "cat" but <i>not</i> the words "baccata" or "catburglar", etc. The "\b" means "word boundary", which means that this search for "cat" <i>cannot</i> appear <i>inside</i> any other words.</li>
+  <li>"<b>(cat|dog|fish)</b>" = Matches <i>any</i> of the words cat, dog or fish. The parenthesis are a "group" and the "|" (pipe) means "or".</li>
+  <li>"<b>Example \d</b>" = Matches "Example " followed by any number ("\d" means digit).</li>
+  <li>"<b>Example [0-9]</b>" = Does the same as above, but specifically provides the range of allowed numbers.</li>
+  <li>"<b>Example [0-5]</b>" = Only looks for numbers in the range 0-5.</li>
+  <li>"<b>Example [a-z]</b>" = Matches "Example " followed by any letter in the range a to z.</li>
+  <li>"<b>^Example</b>" = Matches the word "Example", but only if it's at the <i>start</i> ("^") of a line of text in the message.</li>
+  <li>"<b>Example$</b>" = Matches the word "Example", but only if it's at the <i>end</i> ("$") of a line of text in the message.</li>
+  <li>"<b>(?s)Hi.+?There</b>" = This illustrates the "(?s)" prefix, which changes the behavior of "." from "any character <i>except</i> newlines" into "any character <i>including</i> newlines", which is how you'd perform a search for a phrase that needs to be able to span across multiples lines. It also illustrates "+" (the "one or more" regex repeat-quantifier) which means that ".+" matches "one or more of any character" (including newlines in this case), and lastly "?", which makes the repeat-quantifier "non-greedy" (in other words "the shortest possible match for one or more of any character"), so that it finds the earliest possible match for the word "There".</li>
+</ul>
+<p>There are <i>countless</i> other regex pattern features, which you will have to research on your own. But let's finish off with a big example, which uses a <i>lot</i> of advanced regex features. I'll break it up into sections to explain them all:</p>
+<ul>
+  <li>"<b>egypt(%20|\s)?2[0-9]{2}</b>" = This is the final pattern which we'll be looking at. It matches <i>any</i> mention (or Freenet key) for the word "egypt" followed by the numbers 200 to 299. This method can be used to find anything talking about photo galleries for "egypt" in the range 200 to 299. Now we're in very advanced territory, and you can begin to see the power!</li>
+  <li>"<b>egypt</b>" = Just the literal word "egypt".</li>
+  <li>"<b>(%20|\s)</b>" = A group that matches either "%20" (a common substitute for "space" in Freenet key links) <i>or any whitespace</i> such as a space or tab (that's the "\s" whitespace pattern).</li>
+  <li>"<b>(%20|\s)?</b>" = The question mark after a group makes that group <i>optional</i>, which means that the "%20" or "space" are <i>allowed</i> to appear but <i>aren't necessary</i> for a match.</li>
+  <li>"<b>egypt(%20|\s)?2</b>" = After the pattern, we're looking for the literal number "2". So if you've been following along above, this pattern (so far) matches "egypt2", "egypt%202" (used in some Freenet keys), and "egypt 2".</li>
+  <li>"<b>[0-9]{2}</b>" = This final part matches any of the digits (0 to 9), and requires "{2}" of them, so it matches "00" to "99". Note that alternatively, this part of the pattern could have been written as "<b>\d{2}</b>" instead, which is the alternative syntax for "any digit from 0 to 9", but the full form was used here to remind you that you can specify your own digit ranges.</li>
+  <li>In other words, if you look at the whole pattern again, you'll realize that it finds all matches for "egypt200" to "egypt299", "egypt%20200" to "egypt%20299" and "egypt 200" to "egypt 299". You could <i>never</i> have achieved that with just a normal plaintext search. <i>This</i> is why regular expressions are so <i>incredibly</i> powerful!</li>
+</ul>
+<p>If you want to learn more about regular expressions, you should seek out the countless available online tutorials. I guarantee that you will be rewarded by learning this extremely powerful text searching language. There are websites which will guide you through making your own patterns, testing them, and seeing exactly how they work. Have fun exploring!</p>
+<p>Note that Frost-Next uses the <i>Java</i> flavor of regular expressions, and a web search for "Java regex pattern docs" will bring up the Java documentation with a full list of supported patterns and their meanings.</p>
+<p>Lastly, note that all searches are case-insensitive by default which means that a search for "HI" also matches "hi". If you click the checkboxes to the right of the Sender, Subject or Content fields in the message search window, you'll make those fields case-<i>sensitive</i> instead.</p>
+<p>When you double-click on any of your search results to open the messages, you'll see all of your pattern matches beautifully highlighted within that document.</p>
+<h2># Universal Search</h2>
+<p>The universal search feature in Frost-Next allows you to perform word-searches in most of Frost's GUI. You can search in the message text of the currently viewed message, and in the table columns of all tables. To begin a search, press <b>Ctrl + F</b> for a case-insensitive search, or <b>Ctrl + Shift + F</b> for a case-<i>sensitive</i> search.</p>
+<p>When searching in the message text, be sure to first click in the message text area to give it focus, before pressing the keyboard shortcut.</p>
+<p>When searching in table, the search will take place in the <i>column</i> you click. So to search in the filenames of your Downloads tab, for example, you would first <i>click on any of the filenames in the Filename column</i> to "highlight" that column, then press the search shortcut.</p>
+<p>Another important thing to remember when you're searching tables, is that you should sort the table by a <i>stable</i> column (such as filename) before searching, so that your table rows don't keep jumping around (i.e. if you sort them by their last activity or block count). The stability is necessary for the "next/previous row" feature to work properly, otherwise the rows will keep flying around which means the search (which goes row by row) may miss them.</p>
+<p>That brings us to the final point: Whenever you search, you can use <b>Down Arrow</b> or <b>Ctrl + G</b> to go to the <i>next</i> result (i.e. the next word match in a message, or the next matching row in a table search). Use <b>Up Arrow</b> or <b>Ctrl + Shift + G</b> to go to the <i>previous</i> result.</p>
+<p>Here are three great usage cases for the universal search feature:</p>
+<ul>
+  <li>Search your file transfer queue's Filename column for something like ".csv" to find all queued CSV files, for example.</li>
+  <li>Search the various columns in your "[Sent]" folder to quickly find specific messages you've sent in the past.</li>
+  <li>Click and search in the Subject column of the board message list, and then navigate through the result to quickly find the threads related to your keywords (alternatively, use the regular message search window along with Next's ability to jump directly to the thread).</li>
+</ul>
+<h2># Quicksend Mode</h2>
+<p>This feature is activated via "Preferences &gt; News (1) &gt; Attempt to send your outgoing Frost messages as soon as possible". It is enabled by default, since it greatly speeds up communication for everyone on Frost. When enabled, the act of pressing <i>Send</i> on a new message starts a "download today's messages" board refresh for the target board, and then uploads your message in the next available message slot for today. If disabled, you'll have to wait for the regular 45-minute interval board refresh to happen instead.</p>
+<p>There is <i>zero</i> difference in security between sending messages immediately or 1-45 minutes later, so it's recommended that you keep this feature enabled. The reason that there isn't any difference is that Frost always has (and always will, due to <i>needing</i> the exact upload-time for message sorting) "timestamp" all outgoing messages with the UTC time of the <i>exact</i> moment that their upload attempt begins, which means that there is <i>no</i> difference "to an attacker" between whether your outgoing message waits for 0 <i>seconds</i> or something crazy like 50 <i>hours</i> before its upload begins. The date-stamp on outgoing is messages is <i>necessary</i> for Frost's operation because we <i>need</i> the timestamp of the message to match the slot-index order it's being uploaded into. Without that behavior, you would not be able to correctly sort board messages by date and message index. Even if we removed the date-stamping, an attacker would simply be able to see "I've never seen that message key before, hence we know that the message is being inserted <i>right now</i>", so the date-stamping doesn't really give them any information they didn't already have anyway.</p>
+<p>That being said, it doesn't matter if someone is a direct neighbor of your node and sees you while you are inserting a message and realizes that it's being inserted right now: Your greatest defense against all Freenet attackers is the fact that Freenet's routing of outgoing messages is essentially random, since your message gets a random KSK crypto key which decides a random upload location in the network, which in turn means that a random peer (out of your 142 Freenet peers) is chosen as the recipient of the message, so none of your peers get a "whole picture" of all messages you are sending. They'll only see one or two of them. And even the peers that see the uploads won't know if <i>you're</i> sending it or if it's just being relayed from one of your own peers.</p>
+<h2># Crypto Keys</h2>
+<p>The ability to use custom crypto keys in Next means that you can now upload CHKs with all the security benefits of SSKs and none of the downsides. And as long as you give other people the cryptographic key that was used, they'll be able to heal your files.</p>
+<p>If you just insert a <i>normal</i> CHK with an "Auto" crypto-key, the CHK key is automatically derived from the content of the file, which means that attackers can predicted your final key <i>if</i> you're inserting known material. The use of a custom crypto key prevents that, by encrypting everything with a manual key that <i>isn't</i> derived from the file contents.</p>
+<p>When you insert something with a custom key, it's <i>very</i> important that you save the custom crypto key so that the file can be healed later. For that reason, right-clicking your uploads and choosing "Copy extended information" gives you all of the insert-settings used for the file, including the crypto key that was used (if a manual key was used).</p>
+<p>To apply a custom key, just go into the Uploads tab and select your files to upload as usual. Then, right-click the files and look in the "Custom crypto key" sub-menu. The following options are available:</p>
+<ul>
+  <li>"<b>Set custom crypto key</b>" (also <b>S</b> on the keyboard) = Allows you to manually paste in a crypto key. The key must be exactly 64 hex-characters.</li>
+  <li>"<b>Generate random crypto key</b>" (also <b>G</b> on the keyboard) = This is the most useful option. It generates a random key and applies it to all of the selected files.</li>
+  <li>"<b>Copy current crypto key</b>" (also <b>C</b> on the keyboard) = Copies all selected keys. Useful if you want to save them and re-use them later. You can also simply right-click your queued uploads and "Copy extended information" to get the key that way.</li>
+  <li>"<b>Clear custom crypto key</b>" (also <b>Z</b> on the keyboard) = Removes the custom keys for all selected files and returns them to using automatic, content-derived keys instead.</li>
+</ul>
+<p>Note that crypto keys make it <i>much</i> harder to heal files, since you must save/share your key so that the file can be healed by others. Therefore, you should be <i>very</i> careful about <i>when</i> you decide to use crypto keys. If you're inserting files that already contain random, unpredictable data (such as RAR/7Z/ZIP files you created), then <i>do not</i> use crypto keys since there's no point (the zipped data is random anyway, so the automatic key will be random too). If you're inserting possibly-known files (such as videos), you should consider using a crypto key <i>if</i> inserting the material could get you in trouble.</p>
+<h2># Quickheal Mode</h2>
+<p>This innovative feature greatly speeds up healing of files that <i>won't even start</i> downloading. When a file won't start, it means that the metadata cannot be retrieved, but the rest of the file is <i>usually</i> still out there on the network. Often the metadata is all that needs healing.</p>
+<p>Enabling Quickheal Mode changes the behavior of uploads. <i>While</i> this button is enabled, <i>any</i> upload that <i>begins</i> uploading (even those queued in a "Waiting" state <i>prior</i> to enabling Quickheal Mode), will perform a heal of the <i>metadata first</i>. This allows you to heal the metadata in mere minutes regardless of how large the file is. In fact, since the Quickheal takes effect when the upload <i>begins</i>, you can actually enable Quickheal Mode and then right-click and "Restart selected uploads" to restart any <i>previous</i>, already-ongoing non-quickheal transfers so that they use Quickhealing instead.</p>
+<p>Quickheal Mode achieves the quick metadata healing by changing the uploading process from "insert the whole file first, then insert the metadata", to instead being "insert the <i>metadata first</i>, then insert the whole file". This means that you simply have to enable Quickheal Mode, queue your files, let them progress for a while (until their metadata blocks have been uploaded; those are usually about 1-40 blocks depending on filesize), and then you can either delete the transfer <i>or</i> let it finish to also heal the rest of the file just in case.</p>
+<p>Furthermore, when the upload process inserts metadata in Quickheal Mode, it only inserts a <i>single</i> copy of the metadata (your "Extra Inserts of Metadata" setting is ignored), which greatly speeds up the insertion of the metadata.</p>
+<p>You don't have to keep the "Quickheal Mode" checkbox enabled. As soon as a Quickheal upload begins, you can disable the mode again, since the transfers apply the setting to themselves when they <i>begin</i> uploading, and they keep it for as long as the upload is ongoing.</p>
+<p>In fact, it's <i>recommended</i> that you disable the Quickheal checkbox as quickly as possible. It turns red <i>for a reason</i> when it's enabled: You should <b>never</b>, <i>ever</i> use quickhealing when <i>inserting</i> regular files for the first time. It's <i>only</i> meant for healing. If you use "quickhealing" when doing your regular first-time inserts, you'll create files that <i>die very quickly</i> due to lacking enough metadata, and you also open up a risk of being attacked by evil nodes who are snooping on your insertion and seeing your metadata first, and using that to track who is inserting the file.</p>
+<p>I'll repeat one more time in case you didn't believe it the first time: <b>Do <i>not</i> use quickheal mode for <i>anything</i> except <i>healing</i>!</b></p>
+<p>There is <i>zero</i> benefit to using it for regular inserts, since it does not speed up <i>anything</i> that's important for normal file insertion. It's only good for healing. Got it? Good. Now enjoy your quick <i>heals</i>!</p>
+<h2># Key Conversion Utility</h2>
+<p>This is a powerful, new built-in utility for Freesite creators. It allows you to effortlessly extract and convert Freenet keys into any desired target format.</p>
+<p>Simply dump as much text as you want into the upper field. You can paste message text, HTML, key lists, log files and anything else that contains keys, and you can mix all kinds of input at the same time. Then just press the "Process" button and you will get the clean, extracted, ready-to-use result in the lower field.</p>
+<p>The discovered keys are decoded and de-duplicated so that only a single instance of each <i>unique</i> key is included in the output. Furthermore, it ignores all Freesite keys so that they don't end up among your <i>file</i> keys.</p>
+<p>There are several options which dictate the output format. They make it quicker than ever before to prepare keylists for sites, since you can simply dump a bunch of messages into the utility and then export the resulting key list into a suitable format for your Freesite. The options are as follows:</p>
+<ul>
+  <li>"<b>Empty lines between keys</b>" = Puts an extra, empty line between each key for readability. Optional.</li>
+  <li>"<b>Format: Clean Keys</b>" = Gives you clean, decoded keys for posting in Frost messages. This is the same format used when you're copying keys for your finished uploads.</li>
+  <li>"<b>Format: HTML Encoded Keys</b>" = For people who just want URL-encoded keys for some reason. This <i>isn't</i> recommended unless you know <i>exactly</i> what you're doing!</li>
+  <li>"<b>Format: Freesite: &lt;a&gt; links</b>" = If you want clickable file links on your site, this format takes care of properly URL-encoding the "href" link and using the bare filename as the name of the clickable link (with proper HTML-encoding of any special characters in the filename).</li>
+  <li>"<b>Format: Freesite: &lt;pre&gt; block</b>" = The <i>recommended</i> output format for Freesites. Creates a block of links which is easy for site visitors to copy and paste. Note that this format is <i>not</i> the same as just taking "Clean Keys" and putting &lt;pre&gt; before and after them. This special "&lt;pre&gt; block" output format <i>also</i> takes care of HTML-encoding any special characters in the keys, such as &lt;, &gt; and &amp;.</li>
+</ul>
+<p>You should <i>always</i> use the "Clean Keys" method if you're going to post the keys in a Frost message. On the other hand, you should never, <i>ever</i> use the "Clean Keys" output method if you're intending to use the result <i>on a Freesite</i>. In that case, always use one of the Freesite output modes, to guarantee that your result is safe, <i>valid</i> HTML! Every output format deals with special characters differently, for each intended purpose.</p>
+<h2># Hash Blocklist</h2>
+<p>Frost-Next has a fast and extremely memory-efficient hash-blocklist feature, which helps you avoid downloading duplicate files by detecting and stopping duplicate Freenet downloads even when the files have been renamed or re-inserted with different settings, etc. The memory-efficiency isn't a joke; despite the fact that hashes (and their file paths) can consume hundreds of megabytes or even <i>gigabytes</i> of RAM, the implementation in Frost-Next only uses 2 megabytes of RAM, period, regardless of how large your hash list is!</p>
+<p>When this feature is enabled and a hashlist is loaded, your downloads will be checked against the hashlist to see if they already exist on your hard disk. If so, they'll be aborted with a Failure reason telling you where the file is on your disk. It works by checking the MD5 of your downloads. Note that the MD5 only exists for Freenet keys that are at least 1 MiB and inserted with COMPAT_1255 or later. Smaller or older files can not be checked, since they don't have any hash. Still, this feature is <i>very</i> helpful at saving you time by avoiding wasteful re-downloading of the kind of files that matter the most: Large video files, in particular.</p>
+<p>The first step to using the hash blocklist is to <i>index the hashes on your own hard disk</i> via Next's UpdateMD5 utility. It's an advanced MD5 file hashing utility that's as fast as OpenSSL (the golden standard in hashing speed) and is able to process files at a speed of hundreds of megabytes per second.</p>
+<p>Begin by editing "hashes/UpdateMD5.xml" in a text editor, and configuring the utility to match your preferences. All of the default options are going to suit <i>most</i> people, but you'll <i>need</i> to go down to the "&lt;Paths&gt;" section at the bottom to add the disk paths that you want to include/exclude in the scanning. Read the comments and the examples carefully, and ask a technical friend if you need help. You have to set up <i>at least one</i> include-path.</p>
+<p>Next, run "hashes/UpdateMD5.bat" (if you're on Windows) or "hashes/UpdateMD5.sh" (if you're on Linux/Mac). Watch the progress and wait until it's done indexing. If you ever get new files on your disk, you'll have to run the utility again later (to index those too). It's actually possible to schedule the indexing task to run automatically via cron (on Linux) or the Task Scheduler (on Windows), but that's beyond the scope of this introduction. If you decide to run automatic re-indexing, I suggest choosing a semi-long interval such as 48 hours. Furthermore, Windows users should remove the "pause" line at the bottom of "UpdateMD5.bat" to prevent their scheduled task from pausing. For most people, scheduling isn't worth the hassle, since it's usually sufficient to just run the indexing manually from time to time.</p>
+<p>When the drive has been indexed, you will have a new file called "hashes/files.md5". Now look in Frost-Next's Preferences &gt; Downloads pane, and press the Force Rebuild button to load the hashes into Next's internal database. Importing up to 100k hashes takes less than a second, 200k is about 2.2 seconds, 300k is 4.5 seconds, 400k is 7 seconds, 500k is 10 seconds, 600k is 15 seconds, 800k is 26 seconds, and 1 million is 50 seconds. Most people are in the 5-50k hashes range, which means that it'll be instant for you. Either way, this is just meant to tell you what time to expect if you have a huge amount of hashes, if you were curious. The actual <i>lookups</i> are super fast <i>no matter</i> how many hashes you have.</p>
+<p>Lastly, just enable the "Block downloads matching your on-disk MD5 hashlist" checkbox, and press Ok to close the preferences.</p>
+<p>Your downloads will now automatically be aborted if they match any of the files you already have on-disk. When a file's metadata has been downloaded (the first few blocks before the real block count appears), we'll receive the list of its hashes from your Freenet node. If the file has an MD5 hash, we check that against your MD5 blocklist. If it's on the blocklist, we immediately abort the download and mark it as "Failed: [MD5] Exists on disk: /path/to/your/own/file.avi".</p>
+<p>This avoids downloading duplicates for files you already have on disk, and it complements the key-based blocklist that's also in Frost-Next (which prevents downloading the same Freenet key twice, unless you're sure you want to). So that's <i>two</i> lines of defense against dupes. One which prevents you from even queuing the file (the key-based mode), and one which aborts the download if you've never downloaded that file as a Freenet key before (but had it on your disk as a file). This means that power-downloaders never have to worry about downloading dupes in their collections.</p>
+<p>If you <i>want</i> to download a file that's being blocked by your MD5 blocklist, you can simply go into the Frost-Next preferences and disable the blocklist temporarily, and then start the transfer, and then re-enable the blocklist. The transfer will be allowed to continue even though you've re-enabled the blocklist. However, this exception is a <i>per-session</i> state, so if you exit Frost and restart it, the file transfer will be aborted (but only if it wasn't already Finished). The choice to make it a per-session exception is by design, so that you don't have to worry about whether files might be in a magical "exception" state when they should actually be blocked. Furthermore, if you right-click a transfer and choose "Restart selected downloads", it will yet again be re-checked against the blocklist <i>if</i> the blocklist is enabled (because the exception is stored on a per-transfer basis).</p>
+<p>Lastly, note that the "Failed: [MD5] Exists on disk: ..." message is not stored in the database, so if you restart Frost you'll just see "Failed" without any specific reason anymore. That's by design, to avoid outdated failure reasons "Sticking", since most failure reasons are Node-reasons, which may no longer be true at the next time you start Frost, so we don't save any of them (not even the MD5 reason). The fact that it's "Failed" sticks, but not the actual <i>reason</i> for the failure. So you'll still see "Failed" and the file marked in red, which should be enough to remind you why it failed. If not, you can always restart that download and it'll be blocked by the blocklist again and show the reason yet again.</p>
+<h2># Extra Inserts of Metadata</h2>
+<p>The "Preferences &gt; Uploads &gt; Extra Inserts of Metadata" option decides how many extra copies to insert for small (&lt; 32 KiB) files <i>and</i> for the splitfile metadata blocks of larger files, which leads to longer file life. It's recommended that you use the values 7 or 5, but not higher or lower.</p>
+<p>Available values are:</p>
+<ul>
+  <li>2 (Freenet default)</li>
+  <li>5 (Files live a bit longer)</li>
+  <li>7 (Recommended, longest file life)</li>
+  <li>10 (Way too much, for paranoiacs)</li>
+</ul>
+<p>The setting is used for all file uploads and file attachments. Higher numbers makes files live longer, but increases the amount of time it takes to insert a file.</p>
+<p>When uploads start, they use the setting <i>at the time of starting</i>, <i>not</i> at the time they were queued. So if you set it to 2, and then queue (but don't start) a few files, and set it back to 7, then those files will use 7 whenever they finally start. This is intentional. You are supposed to set-and-forget your Extra Inserts value so that it's applied equally to all uploads.</p>
+<p>However, already-ongoing uploads use the value at the time they started, which means that you can start a few uploads with a very high value, and then change the value back after they've started (so that your future uploads use more sensible numbers).</p>
+<h2># Managing Downloaded Keys</h2>
+<p>When the "Preferences &gt; Downloads &gt; Remember which Freenet keys you've already downloaded" option is enabled, you'll have access to the key-tracker. It remembers which Freenet keys you've already downloaded and asks you to confirm the re-download if you try to queue the same key again, so that you don't have to waste any time <i>accidentally</i> re-downloading things.</p>
+<p>Trying to queue a previously downloaded key will provide you with a prompt, asking whether you want to queue or skip the previously downloaded file. This complements the hash blocklist feature, and provides yet another layer of protection against accidentally downloading duplicates.</p>
+<p>To view your tracked keys, go to "Options &gt; Manage downloaded keys". The entries are stored by their <i>unique</i> key, so there's only a single entry for each unique download-key. And the keys are only added once, the first time they're seen, which means that the "Download Finished" column never changes its value (since it tracks the <i>first</i> time you downloaded that particular key).</p>
+<p>The manager window provides you with several options. People who are migrating from other applications (such as Fuqid) may want to begin by pressing the "Add keys from downloadlog" button and importing their "Fuqid-Downloads.log" file. The import feature has full support for all three of Fuqid's log formats (Fuqid-Downloads.log, Fuqid-Keys.log and Fuqid-InsertOptions.txt"), as well as the two Frost-Next formats (Frost-Downloads.log and Frost-Uploads.log), and most other key lists should work as well. Importing entries is a great way to quickly get started with the key blocking feature; just be aware that imported entries will use the <i>current</i> time as their "download date" along with a filesize of 0 bytes (since no size is known). That doesn't impact the ability to block those previously downloaded keys, but it's worth mentioning. Those fields are only filled in properly when <i>Frost</i> is automatically adding keys after successful downloads.</p>
+<p>When you need to find some old keys, the Search field is very useful. It lets you perform a case-insensitive search for all filenames that contain the entered phrase. You can also do a manual sort by the various columns, to find things from a certain date or board, and you can use the Universal Search feature (see above) to find things in the various columns as well.</p>
+<p>When you've found the desired keys, simply select them all and right-click to get a couple of options:</p>
+<ul>
+  <li>"<b>Copy keys with filenames</b>" = Very useful if you want to share the keys with someone else. Find the material they need, copy the keys, and voila.</li>
+  <li>"<b>Download selected keys again</b>" = The preferred way of re-downloading old keys with a maximum of comfort and ease (it even suppresses the "Are you sure that you want to re-download this key?" question).</li>
+  <li>"<b>Remove selected keys</b>" = Deletes the selected keys from the storage.</li>
+  <li>"<b>Remove all from same board</b>" = If you've selected a key with a "Board" value, it will ask if you want to delete all other keys from the same board from your storage.</li>
+</ul>
+<p>Lastly, there's a button called "Remove older items" which un-tracks anything older than the maximum specified age, but that isn't really necessary since the tracker can easily handle hundreds of thousands of items. There's also a "Refresh" button which reloads the latest list of tracked keys (in case some other download finished while the window was open).</p>
+<h2># Execute Program on Completion</h2>
+<p>In Frost-Next, you aren't limited to the built-in ability to log uploads and downloads or tracking downloaded keys. You can also perform <i>your own</i> custom file transfer logging, by executing an external program whenever a transfer becomes marked as Finished. To do so, simply go into "Preferences &gt; Downloads" or "Preferences &gt; Uploads" and provide a path to a program in the "Execute program on completion" field.</p>
+<p>The program runs for everything in the Uploads/Downloads tables that's queued by <i>your</i> Frost instance (meaning it <i>avoids externally queued items</i> that are only visible via "Show global queue").</p>
+<p>Specifying a program path takes effect immediately, and you don't need to restart any currently-unfinished transfers. However, anything that's <i>already finished</i> before you change the setting will <i>not</i> execute the external program.</p>
+<p>It's important that the program is either in your PATH environment variable (meaning it can be opened by just typing its name in any Terminal/Run-prompt on the system), <i>or</i> a <i>full</i> path to a program. You <i>cannot</i> use shortcuts like "~/" for the "home folder"; the whole path is needed, such as "/home/exampleuser/finished-upload.sh". The "Browse..." button is there to help you pick the executable.</p>
+<p>Be sure that your program actually <i>exists</i> and is marked as <i>executable</i> (if on Linux/Mac), because Frost will <i>not</i> tell you if your application failed to execute or couldn't be found (since there's no system-independent way of doing that, <i>and</i> since we execute the programs asynchronously).</p>
+<p>You can specify extra arguments after the executable name, if your application needs it. For instance, it's possible to have a single script easily handle both uploads and downloads by giving it a parameter that identifies what type of transfer it is (so that you don't have to manually analyze the other arguments to figure out the type). If you add extra arguments after your application name, they will shift the number offsets of the data-carrying parameters. Your own arguments are always sent first, and then the arguments describing the finished transfer. So in the example "/home/exampleuser/finished-transfer.sh upload", the word "upload" would be in $1, and then the transfer parameters would be in $2 and onwards.</p>
+<p>The executed program receives a set of arguments and environment variables to tell it about the finished upload or download. The argument order and positions are always the same, even when certain arguments are empty (those will be sent to your program as empty strings). So it's up to you whether you want to use the environment variables or the strictly-ordered program arguments to read the data. They're equally reliable, although environment variables are easier to read when looking at your code and therefore less prone to human errors.</p>
+<p>The program can be a full-fledged application or a simple shell script (.sh), and the latter is the recommended method if you're on Linux. Shell scripts can be written in bash (#!/bin/bash), or languages like PHP (#!/usr/bin/php) and Python (#!/usr/bin/python). Remember to make it executable (with "chmod +x"). On Windows, you're recommended to use something like "C:\php\php.exe C:\frost-next\finished-transfer.php download", or whatever language you want to write it in.</p>
+<p>Here's the data that your custom program receives:</p>
+<ul>
+  <li><b>Both Uploads and Downloads:</b> The "current working directory" of your launched program is set to the directory that the downloaded or uploaded file is in (such as "/home/exampleuser/frost-next/downloads/myfolder" if the file was downloaded to "/home/exampleuser/frost-next/downloads/myfolder/example.jpg").</li>
+  <li><b>Arguments (Uploads):</b> On-disk filename (just the name, not the path), CHK key, compatibility mode, compression on/off, crypto key.</li>
+  <li><b>Environment Variables (Uploads):</b> (Values correspond exactly to the arguments above) FROST_FILENAME, FROST_KEY, FROST_MODE, FROST_COMPRESS, FROST_CRYPTOKEY.</li>
+  <li><b>Note about the "mode" value:</b> Just like when you look at your uploads-table, this will <i>never</i> be COMPAT_CURRENT. It is <i>always</i> the <i>exact</i> compatibility mode that Freenet chose even if you started a "COMPAT_CURRENT" upload. The display switches to the correct mode instantly when the upload begins, and that's the mode you'll see in your program when the transfer is complete.</li>
+  <li><b>Arguments (Downloads):</b> On-disk filename (just the name, not the path), the filename prefix that you selected (usually blank since most people don't use the prefix feature), CHK key, the name of the board it came from (if you grabbed it by "download files from selected message" features (like attachments or selecting text or file links and right clicking and choosing download)), the message ID it came from (if previous is true).</li>
+  <li><b>Environment Variables (Downloads):</b> (Again, the values correspond exactly to the arguments above) FROST_FILENAME, FROST_FILENAME_PREFIX, FROST_KEY, FROST_ASSOC_BOARD_NAME, FROST_ASSOC_MSG_ID.</li>
+</ul>
+<p>As a general recommendation, try to make your program execute quickly since Frost keeps a thread open for as long as your program is running. You should be able to accomplish any task in a few seconds at most, and then quit your program.</p>
+<p>Also note that your external program is executed asynchronously and <i>instantly</i> as soon as the transfer finishes, which means that multiple instances of your program can run simultaneously. So if you've got a lot of transfers finishing at the exact same time, you could run into concurrency issues (writing to the log at the same time from 2 or more processes). It's recommended that you use a language like PHP or Python and a proper SQLite database with synchronization so that only one program instance records transfer details at a time.</p>
+<p>A small example script is provided here to demonstrate how the parameters and environment variables work. It just writes directly to a text-based log file, which may lead to a jumbled mess if many transfers finish simultaneously. This is just an example to get you started, and it's best to write your own logging program in a more robust way with a proper database that supports concurrency, as mentioned above.</p>
+<p>Save this as "finished-transfer.sh", make it executable with chmod +x, and set it up as "/path/to/finished-transfer.sh download" and "/path/to/finished-transfer.sh upload" via the execute-options in Frost-Next. It's vitally important that you provide the "download" or "upload" argument as the first parameter in your "Execute program on completion" field, otherwise the script won't do anything, since it expects to be told what type of transfer it is.</p>
+<pre>
+#!/bin/bash
+
+# If you want to write a log file, you must specify
+# a complete path, since the current working dir is
+# different *every* time that your script runs!
+EXAMPLE_LOG=/tmp/transfer-log.txt
+
+# Get the type of transfer, the time of completion,
+# and which folder the downloaded/uploaded file is in.
+TRANSFER_TYPE="$1";
+TRANSFER_TIME="$(date '+%Y-%m-%d at %H:%M:%S')";
+TRANSFER_FOLDER="${PWD}";
+
+# The following shows the available environment vars,
+# and what they correspond to as $-arguments (in our
+# case $1 is the type of transfer, but if you're not
+# doing that then subtract 1 from each of these numbers).
+# But we retrieve the values via the environment variables
+# instead of the $-args, since it's clearer and easier.
+if [ "${TRANSFER_TYPE}" = "download" ]; then
+
+    echo "Finished DOWNLOAD at ${TRANSFER_TIME}:" &gt;&gt; "${EXAMPLE_LOG}";
+    echo "Folder: ${TRANSFER_FOLDER}" &gt;&gt; "${EXAMPLE_LOG}";
+
+    # $2. Filename (such as "example.jpg")
+    echo "Filename: ${FROST_FILENAME}" &gt;&gt; "${EXAMPLE_LOG}";
+
+    # $3. Filename Prefix (your user-provided prefix, but only if you set one)
+    # Note: The prefix is already part of the filename above,
+    #       so you probably don't need this info.
+    echo "Filename Prefix: ${FROST_FILENAME_PREFIX}" &gt;&gt; "${EXAMPLE_LOG}";
+
+    # $4. Freenet Key (such as "CHK@../example.jpg")
+    echo "Key: ${FROST_KEY}" &gt;&gt; "${EXAMPLE_LOG}";
+
+    # $5. Associated board name (only if downloaded from a board-message; i.e. "example board")
+    echo "Associated Board: ${FROST_ASSOC_BOARD_NAME}" &gt;&gt; "${EXAMPLE_LOG}";
+
+    # $6. Associated message id (only if downloaded from a board-message; i.e. "508EE..76AB")
+    echo "Associated MessageID: ${FROST_ASSOC_MSG_ID}" &gt;&gt; "${EXAMPLE_LOG}";
+
+    echo "" &gt;&gt; "${EXAMPLE_LOG}"; # add empty line after log entry
+
+elif [ "${TRANSFER_TYPE}" = "upload" ]; then
+
+    echo "Finished UPLOAD at ${TRANSFER_TIME}:" &gt;&gt; "${EXAMPLE_LOG}";
+    echo "Folder: ${TRANSFER_FOLDER}" &gt;&gt; "${EXAMPLE_LOG}";
+
+    # $2. Filename (such as "myupload.jpg")
+    echo "Filename: ${FROST_FILENAME}" &gt;&gt; "${EXAMPLE_LOG}";
+
+    # $3. Freenet Key (such as "CHK@../myupload.jpg")
+    echo "Key: ${FROST_KEY}" &gt;&gt; "${EXAMPLE_LOG}";
+
+    # $4. Compatibility Mode (the exact mode used for the insert, such as "COMPAT_1468")
+    # Note: The exact mode is provided even when you started
+    #       the upload with "COMPAT_CURRENT" ("pick the latest").
+    echo "Mode: ${FROST_MODE}" &gt;&gt; "${EXAMPLE_LOG}";
+
+    # $5. Compression (is either "YES_AUTO" or "NO")
+    echo "Compress: ${FROST_COMPRESS}" &gt;&gt; "${EXAMPLE_LOG}";
+
+    # $6. Crypto Key (is either "AUTO" if no custom key, or a 64-character hex string like "1c8f..4e3")
+    echo "CryptoKey: ${FROST_CRYPTOKEY}" &gt;&gt; "${EXAMPLE_LOG}";
+
+    echo "" &gt;&gt; "${EXAMPLE_LOG}"; # add empty line after log entry
+
+fi
+</pre>
+<p>True power users will definitely enjoy this ability to execute custom programs. For example, you could make a program which logs everything into a proper database, and then you could write a small web front-end for browsing your list of finished transfers. You could even make your application automatically move/sort your finished downloads, if you want to do that.</p>
+<p>Or... you could skip the ability to execute programs, and just use the built-in "Log successful [uploads/downloads] to localdata/Frost-[Uploads/Downloads].log" features instead, both of which are also available in the Frost-Next preferences. Those features log the key + completion time of downloads, and the key + insert settings + upload time of uploads, which is usually enough for anybody.</p>
+<p>The choice is yours. Either way, enjoy Frost-Next!</p>
+</body>
+</html>

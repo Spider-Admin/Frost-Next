@@ -25,6 +25,7 @@ import java.io.*;
 import javax.swing.*;
 
 import frost.*;
+import frost.fileTransfer.ExtraInserts;
 import frost.util.gui.*;
 import frost.util.gui.translation.*;
 
@@ -55,15 +56,17 @@ class UploadPanel extends JPanel {
     private final JLabel threadsLabel = new JLabel();
     private final JTextField threadsTextField = new JTextField(6);
 
+    private final JCheckBox autoEnableUploadsCheckBox = new JCheckBox();
     private final JCheckBox logUploadsCheckBox = new JCheckBox();
-
-    private final JCheckBox removeNotExistingfiles = new JCheckBox();
 
     private final Listener listener = new Listener();
 
     private final JButton browseExecButton = new JButton();
     private final JLabel execLabel = new JLabel();
     private final JTextField execTextField = new JTextField(20);
+
+    private JTranslatableComboBox extraInsertsComboBox = null;
+    private final JLabel extraInsertsLabel = new JLabel();
 
     /**
      * @param settings the SettingsClass instance that will be used to get and store the settings of the panel
@@ -80,7 +83,7 @@ class UploadPanel extends JPanel {
 
     private void browseExecPressed() {
         final JFileChooser fc = new JFileChooser(settings.getValue(SettingsClass.DIR_LAST_USED));
-        fc.setDialogTitle(language.getString("Options.downloads.filechooser.title"));
+        fc.setDialogTitle(language.getString("Options.downloads.filechooser.execProgram.title"));
         fc.setFileHidingEnabled(true);
         fc.setFileSelectionMode(JFileChooser.FILES_ONLY);
         fc.setMultiSelectionEnabled(false);
@@ -103,6 +106,7 @@ class UploadPanel extends JPanel {
         new TextComponentClipboardMenu(maxRetriesTextField, language);
         new TextComponentClipboardMenu(waitTimeTextField, language);
         new TextComponentClipboardMenu(execTextField, language);
+        
 
         // Adds all of the components
         final GridBagConstraints constraints = new GridBagConstraints();
@@ -139,6 +143,20 @@ class UploadPanel extends JPanel {
 
         constraints.gridy++;
         constraints.gridx = 0;
+        add(extraInsertsLabel, constraints);
+        constraints.gridx = 1;
+        final String[] extraInsertsComboBoxKeys =
+            { ExtraInserts.EI2, ExtraInserts.EI5, ExtraInserts.EI7, ExtraInserts.EI10 };
+        extraInsertsComboBox = new JTranslatableComboBox(language, extraInsertsComboBoxKeys);
+        add(extraInsertsComboBox, constraints);
+
+        constraints.gridy++;
+        constraints.gridx = 0;
+        constraints.gridwidth = 3;
+        add(autoEnableUploadsCheckBox, constraints);
+
+        constraints.gridy++;
+        constraints.gridx = 0;
         constraints.gridwidth = 3;
         add(logUploadsCheckBox, constraints);
 
@@ -146,11 +164,6 @@ class UploadPanel extends JPanel {
         constraints.gridx = 0;
         constraints.gridwidth = 3;
         add(enforceFrostPriorityFileUpload, constraints);
-
-        constraints.gridy++;
-        constraints.gridx = 0;
-        constraints.gridwidth = 3;
-        add(removeNotExistingfiles, constraints);
 
         constraints.gridy++;
         constraints.gridx = 0;
@@ -184,9 +197,11 @@ class UploadPanel extends JPanel {
         threadsTextField.setText(settings.getValue(SettingsClass.UPLOAD_MAX_THREADS));
         maxRetriesTextField.setText("" + settings.getIntValue(SettingsClass.UPLOAD_MAX_RETRIES));
         waitTimeTextField.setText("" + settings.getIntValue(SettingsClass.UPLOAD_WAITTIME));
+        autoEnableUploadsCheckBox.setSelected(settings.getBoolValue(SettingsClass.UPLOAD_ENABLED_DEFAULT));
         logUploadsCheckBox.setSelected(settings.getBoolValue(SettingsClass.LOG_UPLOADS_ENABLED));
-        removeNotExistingfiles.setSelected(settings.getBoolValue(SettingsClass.UPLOAD_REMOVE_NOT_EXISTING_FILES));
         execTextField.setText(settings.getValue(SettingsClass.EXEC_ON_UPLOAD));
+        extraInsertsComboBox.setSelectedKey(settings.getDefaultValue(SettingsClass.UPLOAD_EXTRA_INSERTS)); // set to default
+        extraInsertsComboBox.setSelectedKey(settings.getValue(SettingsClass.UPLOAD_EXTRA_INSERTS)); // set to user-value if one exists
     }
 
     public void ok() {
@@ -199,12 +214,13 @@ class UploadPanel extends JPanel {
         waitTimeLabel.setText(language.getString("Options.uploads.waittimeAfterEachTry") + " (" + minutes + ")");
         maxRetriesLabel.setText(language.getString("Options.uploads.maximumNumberOfRetries"));
         threadsLabel.setText(language.getString("Options.uploads.numberOfSimultaneousUploads") + " (3)");
+        autoEnableUploadsCheckBox.setText(language.getString("Options.uploads.autoEnableUploads"));
         logUploadsCheckBox.setText(language.getString("Options.uploads.logUploads"));
         priorityLabel.setText(language.getString("Options.uploads.uploadPriority") + " (3)");
         enforceFrostPriorityFileUpload.setText(language.getString("Options.uploads.enforceFrostPriorityFileUpload"));
-        removeNotExistingfiles.setText(language.getString("Options.uploads.removeNotExistingFiles"));
         execLabel.setText(language.getString("Options.uploads.uploadExec"));
         browseExecButton.setText(language.getString("Common.browse") + "...");
+        extraInsertsLabel.setText(language.getString("Options.uploads.extraInserts") + " (7)");
     }
 
     /**
@@ -216,8 +232,9 @@ class UploadPanel extends JPanel {
         settings.setValue(SettingsClass.UPLOAD_MAX_THREADS, threadsTextField.getText());
         settings.setValue(SettingsClass.UPLOAD_MAX_RETRIES, maxRetriesTextField.getText());
         settings.setValue(SettingsClass.UPLOAD_WAITTIME, waitTimeTextField.getText());
+        settings.setValue(SettingsClass.UPLOAD_ENABLED_DEFAULT, autoEnableUploadsCheckBox.isSelected());
         settings.setValue(SettingsClass.LOG_UPLOADS_ENABLED, logUploadsCheckBox.isSelected());
-        settings.setValue(SettingsClass.UPLOAD_REMOVE_NOT_EXISTING_FILES, removeNotExistingfiles.isSelected());
         settings.setValue(SettingsClass.EXEC_ON_UPLOAD, execTextField.getText());
+        settings.setValue(SettingsClass.UPLOAD_EXTRA_INSERTS, extraInsertsComboBox.getSelectedKey());
     }
 }

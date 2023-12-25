@@ -77,33 +77,38 @@ public class TranslateableFrostResourceBundle extends FrostResourceBundle {
                 externalBundleDir.mkdirs();
             }
             final String filename = EXTERNAL_BUNDLE_DIR + "langres_"+localeName+".properties";
-            final PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(new FileOutputStream(filename), "UTF-8")));
+            try (
+                // NOTE: Java 7+ try-with-resources (autocloseable)
+                final FileOutputStream fileOutputStream = new FileOutputStream(filename);
+                final OutputStreamWriter outputStreamWriter = new OutputStreamWriter(fileOutputStream, "UTF-8");
+                final BufferedWriter bufferedWriter = new BufferedWriter(outputStreamWriter);
+                final PrintWriter out = new PrintWriter(bufferedWriter);
+            ) {
+                final TreeMap<String,String> sorter = new TreeMap<String,String>(bundle);
 
-            final TreeMap<String,String> sorter = new TreeMap<String,String>(bundle);
-
-            for( final String string : sorter.keySet() ) {
-                String key = string;
-                String val = getString(key);
-                key = key.trim();
-                val = val.trim();
-                // change newlines in val into \n
-                final StringBuilder sbTmp = new StringBuilder();
-                for(int x=0; x < val.length(); x++) {
-                    final char c = val.charAt(x);
-                    if( c == '\n' ) {
-                        sbTmp.append("\\n");
-                    } else {
-                        sbTmp.append(c);
+                for( final String string : sorter.keySet() ) {
+                    String key = string;
+                    String val = getString(key);
+                    key = key.trim();
+                    val = val.trim();
+                    // change newlines in val into \n
+                    final StringBuilder sbTmp = new StringBuilder();
+                    for( int x=0; x < val.length(); ++x ) {
+                        final char c = val.charAt(x);
+                        if( c == '\n' ) {
+                            sbTmp.append("\\n");
+                        } else {
+                            sbTmp.append(c);
+                        }
                     }
+                    val = sbTmp.toString();
+
+                    out.println(key + "=" + val);
                 }
-                val = sbTmp.toString();
 
-                out.println(key + "=" + val);
+                return true;
             }
-
-            out.close();
-            return true;
-        } catch(final Throwable t) {
+        } catch( final Throwable t ) {
             logger.log(Level.SEVERE, "Error saving bundle.", t);
             return false;
         }

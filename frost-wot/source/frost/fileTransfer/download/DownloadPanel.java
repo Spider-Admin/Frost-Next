@@ -27,13 +27,11 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.Point;
-import java.awt.Toolkit;
-import java.awt.datatransfer.DataFlavor;
-import java.awt.datatransfer.Transferable;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
+import java.awt.event.InputEvent;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.awt.event.KeyEvent;
@@ -45,9 +43,11 @@ import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 import java.util.logging.Logger;
 
 import javax.swing.AbstractAction;
@@ -60,7 +60,6 @@ import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JTable;
@@ -74,6 +73,8 @@ import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.PlainDocument;
 import javax.swing.tree.TreePath;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
 
 import frost.Core;
 import frost.MainFrame;
@@ -82,12 +83,15 @@ import frost.SettingsUpdater;
 import frost.ext.ExecuteDocument;
 import frost.fileTransfer.FileTransferManager;
 import frost.fileTransfer.FreenetPriority;
+import frost.fileTransfer.KeyParser;
 import frost.fileTransfer.PersistenceManager;
 import frost.fileTransfer.common.FileListFileDetailsDialog;
 import frost.gui.AddNewDownloadsDialog;
+import frost.messaging.frost.FrostMessageObject;
 import frost.messaging.frost.boards.Board;
 import frost.messaging.frost.boards.TofTree;
 import frost.util.CopyToClipboard;
+import frost.util.DesktopUtils;
 import frost.util.FileAccess;
 import frost.util.gui.JSkinnablePopupMenu;
 import frost.util.gui.MiscToolkit;
@@ -97,6 +101,7 @@ import frost.util.gui.translation.Language;
 import frost.util.gui.translation.LanguageEvent;
 import frost.util.gui.translation.LanguageListener;
 import frost.util.model.SortedModelTable;
+import frost.util.Mixed;
 
 @SuppressWarnings("serial")
 public class DownloadPanel extends JPanel implements SettingsUpdater {
@@ -114,35 +119,35 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 	private final JToolBar downloadToolBar = new JToolBar();
 	private final JButton downloadPasteButton = new JButton(MiscToolkit.loadImageIcon("/data/toolbar/edit-paste.png"));
 	private final JButton submitDownloadTextfieldButton = new JButton(MiscToolkit
-			.loadImageIcon("/data/toolbar/document-save-as.png"));
+			.loadImageIcon("/data/toolbar/document-save.png"));
 	private final JButton downloadActivateButton = new JButton(MiscToolkit
 			.loadImageIcon("/data/toolbar/media-playback-start.png"));
 	private final JButton downloadPauseButton = new JButton(MiscToolkit
 			.loadImageIcon("/data/toolbar/media-playback-pause.png"));
 	private final JButton downloadPrefixApplyButton = new JButton(MiscToolkit
-			.loadImageIcon("/data/toolbar/view-refresh.png"));
+			.loadImageIcon("/data/toolbar/document-update.png"));
 	private final JButton downloadDirSelectButton = new JButton(MiscToolkit
 			.loadImageIcon("/data/toolbar/folder-open.png"));
-	private final JButton downloadDirCreateButton = new JButton(MiscToolkit
-			.loadImageIcon("/data/toolbar/folder-new.png"));
 	private final JButton downloadDirApplyButton = new JButton(MiscToolkit
-			.loadImageIcon("/data/toolbar/view-refresh.png"));
+			.loadImageIcon("/data/toolbar/document-update.png"));
 	private final JMenu downloadDirRecentMenu = new JMenu();
 	private final JTextField downloadPrefixTextField = new JTextField(30);
 	private final JTextField downloadDirTextField = new JTextField(30);
 	private final JTextField downloadTextField = new JTextField(30);
-	private final JLabel downloadItemCountLabel = new JLabel();
+	private final JLabel downloadSpeedLabel = new JLabel("", SwingConstants.RIGHT); // right-aligned
+	private final JLabel downloadItemCountLabel = new JLabel("", SwingConstants.LEFT);
 	private final JLabel downloadQuickloadLabel = new JLabel();
 	private final JLabel downloadPrefixLabel = new JLabel();
 	private final JLabel downloadDirLabel = new JLabel();
 	private final JCheckBox removeFinishedDownloadsCheckBox = new JCheckBox();
 	private final JCheckBox showExternalGlobalQueueItems = new JCheckBox();
-	private Color downloadDirDefaultBackground;
 	private SortedModelTable<FrostDownloadItem> modelTable;
 
 	private boolean initialized = false;
 
 	private boolean downloadingActivated = false;
+	private double speedBlocksPerMinute = 0;
+	private long speedBpmInBytesPerSecond = 0;
 	private int downloadItemCount = 0;
 
 	public DownloadPanel() {
@@ -158,15 +163,19 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 	}
 
 	/**
-	 * This Document changes all newlines in the text into semicolons. Needed if
-	 * the user pastes multiple download keys, each on a line, into the download
-	 * text field.
+	 * This Document changes all newlines in the text into " @SEPARATOR@ ", and is used
+	 * for the Quickload field. This is necessary if the user tries to paste
+	 * multiple newline-separated keys into the box. They are only supposed to
+	 * enter a single key in the quickload box and to use the "paste from
+	 * clipboard" button for multiple keys, but there's no guarantee what users
+	 * will do, so this is just a precaution to transparently take care of them.
 	 */
 	protected class HandleMultiLineKeysDocument extends PlainDocument {
 		@Override
 		public void insertString(final int offs, String str, final AttributeSet a) throws BadLocationException {
-			str = str.replace('\n', ';');
-			str = str.replace('\r', ' ');
+			str = str.replace("\r", ""); // remove windows carriage returns
+			str = str.replaceAll("(?:^\n+|\n+$)", ""); // remove all leading and trailing newlines
+			str = str.replaceAll("\n+", " @SEPARATOR@ "); // replace sequences of 1+ mac/win/linux newlines with separator
 			super.insertString(offs, str, a);
 		}
 	}
@@ -175,11 +184,17 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 		if (!initialized) {
 			refreshLanguage();
 
+			downloadToolBar.setRollover(true);
+			downloadToolBar.setFloatable(false);
+
+			removeFinishedDownloadsCheckBox.setOpaque(false);
+			showExternalGlobalQueueItems.setOpaque(false);
+
+
 			MiscToolkit.configureButton(downloadPasteButton);
 			MiscToolkit.configureButton(submitDownloadTextfieldButton);
 			MiscToolkit.configureButton(downloadPrefixApplyButton);
 			MiscToolkit.configureButton(downloadDirSelectButton);
-			MiscToolkit.configureButton(downloadDirCreateButton);
 			MiscToolkit.configureButton(downloadDirApplyButton);
 
 			MiscToolkit.configureButton(downloadActivateButton); // play_rollover
@@ -195,11 +210,7 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 			menu.add(downloadDirRecentMenu);
 			downloadDirRecentMenu.addMenuListener(listener);
 
-			downloadToolBar.setRollover(true);
-			downloadToolBar.setFloatable(false);
 
-			removeFinishedDownloadsCheckBox.setOpaque(false);
-			showExternalGlobalQueueItems.setOpaque(false);
 
 			// Toolbar
 			downloadToolBar.add(downloadActivateButton);
@@ -211,6 +222,7 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 				downloadToolBar.add(showExternalGlobalQueueItems);
 			}
 			downloadToolBar.add(Box.createHorizontalGlue());
+			downloadToolBar.add(downloadSpeedLabel);
 			downloadToolBar.add(downloadItemCountLabel);
 
 			final GridBagConstraints gridBagConstraints = new GridBagConstraints();
@@ -279,7 +291,6 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 			{
 				JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
 				p.add(downloadDirSelectButton);
-				p.add(downloadDirCreateButton);
 				p.add(downloadDirApplyButton);
 				gridBagLayout.add(p, gridBagConstraints);
 			}
@@ -289,13 +300,28 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 			downloadDirTextField.setMinimumSize(downloadTextField.getPreferredSize());
 
 			downloadTextField.setDocument(new HandleMultiLineKeysDocument());
-			downloadDirTextField.setText(Core.frostSettings.getValue(SettingsClass.DIR_DOWNLOAD));
-
-			downloadDirDefaultBackground = downloadDirTextField.getBackground();
-			updateDownloadDirTextFieldBackground();
+			downloadDirTextField.setText(FrostDownloadItem.getDefaultDownloadDir()); // inits to default download dir on each startup
+			cleanupDownloadDirString();
 
 			// create the main download panel
-			modelTable = new SortedModelTable<FrostDownloadItem>(model);
+			modelTable = new SortedModelTable<FrostDownloadItem>(model) {
+				// override the default sort order when clicking different columns
+				@Override
+				public boolean getColumnDefaultAscendingState(final int columnNumber) {
+					//#DIEFILESHARING: since filesharing is permanently disabled in Frost-Next,
+					//we do not take the filesharing columns into account. if it's ever re-added,
+					//this needs to be modified to shift numbers if sharing columns are visible.
+					if( columnNumber == 0 || columnNumber == 2 || columnNumber == 3 || columnNumber == 4 || columnNumber == 7 || columnNumber == 9 ) {
+						// sort enabled, filesize, state, blocks, lastactivity and "isDDA" descending by default
+						// NOTE: the isDDA column (9) is only added if persistent global queue
+						// is enabled in Frost, but it's safe to check its number this way since
+						// no other columns are added *after* it if persistence is disabled,
+						// so the existence/lack of that column doesn't affect any column numbers.
+						return false;
+					}
+					return true; // all other columns: ascending
+				}
+			};
 			new TableFindAction().install(modelTable.getTable());
 			setLayout(new BorderLayout());
 
@@ -307,9 +333,7 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 			add(modelTable.getScrollPane(), BorderLayout.CENTER);
 			fontChanged();
 
-			modelTable.getTable().setDefaultRenderer(Object.class, new CellRenderer());
-
-			// listeners
+			// event listeners for the buttons and the file table's click and keyboard
 			downloadTextField.addActionListener(listener);
 			downloadPasteButton.addActionListener(listener);
 			submitDownloadTextfieldButton.addActionListener(listener);
@@ -321,23 +345,78 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 			removeFinishedDownloadsCheckBox.addItemListener(listener);
 			showExternalGlobalQueueItems.addItemListener(listener);
 			downloadPrefixApplyButton.addActionListener(listener);
-			downloadDirTextField.addKeyListener(listener);
+			downloadPrefixTextField.addFocusListener(listener);
 			downloadDirTextField.addFocusListener(listener);
 			downloadDirSelectButton.addActionListener(listener);
-			downloadDirCreateButton.addActionListener(listener);
 			downloadDirApplyButton.addActionListener(listener);
 			Core.frostSettings.addPropertyChangeListener(SettingsClass.FILE_LIST_FONT_NAME, listener);
 			Core.frostSettings.addPropertyChangeListener(SettingsClass.FILE_LIST_FONT_SIZE, listener);
 			Core.frostSettings.addPropertyChangeListener(SettingsClass.FILE_LIST_FONT_STYLE, listener);
 
-			// Settings
-			removeFinishedDownloadsCheckBox.setSelected(Core.frostSettings
-					.getBoolValue(SettingsClass.DOWNLOAD_REMOVE_FINISHED));
-			showExternalGlobalQueueItems.setSelected(Core.frostSettings
-					.getBoolValue(SettingsClass.GQ_SHOW_EXTERNAL_ITEMS_DOWNLOAD));
+			// set the state of the toolbar checkboxes to the user's current config state,
+			// triggering the event listener for every enabled one (but not disabled ones)
+			removeFinishedDownloadsCheckBox.setSelected(Core.frostSettings.getBoolValue(SettingsClass.DOWNLOAD_REMOVE_FINISHED));
+			showExternalGlobalQueueItems.setSelected(Core.frostSettings.getBoolValue(SettingsClass.GQ_SHOW_EXTERNAL_ITEMS_DOWNLOAD));
 			setDownloadingActivated(Core.frostSettings.getBoolValue(SettingsClass.DOWNLOADING_ACTIVATED));
 
 			assignHotkeys();
+
+			// start the "blocks per minute" speed tracking thread
+			new Thread("DownloadSpeedTracker") {
+				@Override
+				public void run() {
+					while( true ) {
+						// run at a 10 second update interval; we only scan in-progress items, so
+						// it's very optimized. (might sound really rapid, but I've even tried it
+						// with 0.1 seconds and it still stayed responsive; but 10s is all anyone would need)
+						// and this ensures we don't put too much pressure on analyzing items.
+						Mixed.wait(10000);
+
+						// calculate the combined blocks per minute and bytes per minute of all ongoing transfers
+						double totalBlocksPerMinute = 0;
+						long totalBpmInBytesPerSecond = 0;
+
+						// copy the transfer-items into a list (safe from external modification)
+						// and process the values. note that "getItems()" is thread-safe and
+						// returns a defensive copy which means it's safe to read anytime.
+						// NOTE: the list won't include external items unless "show global queue".
+						final List<FrostDownloadItem> itemList = model.getItems();
+						for( final FrostDownloadItem dlItem : itemList ) {
+							if( dlItem.getState() == FrostDownloadItem.STATE_PROGRESS ) {
+								// determine how long ago the current item measurement was updated
+								final long millisSinceLastMeasurement = dlItem.getMillisSinceLastMeasurement();
+
+								// only include measurements that have been updated in the
+								// last minute (aka non-stalled downloads)
+								if( millisSinceLastMeasurement <= 60000 ) {
+									// get the current average number of blocks per minute
+									double blocksPerMinute = dlItem.getAverageBlocksPerMinute();
+
+									// only include actual measurements, meaning not "-1" (measuring activity)
+									// or "-2" (no recent transfer activity in the last hard-cap minutes)
+									if( blocksPerMinute >= 0 ) {
+										// since this is a valid measurement, also get its corresponding "bytes per second" count
+										long bpmInBytesPerSecond = dlItem.getAverageBytesPerSecond();
+
+										// now just add the current item's statistics to the total
+										totalBlocksPerMinute += blocksPerMinute;
+										totalBpmInBytesPerSecond += bpmInBytesPerSecond;
+									}
+								}
+							}
+						}
+
+						// we must perform the actual GUI update in the GUI thread, so queue the update now
+						final double atomicTotalBlocksPerMinute = totalBlocksPerMinute; // threads can only access these final variables
+						final long atomicTotalBpmInBytesPerSecond = totalBpmInBytesPerSecond;
+						SwingUtilities.invokeLater(new Runnable() {
+							public void run() {
+								setDownloadSpeed(atomicTotalBlocksPerMinute, atomicTotalBpmInBytesPerSecond);
+							}
+						});
+					}
+				}
+			}.start();
 
 			initialized = true;
 		}
@@ -364,7 +443,6 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 		downloadPrefixApplyButton
 				.setToolTipText(language.getString("DownloadPane.toolbar.tooltip.applyDownloadPrefix"));
 		downloadDirSelectButton.setToolTipText(language.getString("DownloadPane.toolbar.tooltip.selectDownloadDir"));
-		downloadDirCreateButton.setToolTipText(language.getString("DownloadPane.toolbar.tooltip.createDownloadDir"));
 		downloadDirApplyButton.setToolTipText(language.getString("DownloadPane.toolbar.tooltip.applyDownloadDir"));
 
 		downloadDirRecentMenu.setText(language.getString("DownloadPane.toolbar.downloadDirMenu.setDownloadDirTo"));
@@ -373,10 +451,16 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 		downloadPrefixLabel.setText(language.getString("DownloadPane.toolbar.label.downloadPrefix") + ": ");
 		downloadDirLabel.setText(language.getString("DownloadPane.toolbar.label.downloadDir") + ": ");
 
+		final String blocksPerMinute = language.getString("DownloadPane.toolbar.blocksPerMinute");
+		final Dimension bpmLabelSize = calculateLabelSize(blocksPerMinute + ": 99999.99 (~99999.99 MiB/s)");
+		downloadSpeedLabel.setPreferredSize(bpmLabelSize);
+		downloadSpeedLabel.setMinimumSize(bpmLabelSize);
+		setDownloadSpeed(0, 0);
+
 		final String waiting = language.getString("DownloadPane.toolbar.waiting");
-		final Dimension labelSize = calculateLabelSize(waiting + ": 00000");
-		downloadItemCountLabel.setPreferredSize(labelSize);
-		downloadItemCountLabel.setMinimumSize(labelSize);
+		final Dimension itemCountLabelSize = calculateLabelSize(waiting + ": 00000");
+		downloadItemCountLabel.setPreferredSize(itemCountLabelSize);
+		downloadItemCountLabel.setMinimumSize(itemCountLabelSize);
 		downloadItemCountLabel.setText(waiting + ": " + downloadItemCount);
 	}
 
@@ -384,31 +468,55 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 		this.model = model;
 	}
 
-	private void updateDownloadDirTextFieldBackground() {
-		final File file = new File(downloadDirTextField.getText());
-		if (file.isDirectory()) {
-			downloadDirTextField.setBackground(downloadDirDefaultBackground);
-		} else {
-			downloadDirTextField.setBackground(Color.YELLOW);
+	private void cleanupDownloadPrefixString() {
+		String prefix = downloadPrefixTextField.getText();
+		if( prefix != null && prefix.length() > 0 ) {
+			prefix = Mixed.makeFilename(prefix); // replace illegal characters with underscores
+			prefix = prefix.trim();
+			downloadPrefixTextField.setText(prefix);
 		}
 	}
 
-	private void downloadDirTextField_keyReleased(final KeyEvent e) {
-		updateDownloadDirTextFieldBackground();
-	}
-
-	private void downloadDirTextField_focusLost(final FocusEvent e) {
-		updateDownloadDirTextFieldBackground();
-	}
-
 	private final String getDownloadPrefix() {
-		return downloadPrefixTextField.getText();
+		cleanupDownloadPrefixString();
+		final String prefix = downloadPrefixTextField.getText();
+
+		if( prefix == null || prefix.length() == 0 ) {
+			return null;
+		} else {
+			return prefix;
+		}
+	}
+
+	private void cleanupDownloadDirString() {
+		String downlDirTxt = downloadDirTextField.getText();
+		if( downlDirTxt != null ) {
+			// remove leading/trailing whitespace
+			downlDirTxt = downlDirTxt.trim();
+
+			if( !downlDirTxt.isEmpty() ) {
+				// they've provided a custom path, so let's relativize it
+				downlDirTxt = Core.pathRelativizer.relativize(downlDirTxt);
+			}
+
+			// if the relativization rejected the path, or if they've provided no path,
+			// then just fall back to the current settings value (or if that's invalid
+			// too, then it uses the original built-in default directory, "downloads/")
+			if( downlDirTxt == null || downlDirTxt.isEmpty() ) {
+				downlDirTxt = FrostDownloadItem.getDefaultDownloadDir();
+			}
+
+			// always append a fileseparator to the end of string if necessary
+			// NOTE: we accept non-existent folders, since Frost automatically creates them when queuing/saving downloads
+			downloadDirTextField.setText(FileAccess.appendSeparator(downlDirTxt));
+		}
 	}
 
 	private final String getDownloadDir() {
+		cleanupDownloadDirString();
 		final String dir = downloadDirTextField.getText();
 
-		if (dir.length() == 0) {
+		if( dir == null || dir.length() == 0 ) {
 			return null;
 		} else {
 			return dir;
@@ -416,52 +524,73 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 	}
 
 	private void downloadDirSelectButton_actionPerformed(final ActionEvent e) {
-		final JFileChooser fc = new JFileChooser(FileAccess.appendSeparator(downloadDirTextField.getText()));
-		fc.setDialogTitle(language.getString("Options.downloads.filechooser.title"));
-		fc.setFileHidingEnabled(true);
-		fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-		fc.setMultiSelectionEnabled(false);
+		// attempt to start navigation from the "Directory" textfield path value.
+		// but if that fails (due to directory not existing), we'll start navigation
+		// from the default download directory instead
+		String startDir = getDownloadDir();
+		if( startDir != null ) {
+			startDir = startDir.trim(); // remove leading and trailing whitespace
+			if( !startDir.isEmpty() ) {
+				final File startDirTest = new File(startDir);
+				if( !startDirTest.isDirectory() ) { // must exist and be a directory
+					startDir = null;
+				}
+			}
+		}
+		if( startDir == null || startDir.isEmpty() ) {
+			startDir = FrostDownloadItem.getDefaultDownloadDir();
+		}
 
+		// display a folder-only file chooser
+		final JFileChooser fc = new JFileChooser(startDir);
+		fc.setDialogTitle(language.getString("Options.downloads.filechooser.downloadDir.title"));
+		fc.setMultiSelectionEnabled(false); // only allow single selections
+		fc.setFileHidingEnabled(true); // hide hidden files
+		fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY); // only show directories
 		final int returnVal = fc.showOpenDialog(this);
-		if (returnVal == JFileChooser.APPROVE_OPTION) {
-			final File file = fc.getSelectedFile();
-			Core.frostSettings.setValue(SettingsClass.DIR_LAST_USED, file.getParent());
-			downloadDirTextField.setText(file.getPath());
-			updateDownloadDirTextFieldBackground();
+		if( returnVal != JFileChooser.APPROVE_OPTION ) {
+			return; // user canceled
 		}
-	}
+		final File selectedFolder = fc.getSelectedFile();
 
-	private void downloadDirCreateButton_actionPerformed(final ActionEvent e) {
-		File dir = new File(downloadDirTextField.getText());
+		// remember absolute path of last download dir used (this is used by various file chooser dialogs)
+		Core.frostSettings.setValue(SettingsClass.DIR_LAST_USED, selectedFolder.toString());
 
-		try {
-			dir.mkdirs();
-		} catch (Exception foo) {
-		}
-
-		updateDownloadDirTextFieldBackground();
+		// put the chosen download directory in the text field
+		downloadDirTextField.setText(selectedFolder.toString()); // sets an absolute path
+		cleanupDownloadDirString(); // cleans it up to a relative path (if needed) and adds trailing slash
 	}
 
 	private void applyDownloadPrefixToSelectedDownloads() {
 		final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
+		if( selectedItems == null ) { return; }
+		if( this.model == null ) { return; } // refuse to change anything if download model is not loaded
 
-		for (final FrostDownloadItem i : selectedItems) {
+		for( final FrostDownloadItem dlItem : selectedItems ) {
+			// only apply the changes to non-external items, and only if they're *not* already finished
+			if( !dlItem.isExternal() && dlItem.getState() != FrostDownloadItem.STATE_DONE ) {
+				dlItem.setFilenamePrefix(getDownloadPrefix());
+				// add or remove "(frost_#)" filename prefix as required to make name unique
+				this.model.ensureUniqueFilename(dlItem);
 
-			if (!i.isExternal()) {
-				i.setFilenamePrefix(getDownloadPrefix());
-				i.fireValueChanged();
+				dlItem.fireValueChanged();
 			}
 		}
 	}
 
 	private void applyDownloadDirToSelectedDownloads() {
 		final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
+		if( selectedItems == null ) { return; }
+		if( this.model == null ) { return; } // refuse to change anything if download model is not loaded
 
-		for (final FrostDownloadItem i : selectedItems) {
+		for( final FrostDownloadItem dlItem : selectedItems ) {
+			// only apply the changes to non-external items, and only if they're *not* already finished
+			if( !dlItem.isExternal() && dlItem.getState() != FrostDownloadItem.STATE_DONE ) {
+				dlItem.setDownloadDir(getDownloadDir());
+				// add or remove "(frost_#)" filename prefix as required to make name unique
+				this.model.ensureUniqueFilename(dlItem);
 
-			if (!i.isExternal()) {
-				i.setDownloadDir(getDownloadDir());
-				i.fireValueChanged();
+				dlItem.fireValueChanged();
 			}
 		}
 	}
@@ -476,12 +605,15 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 
 	/**
 	 * downloadTextField Action Listener (Download/Quickload) The textfield can
-	 * contain 1 key to download or multiple keys separated by ';'.
+	 * contain 1 key to download or multiple keys separated by " @SEPARATOR@ ".
 	 */
 	private void downloadTextField_actionPerformed(final ActionEvent e) {
-		String keylist = downloadTextField.getText();
-		if (keylist != null && keylist.length() != 0) {
-			openAddNewDownloadsDialog(keylist);
+		String keyText = downloadTextField.getText();
+		if( keyText != null && keyText.length() > 0 ) {
+			// decode the case-insensitive separator into newlines again; surrounding spaces are optional
+			keyText = keyText.replaceAll("(?i) ?@SEPARATOR@ ?", "\n");
+			// 1st true = ask to redownload duplicates, 2nd true = enable "paste more" button
+			openAddNewDownloadsDialog(keyText, true, getDownloadPrefix(), getDownloadDir(), true, null);
 		}
 	}
 
@@ -491,30 +623,47 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 	private void downloadTable_keyPressed(final KeyEvent e) {
 		final char key = e.getKeyChar();
 		if (key == KeyEvent.VK_DELETE && !modelTable.getTable().isEditing()) {
-			removeSelectedDownloads();
+			removeSelectedFiles(true); // true = delete both internally and externally (global-only) queued items
 		}
 	}
 
-	private void removeSelectedDownloads() {
+	/**
+	 * Remove selected files from the model and global queue.
+	 * @param {boolean} removeExternal - if true, it also deletes externally queued (global-only)
+	 * items; otherwise it only deletes and de-queues things that were internally queued
+	 */
+	private void removeSelectedFiles(final boolean removeExternal) {
 		final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
+		if( selectedItems == null ) { return; }
 
 		final List<String> externalRequestsToRemove = new LinkedList<String>();
 		final List<FrostDownloadItem> requestsToRemove = new LinkedList<FrostDownloadItem>();
-		for (final FrostDownloadItem frostDownloadItem : selectedItems) {
-			requestsToRemove.add(frostDownloadItem);
-			if (frostDownloadItem.isExternal()) {
-				externalRequestsToRemove.add(frostDownloadItem.getGqIdentifier());
+		for( final FrostDownloadItem mi : selectedItems ) {
+			if( mi.isExternal() && !removeExternal ) {
+				continue; // do nothing to externally queued items if we've been told to avoid those
+			}
+			// don't restart items whose data transfer from the node is currently in progress.
+			// otherwise, we risk partially written or orphaned files, inconsistent dlItem states, etc.
+			if( FileTransferManager.inst().getPersistenceManager() != null ) {
+				if( FileTransferManager.inst().getPersistenceManager().isDirectTransferInProgress(mi) ) {
+					continue;
+				}
+			}
+			requestsToRemove.add(mi);
+			if( mi.isExternal() ) {
+				externalRequestsToRemove.add(mi.getGqIdentifier());
 			}
 		}
 
-		model.removeItems(requestsToRemove);
+		model.removeItems(requestsToRemove); // NOTE: if these are internal items, they'll also be de-queued from the global queue automatically
 
 		modelTable.getTable().clearSelection();
 
-		if (FileTransferManager.inst().getPersistenceManager() != null && externalRequestsToRemove.size() > 0) {
+		if( FileTransferManager.inst().getPersistenceManager() != null && externalRequestsToRemove.size() > 0 ) {
 			new Thread() {
 				@Override
 				public void run() {
+					// de-queue the external-only items from the global queue
 					FileTransferManager.inst().getPersistenceManager().removeRequests(externalRequestsToRemove);
 				}
 			}.start();
@@ -530,6 +679,22 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 
 		downloadActivateButton.setEnabled(!downloadingActivated);
 		downloadPauseButton.setEnabled(downloadingActivated);
+
+		// forces the "DOWNLOADING_ACTIVATED" setting to update instantly (instead of just on
+		// Frost shutdown and forced settings updates (such as when the preferences panel opens)).
+		// this is important, since the setting is read by the download-threads to determine
+		// if it should start downloading the next file(s) or not.
+		updateSettings();
+	}
+
+	public void setDownloadSpeed(final double newSpeedBlocksPerMinute, final long newSpeedBpmInBytesPerSecond) {
+		speedBlocksPerMinute = newSpeedBlocksPerMinute;
+		speedBpmInBytesPerSecond = newSpeedBpmInBytesPerSecond;
+
+		// display the total blocks/minute and the human-readable bytes/second equivalent
+		final String s = new StringBuilder().append(language.getString("DownloadPane.toolbar.blocksPerMinute")).append(": ")
+			.append(String.format("%.2f", speedBlocksPerMinute)).append(" (~").append(Mixed.convertBytesToHuman(speedBpmInBytesPerSecond)).append("/s), ").toString();
+		downloadSpeedLabel.setText(s);
 	}
 
 	public void setDownloadItemCount(final int newDownloadItemCount) {
@@ -577,49 +742,94 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 	}
 
 	private void downloadPasteButtonPressed(final ActionEvent e) {
-		Transferable transferable = Toolkit.getDefaultToolkit().getSystemClipboard().getContents(null);
-		if (transferable == null) {
-			return;
-		}
-
-		// try to get data from clipboard
-		String clipboardText;
-		try {
-			if (!transferable.isDataFlavorSupported(DataFlavor.stringFlavor)) {
-				return;
-			}
-			clipboardText = (String) transferable.getTransferData(DataFlavor.stringFlavor);
-		} catch (Exception stfu) {
-			return;
-		}
-
-		if (clipboardText != null && clipboardText.length() != 0) {
-			openAddNewDownloadsDialog(clipboardText);
-		}
+		final String clipboardText = Mixed.getClipboardText();
+		if( clipboardText == null ) { return; }
+		// 1st true = ask to redownload duplicates, 2nd true = enable "paste more" button
+		openAddNewDownloadsDialog(clipboardText, true, getDownloadPrefix(), getDownloadDir(), true, null);
 	}
 
-	private void openAddNewDownloadsDialog(final String keylist) {
-		// parse plaintext to get key list
-		List<FrostDownloadItem> frostDownloadItemList = DownloadManager.parseKeys(keylist);
-		if (frostDownloadItemList.size() == 0) {
+	/**
+	 * Parses all keys in a string and opens an "add new downloads" dialog.
+	 * @param {List} frostDownloadItemList - a list of FrostDownloadItem objects to download
+	 * @param {boolean} askBeforeRedownload - if true, it will ask before redownloading keys
+	 * that you've already downloaded before (matched via the download tracker).
+	 * @param {String} overrideDownloadPrefix - if null, uses default prefix (none), otherwise uses
+	 * this string. should ONLY be specified when downloads come from the Download Panel (via the
+	 * clipboard or quickload buttons)
+	 * @param {String} overrideDownloadDir - if null, uses default download directory (from the
+	 * Frost preferences), otherwise this directory is used for the downloads. same as prefix,
+	 * this should ONLY be specified when the downloads are coming from the Download Panel.
+	 * @param {boolean} showPasteMoreButton - if true, the "Add new downloads" dialog will have
+	 * a "paste more keys from clipboard" button. any keys you paste using the button will use
+	 * the "override" prefix/dir (if non-null). WARNING: FOR UI CONSISTENCY, THIS SETTING IS ONLY
+	 * ALLOWED TO BE TRUE WHEN IT *MAKES SENSE*: ONLY WHEN THE "ADD NEW DOWNLOADS" DIALOG IS STARTED
+	 * FROM THE DOWNLOAD PANEL VIA THE QUICKLOAD OR "PASTE FROM CLIPBOARD" BUTTONS! IT MUST *NEVER*
+	 * BE ENABLED WHEN THE USER JUST ADDS KEYS FROM A FROST MESSAGE! THAT WOULDN'T MAKE SENSE!
+	 * @param {FrostMessageObject} associatedFrostMessageObject - can be null; if provided,
+	 * the board and message id will be associated with the download item(s), so that the "View
+	 * associated message" popup menu function works, and so that the "Save files into subfolders
+	 * named after the boards they came from" feature works.
+	 */
+	public void openAddNewDownloadsDialog(
+			final List<FrostDownloadItem> frostDownloadItemList,
+			final boolean askBeforeRedownload,
+			final String overrideDownloadPrefix,
+			final String overrideDownloadDir,
+			final boolean showPasteMoreButton,
+			final FrostMessageObject associatedFrostMessageObject)
+	{
+		// verify that the key list exists and has at least 1 item
+		if( frostDownloadItemList == null || frostDownloadItemList.size() == 0 ) {
 			return;
 		}
 
-		// add default download dir and prefix
-		for (final FrostDownloadItem frostDownloadItem : frostDownloadItemList) {
-			final String downloadDir = this.downloadDirTextField.getText();
-			if (downloadDir != null && downloadDir.length() != 0) {
-				frostDownloadItem.setDownloadDir(downloadDir);
+		// add the appropriate download dir and filename prefix
+		for( final FrostDownloadItem frostDownloadItem : frostDownloadItemList ) {
+			// all downloads default to using Frost's "download directory" preference and
+			// no default prefix. but if we're starting a dialog that should use another prefix
+			// or directory, then apply them to the downloads now.
+			if( overrideDownloadPrefix != null ) {
+				frostDownloadItem.setFilenamePrefix(overrideDownloadPrefix);
+			}
+			if( overrideDownloadDir != null ) {
+				frostDownloadItem.setDownloadDir(overrideDownloadDir);
 			}
 
-			final String filenamePrefix = this.downloadPrefixTextField.getText();
-			if (filenamePrefix != null && filenamePrefix.length() != 0) {
-				frostDownloadItem.setFilenamePrefix(this.downloadPrefixTextField.getText());
+			// now let's associate any Frost Message Object and board path with this download
+			if( associatedFrostMessageObject != null ) {
+				// makes the "View associated message" popup menu item work for this download
+				frostDownloadItem.associateWithFrostMessageObject(associatedFrostMessageObject);
+
+				// if the user has enabled "Save files into subfolders named after the boards they
+				// came from" then let's add the board subfolder to the download path
+				if( Core.frostSettings.getBoolValue(SettingsClass.USE_BOARDNAME_DOWNLOAD_SUBFOLDER_ENABLED) ){
+					// NOTE: we don't need to add any separators since the download dir setter/getter always adds one
+					frostDownloadItem.setDownloadDir(frostDownloadItem.getDownloadDir().concat(frostDownloadItem.getAssociatedBoardName()));
+				}
 			}
 		}
 
 		// open dialog - blocking
-		new AddNewDownloadsDialog(MainFrame.getInstance()).startDialog(frostDownloadItemList);
+		new AddNewDownloadsDialog(MainFrame.getInstance()).startDialog(frostDownloadItemList, askBeforeRedownload, overrideDownloadPrefix, overrideDownloadDir, showPasteMoreButton);
+	}
+
+	/**
+	 * This is just a convenience function, with one small difference in the 1st parameter:
+	 *
+	 * @param {String} text - the string to parse for keys, with one key per line
+	 */
+	public void openAddNewDownloadsDialog(
+			final String text,
+			final boolean askBeforeRedownload,
+			final String overrideDownloadPrefix,
+			final String overrideDownloadDir,
+			final boolean showPasteMoreButton,
+			final FrostMessageObject associatedFrostMessageObject)
+	{
+		// parse plaintext to get key list
+		// NOTE: we don't want Freesite keys so the 2nd argument is false
+		List<FrostDownloadItem> frostDownloadItemList = KeyParser.parseKeys(text, false);
+		openAddNewDownloadsDialog(frostDownloadItemList, askBeforeRedownload, overrideDownloadPrefix, overrideDownloadDir, showPasteMoreButton, associatedFrostMessageObject);
 	}
 
 	private void downloadActivateButtonPressed(final ActionEvent e) {
@@ -631,7 +841,7 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 	}
 
 	private void openFile(FrostDownloadItem dlItem) {
-		if (dlItem == null) {
+		if (dlItem == null || dlItem.isExternal()) {
 			return;
 		}
 		
@@ -644,8 +854,8 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 		try {
 			ExecuteDocument.openDocument(targetFile);
 		} catch (final Throwable t) {
-			JOptionPane.showMessageDialog(this, "Could not open the file: " + targetFile.getAbsolutePath() + "\n"
-					+ t.toString(), "Error", JOptionPane.ERROR_MESSAGE);
+			MiscToolkit.showMessageDialog(this, "Could not open file: " + t.getMessage() + ".",
+					"Error", MiscToolkit.ERROR_MESSAGE);
 		}
 	}
 
@@ -659,86 +869,172 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 	}
 
 	public void changeItemPriorites(final List<FrostDownloadItem> items, final FreenetPriority newPrio) {
-		if (items == null || items.size() == 0 || FileTransferManager.inst().getPersistenceManager() == null) {
+		if (items == null || items.size() == 0 || FileTransferManager.inst().getPersistenceManager() == null || !PersistenceManager.isPersistenceEnabled()) {
 			return;
 		}
 		for (final FrostDownloadItem di : items) {
-			String gqid = null;
-			di.setPriority(newPrio);
-			if (di.getState() == FrostDownloadItem.STATE_PROGRESS) {
-				gqid = di.getGqIdentifier();
-			}
-			if (gqid != null) {
-				FileTransferManager.inst().getPersistenceManager().getFcpTools().changeRequestPriority(gqid, newPrio);
+			if (di.getState() == FrostDownloadItem.STATE_PROGRESS || di.getState() == FrostDownloadItem.STATE_WAITING) {
+				di.setPriority(newPrio);
+				if (di.getState() == FrostDownloadItem.STATE_PROGRESS) {
+					String gqid = di.getGqIdentifier();
+					if (gqid != null) {
+						FileTransferManager.inst().getPersistenceManager().getFcpTools().changeRequestPriority(gqid, newPrio);
+					}
+				}
 			}
 		}
 	}
 
-	private void assignHotkeys() {
-
-		// assign keys 1-6 - set priority of selected items
-		final Action setPriorityAction = new AbstractAction() {
-			public void actionPerformed(final ActionEvent event) {
-				final FreenetPriority prio = FreenetPriority.getPriority(new Integer(event.getActionCommand()).intValue());
-				final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
-				changeItemPriorites(selectedItems, prio);
-				
-			}
-		};
-		getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_1, 0),
-				"SETPRIO");
-		getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_2, 0),
-				"SETPRIO");
-		getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_3, 0),
-				"SETPRIO");
-		getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_4, 0),
-				"SETPRIO");
-		getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_5, 0),
-				"SETPRIO");
-		getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_6, 0),
-				"SETPRIO");
-		getActionMap().put("SETPRIO", setPriorityAction);
-		
-		// Enter
-		final Action setOpenFileAction = new AbstractAction() {
-			public void actionPerformed(final ActionEvent event) {
-				openFile(modelTable.getSelectedItem());
-			}
-		};
-		getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0),"OpenFile");
-		getActionMap().put("OpenFile", setOpenFileAction);
+	private void invertEnabledSelected() {
+		final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
+		if( selectedItems == null ) { return; }
+		model.setItemsEnabled(null, selectedItems);
 	}
 
-	/**
-	 * Renderer draws background of DONE items in green.
-	 */
-	private class CellRenderer extends DefaultTableCellRenderer {
+	private void startSelectedDownloadsNow() {
+		final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
+		if( selectedItems == null ) { return; }
 
-		private final Color col_green = new Color(0x00, 0x80, 0x00);
-
-		public CellRenderer() {
-			super();
+		final List<FrostDownloadItem> itemsToStart = new LinkedList<FrostDownloadItem>();
+		for( final FrostDownloadItem dlItem : selectedItems ) {
+			if( dlItem.isExternal() ) {
+			    continue;
+			}
+			if( dlItem.getState() != FrostDownloadItem.STATE_WAITING ) {
+			    continue;
+			}
+			if( dlItem.getKey() == null ) {
+				continue;
+			}
+			itemsToStart.add(dlItem);
 		}
 
-		@Override
-		public Component getTableCellRendererComponent(final JTable table, final Object value,
-				final boolean isSelected, final boolean hasFocus, final int row, final int column) {
-
-			super.getTableCellRendererComponent(table, value, isSelected, /* hasFocus */
-			false, row, column);
-
-			final FrostDownloadItem item = (FrostDownloadItem) model.getItemAt(row);
-
-			// set background of DONE downloads green
-			if (item.getState() == FrostDownloadItem.STATE_DONE) {
-				setBackground(col_green);
-			} else {
-				setBackground(modelTable.getTable().getBackground());
-			}
-
-			return this;
+		for( final FrostDownloadItem dlItem : itemsToStart ) {
+			dlItem.setEnabled(true);
+			FileTransferManager.inst().getDownloadManager().startDownload(dlItem);
 		}
 	}
+
+	private void openSelectedDownloadDirectory() {
+		if( !DesktopUtils.canPerformOpen() ) { return; }
+		final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
+		if( selectedItems == null || selectedItems.size() < 1 ) { return; }
+
+		// build a list of all *unique* directories within their selection
+		final Map<String,File> selectedDirs = new LinkedHashMap<String,File>();
+		for( final FrostDownloadItem dlItem : selectedItems ) {
+			// NOTE: for downloads, we don't care if they've selected global items since
+			// they still have a guessed "downloads/" path (default dir) the user may want.
+
+			// convert the download directory string to a File object
+			final String downloadDirStr = dlItem.getDownloadDir();
+			if( downloadDirStr == null ) { continue; } // skip empty
+			File downloadDir = new File(downloadDirStr);
+
+			// resolve the absolute path if it was relative (doesn't check if file exists!)
+			final String downloadDirAbsStr = downloadDir.getAbsolutePath();
+
+			// skip this directory if it's already been seen
+			if( selectedDirs.containsKey(downloadDirAbsStr) ) { continue; }
+
+			// now just store the File object in the map
+			selectedDirs.put(downloadDirAbsStr, downloadDir);
+		}
+
+		// now attempt to open all valid (existing) directories
+		for( Map.Entry<String,File> entry : selectedDirs.entrySet() ) {
+			final File thisDir = entry.getValue();
+			boolean success = false;
+			if( thisDir.isDirectory() ) {
+				success = DesktopUtils.openDirectory(thisDir);
+			}
+
+			// directory didn't exist or somehow failed to open?
+			if( !success ) {
+				MiscToolkit.showMessageDialog(
+						this,
+						language.formatMessage("DownloadPane.openDirectoryError.body",
+							thisDir.toString()),
+						language.getString("DownloadPane.openDirectoryError.title"),
+						MiscToolkit.ERROR_MESSAGE);
+			}
+		}
+	}
+
+    private void assignHotkeys() {
+
+        // assign keys 0-6 - set priority of selected items
+        final Action setPriorityAction = new AbstractAction() {
+            public void actionPerformed(final ActionEvent event) {
+                // parse the 0-6 and numpad 0-6 keys into an integer
+                int prioInt = -1;
+                try {
+                    prioInt = new Integer(event.getActionCommand()).intValue();
+                } catch( final Exception e ) {} // not a number
+                if( prioInt < 0 || prioInt > 6 ) { return; }
+
+                // now just apply the priority
+                final FreenetPriority prio = FreenetPriority.getPriority(prioInt);
+                final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
+                if( selectedItems == null ) { return; }
+                changeItemPriorites(selectedItems, prio);
+            }
+        };
+        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_0, 0, true), "SetPriority");
+        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_NUMPAD0, 0, true), "SetPriority");
+        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_1, 0, true), "SetPriority");
+        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_NUMPAD1, 0, true), "SetPriority");
+        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_2, 0, true), "SetPriority");
+        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_NUMPAD2, 0, true), "SetPriority");
+        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_3, 0, true), "SetPriority");
+        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_NUMPAD3, 0, true), "SetPriority");
+        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_4, 0, true), "SetPriority");
+        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_NUMPAD4, 0, true), "SetPriority");
+        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_5, 0, true), "SetPriority");
+        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_NUMPAD5, 0, true), "SetPriority");
+        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_6, 0, true), "SetPriority");
+        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_NUMPAD6, 0, true), "SetPriority");
+        getActionMap().put("SetPriority", setPriorityAction);
+
+        // remove all default Enter assignments from table (default assignment makes Enter select the next row)
+        modelTable.getTable().getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).getParent().remove(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0));
+
+        // Enter - open selected files
+        final Action openFileAction = new AbstractAction() {
+            public void actionPerformed(final ActionEvent event) {
+                openFile(modelTable.getSelectedItem());
+            }
+        };
+        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0, true), "OpenFile");
+        getActionMap().put("OpenFile", openFileAction);
+
+        // Shift+D - open selected directories
+        final Action openDirectoryAction = new AbstractAction() {
+            public void actionPerformed(final ActionEvent event) {
+                openSelectedDownloadDirectory();
+            }
+        };
+        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.SHIFT_MASK, true), "OpenDirectory");
+        getActionMap().put("OpenDirectory", openDirectoryAction);
+
+        // Shift+S - start selected downloads now
+        final Action startNowAction = new AbstractAction() {
+            public void actionPerformed(final ActionEvent event) {
+                startSelectedDownloadsNow();
+            }
+        };
+        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.SHIFT_MASK, true), "StartNow");
+        getActionMap().put("StartNow", startNowAction);
+
+        // Shift+E - invert "enabled" state
+        final Action invertEnabledAction = new AbstractAction() {
+            public void actionPerformed(final ActionEvent event) {
+                invertEnabledSelected();
+            }
+        };
+        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_E, InputEvent.SHIFT_MASK, true), "InvertEnabled");
+        getActionMap().put("InvertEnabled", invertEnabledAction);
+    }
 
 	private class PopupMenuDownload extends JSkinnablePopupMenu implements ActionListener, LanguageListener {
 
@@ -757,6 +1053,7 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 		private final JMenuItem startSelectedDownloadsNow = new JMenuItem();
 
 		private final JMenuItem useThisDownloadDirItem = new JMenuItem();
+		private final JMenuItem openSelectedDownloadDirItem = new JMenuItem();
 		private final JMenuItem jumpToAssociatedMessage = new JMenuItem();
 
 		private JMenu changePriorityMenu = null;
@@ -773,15 +1070,17 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 
 			if (PersistenceManager.isPersistenceEnabled()) {
 				changePriorityMenu = new JMenu();
-        		for(final FreenetPriority priority : FreenetPriority.values()) {
-        			JMenuItem priorityMenuItem = new JMenuItem();
-        			priorityMenuItem.addActionListener(new java.awt.event.ActionListener() {
-        				public void actionPerformed(final ActionEvent actionEvent) {
-        					changeItemPriorites(modelTable.getSelectedItems(), priority);
-        				}
-        			});
-        			changePriorityMenu.add(priorityMenuItem);
-        		}
+				for(final FreenetPriority priority : FreenetPriority.values()) {
+					JMenuItem priorityMenuItem = new JMenuItem();
+					priorityMenuItem.addActionListener(new java.awt.event.ActionListener() {
+						public void actionPerformed(final ActionEvent actionEvent) {
+							final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
+							if( selectedItems == null ) { return; }
+							changeItemPriorites(selectedItems, priority);
+						}
+					});
+					changePriorityMenu.add(priorityMenuItem);
+				}
 				
 				removeFromGqItem = new JMenuItem();
 
@@ -808,6 +1107,7 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 			detailsItem.addActionListener(this);
 			startSelectedDownloadsNow.addActionListener(this);
 			useThisDownloadDirItem.addActionListener(this);
+			openSelectedDownloadDirItem.addActionListener(this);
 			jumpToAssociatedMessage.addActionListener(this);
 		}
 
@@ -835,6 +1135,7 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 			startSelectedDownloadsNow.setText(language
 					.getString("DownloadPane.fileTable.popupmenu.startSelectedDownloadsNow"));
 			useThisDownloadDirItem.setText(language.getString("DownloadPane.fileTable.popupmenu.useThisDownloadDir"));
+			openSelectedDownloadDirItem.setText(language.getString("DownloadPane.fileTable.popupmenu.openSelectedDownloadDir"));
 			jumpToAssociatedMessage.setText(language
 					.getString("DownloadPane.fileTable.popupmenu.jumpToAssociatedMessage"));
 
@@ -854,17 +1155,23 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 
 		public void actionPerformed(final ActionEvent e) {
 			if (e.getSource() == copyKeysAndNamesItem) {
-				CopyToClipboard.copyKeysAndFilenames(modelTable.getSelectedItems().toArray());
+				final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
+				if( selectedItems == null ) { return; }
+				CopyToClipboard.copyKeysAndFilenames(selectedItems.toArray());
 			} else if (e.getSource() == copyExtendedInfoItem) {
-				CopyToClipboard.copyExtendedInfo(modelTable.getSelectedItems().toArray());
+				final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
+				if( selectedItems == null ) { return; }
+				CopyToClipboard.copyExtendedInfo(selectedItems.toArray());
 			} else if (e.getSource() == restartSelectedDownloadsItem) {
 				restartSelectedDownloads();
 			} else if (e.getSource() == useThisDownloadDirItem) {
 				useThisDownloadDirectory();
+			} else if (e.getSource() == openSelectedDownloadDirItem) {
+				openSelectedDownloadDirectory();
 			} else if (e.getSource() == jumpToAssociatedMessage) {
 				jumpToAssociatedMessage();
 			} else if (e.getSource() == removeSelectedDownloadsItem) {
-				removeSelectedDownloads();
+				removeSelectedFiles(false); // false = only delete internally queued items (not global-only items), when triggered from the right-click menu
 			} else if (e.getSource() == enableAllDownloadsItem) {
 				enableAllDownloads();
 			} else if (e.getSource() == disableAllDownloadsItem) {
@@ -880,7 +1187,7 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 			} else if (e.getSource() == detailsItem) {
 				showDetails();
 			} else if (e.getSource() == removeFromGqItem) {
-				removeSelectedUploadsFromGlobalQueue();
+				removeSelectedDownloadsFromGlobalQueue();
 			} else if (e.getSource() == retrieveDirectExternalDownloads) {
 				retrieveDirectExternalDownloads();
 			} else if (e.getSource() == startSelectedDownloadsNow) {
@@ -888,35 +1195,80 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 			}
 		}
 
-		private void removeSelectedUploadsFromGlobalQueue() {
-			if (FileTransferManager.inst().getPersistenceManager() == null) {
+		private void removeSelectedDownloadsFromGlobalQueue() {
+			if( FileTransferManager.inst().getPersistenceManager() == null ) {
 				return;
 			}
 			final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
+			if( selectedItems == null ) { return; }
+
 			final List<String> requestsToRemove = new ArrayList<String>();
 			final List<FrostDownloadItem> itemsToUpdate = new ArrayList<FrostDownloadItem>();
-			for (final FrostDownloadItem item : selectedItems) {
-				if (FileTransferManager.inst().getPersistenceManager().isItemInGlobalQueue(item)) {
-					requestsToRemove.add(item.getGqIdentifier());
+			for( final FrostDownloadItem item : selectedItems ) {
+				// don't de-queue items whose data transfer from the node is currently in progress.
+				// otherwise, we risk partially written or orphaned files, inconsistent dlItem states, etc.
+				if( FileTransferManager.inst().getPersistenceManager().isDirectTransferInProgress(item) ) {
+					continue;
+				}
+
+				if( FileTransferManager.inst().getPersistenceManager().isItemInGlobalQueue(item) ) {
+					requestsToRemove.add( item.getGqIdentifier() );
 					itemsToUpdate.add(item);
-					item.setInternalRemoveExpected(true);
+					item.setInternalRemoveExpected(true); // tells the persistencemanager that we're expecting this item to be removed from the global queue
 				}
 			}
 			FileTransferManager.inst().getPersistenceManager().removeRequests(requestsToRemove);
-			// after remove, update state of removed items
-			for (final FrostDownloadItem item : itemsToUpdate) {
-				item.setState(FrostDownloadItem.STATE_WAITING);
-				item.setEnabled(Boolean.FALSE);
-				item.setPriority(FreenetPriority.PAUSE);
-				item.fireValueChanged();
-			}
+			// lastly, start a thread which will update the state of all removed items
+			new Thread() {
+				@Override
+				public void run() {
+					// NOTE/TODO: (slightly ugly) wait until the item has been de-queued from the
+					// global queue. this wrapper thread waits for 1 second (without locking up
+					// the GUI), so that the removal requests above have a chance to execute and
+					// so that the final "SimpleProgress" messages can be processed in time. after
+					// waiting, it then starts a GUI update thread which sets the state to "FAILED".
+					// this fixes a race condition where de-queuing the item would get it stuck in
+					// a "Downloading" state but without any global queue item running anymore. it
+					// happened whenever an FCP SimpleProgress message was waiting to be processed
+					// at the exact moment that you de-queued the file... in that case, the delayed
+					// progress msg incorrectly changed the status back to "in progress" again.
+					Mixed.wait(1000);
+					// we must perform the actual GUI updates on the GUI thread, so queue the update now
+					SwingUtilities.invokeLater(new Runnable() {
+						public void run() {
+							for( final FrostDownloadItem item : itemsToUpdate ) {
+								// don't change the state to "failed" if the item was already done
+								if( item.getState() != FrostDownloadItem.STATE_DONE ) {
+									// NOTE: Frost used to set this to WAITING, but that was inconsistent
+									// with the uploads table; it's better to set it to FAILED just like
+									// the uploads (which makes sense, since the file was removed from the
+									// global queue, so it's "failed"), and then let the user manually
+									// right-click and restart the download if they feel like it later
+									item.setState(FrostDownloadItem.STATE_FAILED);
+									item.setErrorCodeDescription(null); // remove any existing "failure reason" error string
+								}
+								// ensures that the file won't begin downloading again unless the user explicitly restarts it
+								item.setEnabled(false);
+								// NOTE: Frost used to set the priority to 6 ("paused") after removing
+								// them from the global queue, but that makes zero sense since the
+								// file is already disabled and won't download again without intervention,
+								// so this has been commented out...
+								//item.setPriority(FreenetPriority.PAUSE);
+								item.fireValueChanged();
+							}
+						}
+					});
+				}
+			}.start();
 		}
 
 		private void retrieveDirectExternalDownloads() {
-			if (FileTransferManager.inst().getPersistenceManager() == null) {
+			if (FileTransferManager.inst().getPersistenceManager() == null || !PersistenceManager.isPersistenceEnabled()) {
 				return;
 			}
 			final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
+			if( selectedItems == null ) { return; }
+
 			for (final FrostDownloadItem item : selectedItems) {
 				if (item.isExternal() && item.isDirect() && item.getState() == FrostDownloadItem.STATE_DONE) {
 					final long expectedFileSize = item.getFileSize(); // set
@@ -928,31 +1280,10 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 			}
 		}
 
-		private void startSelectedDownloadsNow() {
-			final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
-
-			final List<FrostDownloadItem> itemsToStart = new LinkedList<FrostDownloadItem>();
-			for (final FrostDownloadItem i : selectedItems) {
-				if (i.isExternal()) {
-					continue;
-				}
-				if (i.getState() != FrostDownloadItem.STATE_WAITING) {
-					continue;
-				}
-				if (i.getKey() == null) {
-					continue;
-				}
-				itemsToStart.add(i);
-			}
-
-			for (final FrostDownloadItem dlItem : itemsToStart) {
-				dlItem.setEnabled(true);
-				FileTransferManager.inst().getDownloadManager().startDownload(dlItem);
-			}
-		}
-
 		private void showDetails() {
 			final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
+			if( selectedItems == null ) { return; }
+
 			if (selectedItems.size() != 1) {
 				return;
 			}
@@ -962,20 +1293,20 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 			new FileListFileDetailsDialog(MainFrame.getInstance()).startDialog(selectedItems.get(0).getFileListFileObject());
 		}
 
-		private void invertEnabledSelected() {
-			model.setItemsEnabled(null, modelTable.getSelectedItems());
-		}
-
 		private void invertEnabledAll() {
 			model.setAllItemsEnabled(null);
 		}
 
 		private void disableSelectedDownloads() {
-			model.setItemsEnabled(Boolean.FALSE, modelTable.getSelectedItems());
+			final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
+			if( selectedItems == null ) { return; }
+			model.setItemsEnabled(Boolean.FALSE, selectedItems);
 		}
 
 		private void enableSelectedDownloads() {
-			model.setItemsEnabled(Boolean.TRUE, modelTable.getSelectedItems());
+			final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
+			if( selectedItems == null ) { return; }
+			model.setItemsEnabled(Boolean.TRUE, selectedItems);
 		}
 
 		private void disableAllDownloads() {
@@ -987,18 +1318,42 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 		}
 
 		private void restartSelectedDownloads() {
-			model.restartItems(modelTable.getSelectedItems());
+			final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
+			if( selectedItems == null ) { return; }
+			model.restartItems(selectedItems);
 		}
 
 		private void useThisDownloadDirectory() {
-			if (modelTable.getSelectedItems().size() > 0) {
-				downloadDirTextField.setText(modelTable.getSelectedItems().get(0).getDownloadDir());
+			final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
+			if( selectedItems == null ) { return; }
+
+			if( selectedItems.size() > 0 ) {
+				downloadDirTextField.setText(selectedItems.get(0).getDownloadDir());
+				cleanupDownloadDirString();
 			}
 		}
 
+		// this very old Frost function performs an extremely simplistic jump without any
+		// error checking. it forces the board selection tree to clear its selection (which
+		// unloads all board messages); next, it forcibly writes the parent message's id as
+		// the "previously selected message" in the tree. then it selects the board again
+		// (which causes a sloooow message reload of the whole board). finally, it switches
+		// to the "news" tab. this definitely *works*, but it's horribly written on many levels.
+		// TODO: there is no error checking against missing messages (such as being hidden
+		// due to the age of the message or the user's view-filters), and it will select the
+		// wrong board in case multiple ones use the same name but different keys, and it
+		// causes a very slow board message reload every time you try to jump to a message.
+		// it would be much better to rewrite this to use the advanced "jump to message" thread
+		// from the search dialog instead. but it's such a low-priority fix that I'll leave it
+		// like this for now... these drawbacks (such as the very slow board reload) don't
+		// matter as much here, since people very rarely use the "view message associated with
+		// the download item" feature; whereas they use the "go to search result" feature constantly.
 		private void jumpToAssociatedMessage() {
-			if (modelTable.getSelectedItems().size() > 0) {
-				final FrostDownloadItem item = modelTable.getSelectedItems().get(0);
+			final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
+			if( selectedItems == null ) { return; }
+
+			if( selectedItems.size() > 0 ) {
+				final FrostDownloadItem item = selectedItems.get(0);
 				final String boardName = item.getAssociatedBoardName();
 				final String messageId = item.getAssociatedMessageId();
 
@@ -1027,65 +1382,168 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 
 			final List<FrostDownloadItem> selectedItems = modelTable.getSelectedItems();
 
-			if (selectedItems.size() == 0) {
+			// if no items are selected, we won't show the menu
+			if( selectedItems == null || selectedItems.size() == 0 ) {
 				return;
 			}
 
+			// determine what types of items we have selected
+			// local = something that's in our local file table but isn't yet in the global queue
+			// global = something that's in the global queue (our own files will be there too,
+			//   when they're in progress/finished)
+			// external = something that's *only* in the global queue (wasn't queued by us)
+			// internal = something that was queued locally (and may or may not be in the global queue yet)
+			// done = anything that's finished downloading
+			// failed = anything that failed downloading
+			// inprogress = anything that's currently downloading
+			// waiting = anything that's in the "waiting" state and hasn't begun downloading via
+			//   the global queue yet; these are only local items
+			// canrestartdownload = means that we've selected at least 1 internally queued file
+			//   that isn't in a "trying"/"decoding" state
+			// canretrievedirectexternal = means that we've selected at least 1 external (globally
+			//   queued), *finished*, direct download
+			boolean selectedLocal = false;
+			boolean selectedGlobal = false;
+			boolean selectedExternal = false;
+			boolean selectedInternal = false;
+			boolean selectedDone = false;
+			boolean selectedFailed = false;
+			boolean selectedInProgress = false;
+			boolean selectedWaiting = false;
+			boolean canRestartDownload = false;
+			boolean canRetrieveDirectExternal = false;
+			final PersistenceManager pm = FileTransferManager.inst().getPersistenceManager();
+			for( final FrostDownloadItem dlItem : selectedItems ) {
+				// first determine what item states we've selected
+				final int itemState = dlItem.getState();
+				if( itemState == FrostDownloadItem.STATE_DONE ) {
+					selectedDone = true;
+				} else if( itemState == FrostDownloadItem.STATE_FAILED ) {
+					selectedFailed = true;
+				} else if( itemState == FrostDownloadItem.STATE_PROGRESS ) {
+					selectedInProgress = true;
+				} else if( itemState == FrostDownloadItem.STATE_WAITING ) {
+					selectedWaiting = true;
+				}
+
+				// now determine what type of queue item it is, and check for a few special cases
+				if( dlItem.isExternal() ) {
+					selectedExternal = true;
+
+					// this is an externally queued item, so let's determine if it's in a state
+					// that can perform a direct external retrieval into frost
+					if( pm != null && PersistenceManager.isPersistenceEnabled() && dlItem.isDirect() && itemState == FrostDownloadItem.STATE_DONE ) {
+						canRetrieveDirectExternal = true;
+					}
+				} else {
+					selectedInternal = true;
+
+					// this is an internally queued item, so let's determine if it's in a state
+					// that can start re(start) downloading
+					if( itemState == FrostDownloadItem.STATE_FAILED
+							|| itemState == FrostDownloadItem.STATE_WAITING
+							|| itemState == FrostDownloadItem.STATE_PROGRESS
+							|| itemState == FrostDownloadItem.STATE_DONE ) {
+						canRestartDownload = true;
+					}
+				}
+				if( pm != null && PersistenceManager.isPersistenceEnabled() && pm.isItemInGlobalQueue(dlItem) ) {
+					selectedGlobal = true;
+				} else {
+					selectedLocal = true;
+				}
+			}
+
+			// construct the menu based on what types of items the user has selected
+			// begin by always showing the "copy keys/extended information" items
 			add(copyKeysAndNamesItem);
 			add(copyExtendedInfoItem);
 			addSeparator();
-			add(startSelectedDownloadsNow);
-			add(restartSelectedDownloadsItem);
-			addSeparator();
 
-			if (PersistenceManager.isPersistenceEnabled()) {
+			// only show the priority menu if there are "waiting" or "in progress" items selected
+			// *and* the persistence manager is instantiated
+			// NOTE: we do NOT show the menu if the items are finished, failed or decoding, since
+			// you can't change the priority in any of those states
+			if( pm != null && PersistenceManager.isPersistenceEnabled() && ( selectedWaiting || selectedInProgress ) ) {
 				add(changePriorityMenu);
 				addSeparator();
 			}
 
-			final JMenu enabledSubMenu = new JMenu(language
-					.getString("DownloadPane.fileTable.popupmenu.enableDownloads")
-					+ "...");
-			enabledSubMenu.add(enableSelectedDownloadsItem);
-			enabledSubMenu.add(disableSelectedDownloadsItem);
-			enabledSubMenu.add(invertEnabledSelectedItem);
-			enabledSubMenu.addSeparator();
-
-			enabledSubMenu.add(enableAllDownloadsItem);
-			enabledSubMenu.add(disableAllDownloadsItem);
-			enabledSubMenu.add(invertEnabledAllItem);
-			add(enabledSubMenu);
-
-			// we only find external items if persistence is enabled
-			if (PersistenceManager.isPersistenceEnabled()) {
-				for (final FrostDownloadItem item : selectedItems) {
-					if (item.isExternal() && item.isDirect() && item.getState() == FrostDownloadItem.STATE_DONE) {
-						add(retrieveDirectExternalDownloads);
-						break;
-					}
-				}
+			// only show the "enable/disable selected download" menu if we have at least 1 "internally queued" item selected
+			if( selectedInternal ) {
+				final JMenu enabledSubMenu = new JMenu(language.getString("DownloadPane.fileTable.popupmenu.enableDownloads") + "...");
+				enabledSubMenu.add(enableSelectedDownloadsItem);
+				enabledSubMenu.add(disableSelectedDownloadsItem);
+				enabledSubMenu.add(invertEnabledSelectedItem);
+				enabledSubMenu.addSeparator();
+				enabledSubMenu.add(enableAllDownloadsItem);
+				enabledSubMenu.add(disableAllDownloadsItem);
+				enabledSubMenu.add(invertEnabledAllItem);
+				add(enabledSubMenu);
 			}
-			add(removeSelectedDownloadsItem);
-			if (FileTransferManager.inst().getPersistenceManager() != null && selectedItems != null) {
-				// add only if there are removable items selected
-				for (final FrostDownloadItem item : selectedItems) {
-					if (FileTransferManager.inst().getPersistenceManager().isItemInGlobalQueue(item)) {
-						add(removeFromGqItem);
-						break;
-					}
-				}
+
+			// only show "start selected downloads immediately" if we have at least 1 "waiting" (internally queued) file
+			if( selectedWaiting ) {
+				add(startSelectedDownloadsNow);
 			}
-			if (selectedItems.size() == 1) {
+			// only show "restart selected downloads" if we have at least 1 internally queued
+			// file that is in any state *except* "trying"/decoding
+			if( canRestartDownload ) {
+				add(restartSelectedDownloadsItem);
+			}
+			// only show "retrieve direct external downloads into download directory" if we have
+			// at least 1 direct-mode external download
+			if( canRetrieveDirectExternal ) {
+				add(retrieveDirectExternalDownloads);
+			}
+			// add a separator if any of the internal/waiting/canrestart/canretrievedirect blocks
+			// above have been added; this ensures that selections consisting entirely of global
+			// queue items don't get two separators (meaning the "copy key" or priority menu's
+			// separator plus this one)
+			if( selectedInternal || selectedWaiting || canRestartDownload || canRetrieveDirectExternal ) {
+				addSeparator();
+			}
+			// only show "remove selected files" if we have at least 1 "internally queued" file
+			// (regardless of its state; it can for instance be waiting without being in the global
+			// queue yet, or it can even be "done" in the global queue, it doesn't matter at all)
+			if( selectedInternal ) {
+				add(removeSelectedDownloadsItem);
+			}
+			// only show "remove from global queue" if we have at least 1 "global queue" item
+			// (either something externally queued, or an internally queued file which is on the
+			// global queue); this feature allows the user to abort their ongoing downloads by
+			// removing them from the global queue
+			if( selectedGlobal ) {
+				add(removeFromGqItem);
+			}
+
+			// if exactly 1 file is selected, then add some special menu items...
+			if( selectedItems.size() == 1 ) {
+				addSeparator();
+				// add the "[use/open] this download directory" items; note that we show then even
+				// if they've selected a global item - that's because even global items have a "guessed"
+				// (almost always wrong) download folder in Frost, and it's nice to let the user
+				// copy/open that folder name too, if they want to use it for whatever reason
+				add(useThisDownloadDirItem);
+				if( DesktopUtils.canPerformOpen() ) {
+					add(openSelectedDownloadDirItem); // only show "open" if OS supports opening folders
+				}
+				// if it's a "my shared files" item, then display another menu item
 				final FrostDownloadItem item = selectedItems.get(0);
 				if (item.isSharedFile()) {
 					addSeparator();
 					add(detailsItem);
 				}
-				addSeparator();
-				add(useThisDownloadDirItem);
+				// if the key came from a message, then add the "jump" item
 				if (item.getAssociatedMessageId() != null) {
 					addSeparator();
 					add(jumpToAssociatedMessage);
+				}
+			} else {
+				// they have selected multiple items, so let's at least show the "open directory" feature
+				if( DesktopUtils.canPerformOpen() ) {
+					addSeparator();
+					add(openSelectedDownloadDirItem); // only show "open" if OS supports opening folders
 				}
 			}
 
@@ -1107,8 +1565,6 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 		public void actionPerformed(final ActionEvent e) {
 			if (e.getSource() == downloadDirSelectButton) {
 				downloadDirSelectButton_actionPerformed(e);
-			} else if (e.getSource() == downloadDirCreateButton) {
-				downloadDirCreateButton_actionPerformed(e);
 			} else if (e.getSource() == downloadPrefixApplyButton) {
 				downloadPrefixApplyButton_actionPerformed(e);
 			} else if (e.getSource() == downloadDirApplyButton) {
@@ -1128,6 +1584,7 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 					final JMenuItem item = downloadDirRecentMenu.getItem(i);
 					if (e.getSource() == item) {
 						downloadDirTextField.setText(item.getText());
+						cleanupDownloadDirString();
 					}
 				}
 			}
@@ -1140,9 +1597,6 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 		}
 
 		public void keyReleased(final KeyEvent e) {
-			if (e.getSource() == downloadDirTextField) {
-				downloadDirTextField_keyReleased(e);
-			}
 		}
 
 		public void keyTyped(final KeyEvent e) {
@@ -1152,8 +1606,10 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 		}
 
 		public void focusLost(final FocusEvent e) {
-			if (e.getSource() == downloadDirTextField) {
-				downloadDirTextField_focusLost(e);
+			if( e.getSource() == downloadDirTextField ) {
+				cleanupDownloadDirString();
+			} else if( e.getSource() == downloadPrefixTextField ) {
+				cleanupDownloadPrefixString();
 			}
 		}
 
@@ -1195,17 +1651,33 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 		}
 
 		public void itemStateChanged(final ItemEvent e) {
-			if (removeFinishedDownloadsCheckBox.isSelected()) {
-				Core.frostSettings.setValue(SettingsClass.DOWNLOAD_REMOVE_FINISHED, true);
-				model.removeFinishedDownloads();
-			} else {
-				Core.frostSettings.setValue(SettingsClass.DOWNLOAD_REMOVE_FINISHED, false);
+			// remember: the "checkbox state changed" events don't trigger during Frost's initial
+			// GUI startup for any settings saved as "off", since that's the default state of new
+			// checkboxes. all important logic is therefore in the "on" events, for when the
+			// checkboxes become enabled (both manually by the user, and via the GUI's startup
+			// loading of saved "on" settings).
+			if( e.getSource() == removeFinishedDownloadsCheckBox ) {
+				if( removeFinishedDownloadsCheckBox.isSelected() ) {
+					// this setting means that DownloadManager.java will automatically clear any future finished downloads
+					Core.frostSettings.setValue(SettingsClass.DOWNLOAD_REMOVE_FINISHED, true);
+					model.removeFinishedDownloads(); // clear existing finished downloads
+				} else {
+					Core.frostSettings.setValue(SettingsClass.DOWNLOAD_REMOVE_FINISHED, false);
+				}
 			}
-			if (showExternalGlobalQueueItems.isSelected()) {
-				Core.frostSettings.setValue(SettingsClass.GQ_SHOW_EXTERNAL_ITEMS_DOWNLOAD, true);
-			} else {
-				Core.frostSettings.setValue(SettingsClass.GQ_SHOW_EXTERNAL_ITEMS_DOWNLOAD, false);
-				model.removeExternalDownloads();
+			if( e.getSource() == showExternalGlobalQueueItems ) {
+				if( showExternalGlobalQueueItems.isSelected() ) {
+					// NOTE: we don't have to do anything other than setting this setting to true;
+					// PersistenceManager.java in turn has an event-listener for when this setting
+					// becomes true, and it then re-adds the latest list of external downloads back
+					// into the file-download table (and if the setting is false, it never adds them
+					// to the table in the first place)
+					Core.frostSettings.setValue(SettingsClass.GQ_SHOW_EXTERNAL_ITEMS_DOWNLOAD, true);
+				} else {
+					Core.frostSettings.setValue(SettingsClass.GQ_SHOW_EXTERNAL_ITEMS_DOWNLOAD, false);
+					// now remove all file-download table entries that came from "external downloads" (ones initiated outside of Frost)
+					model.removeExternalDownloads();
+				}
 			}
 		}
 
@@ -1221,7 +1693,7 @@ public class DownloadPanel extends JPanel implements SettingsUpdater {
 
 				downloadDirRecentMenu.removeAll();
 
-				item = new JMenuItem(Core.frostSettings.getValue(SettingsClass.DIR_DOWNLOAD));
+				item = new JMenuItem(FrostDownloadItem.getDefaultDownloadDir());
 				downloadDirRecentMenu.add(item);
 				item.addActionListener(this);
 

@@ -20,6 +20,7 @@ package frost.fcp.fcp07.filepersistence;
 
 import java.util.*;
 
+import frost.Core;
 import frost.fcp.fcp07.*;
 import frost.fileTransfer.FreenetPriority;
 import frost.util.*;
@@ -34,6 +35,11 @@ public class FcpPersistentQueue implements NodeMessageListener {
     // we hold all requests, gui shows only the wanted requests (all or own)
     final private HashMap<String,FcpPersistentPut> uploadRequests = new HashMap<String,FcpPersistentPut>();
     final private HashMap<String,FcpPersistentGet> downloadRequests = new HashMap<String,FcpPersistentGet>();
+
+    // keeps track of all seen compatibility modes (from the CompatibilityMode messages sent when downloading files)
+    // this speeds up processing since we don't have to re-check ones we've already seen during this session.
+    // NOTE: we pre-allocate room for 10 unique values; will grow dynamically if more is needed.
+    final private HashSet<String> seenCompatibilityModes = new HashSet<String>(10);
 
     public FcpPersistentQueue(final FcpMultiRequestConnectionFileTransferTools tools, final IFcpPersistentRequestsHandler pman) {
         fcpTools = tools;
@@ -121,19 +127,76 @@ public class FcpPersistentQueue implements NodeMessageListener {
             onIdentifierCollision(id, nm);
         } else if( nm.isMessageName("ProtocolError") ) {
             onProtocolError(id, nm);
-            
-        } else if( nm.isMessageName("ExpectedHashes") ) {
-            // ignore
-        } else if( nm.isMessageName("ExpectedMIME") ) {
-            // ignore
         } else if( nm.isMessageName("CompatibilityMode") ) {
-            // ignore
+            onCompatibilityMode(id, nm);
+        } else if( nm.isMessageName("URIGenerated") ) {
+            // indicates the final URI of the data you inserted; is sent before the upload is complete
+            onURIGenerated(id, nm);
+        } else if( nm.isMessageName("ExpectedDataLength") ) {
+            // ignore; this newish message is just the node pointlessly guessing
+            // about the final filesize of a download before completion
+        } else if( nm.isMessageName("ExpectedHashes") ) {
+            onExpectedHashes(id, nm);
+        } else if( nm.isMessageName("ExpectedMIME") ) {
+            // ignore; we don't care what filetype Freenet guesses for downloads
         } else if( nm.isMessageName("SendingToNetwork") ) {
-            // ignore
-            
+            // ignore; we don't care if the node lets us know that it has to route a request
+            // out to the network instead of fulfilling it from our datastore
+        } else if( nm.isMessageName("EnterFiniteCooldown") ) {
+            // ignore; means that Freenet has requested all blocks of a download 3 times
+            // and that the remaining blocks are waiting for 30 minutes before they
+            // will be tried again. we don't care!
+        } else if( nm.isMessageName("StartedCompression") ) {
+            // ignore; the node is telling us that it's started compressing a compressed upload. so what?!
+        } else if( nm.isMessageName("FinishedCompression") ) {
+            // ignore; the node is telling us that it's finished compressing a compressed upload. so what?!
+        } else if( nm.isMessageName("PutFetchable") ) {
+            // ignore; means that enough data has been inserted into Freenet that the key should
+            // now be fetchable, but the node never seems to send this message even though our
+            // Verbosity level asks for it, so let's just ignore it in case they ever decide to
+            // send it properly, so that it doesn't show up in logs. it'd be a useless message
+            // anyway, since we don't care if it's fetchable. we always do the complete insert.
+            // UPDATE: It probably didn't show up since Frost's WatchGlobal VerbosityMask was wrong,
+            // and that's been corrected now, but we still don't want this message anyway.
         } else {
             // unhandled msg
             System.out.println("### INFO - Unhandled msg: "+nm);
+        }
+    }
+
+    protected void onCompatibilityMode(final String id, final NodeMessage nm) {
+        // the "CompatibilityMode" message is only sent for downloads, and it can be sent
+        // multiple times with various early guesses, until the final msg with Definitive=true,
+        // so we wait until the node has decided what insertion modes the file used!
+        // NOTE: for Uploads, we handle their compatibility mode in PersistenceManager.java
+        // instead, since we also update the GUI in their case.
+        final String isDefinitive = nm.getStringValue("Definitive");
+        if( isDefinitive != null && isDefinitive.equals("true") ) {
+            // grab the Min/Max compatibility mode guesses. if we're seeing the modes for the
+            // first time this session, then trigger the auto-learning. this will dynamically
+            // train and expand the compatibility mode manager with new, previously unseen
+            // compatibility modes over time, without having to recompile Frost to add them
+            // manually. pure magic! ;-)
+            final String compatMin = nm.getStringValue("Min");
+            final String compatMax = nm.getStringValue("Max");
+            if( compatMin != null && !seenCompatibilityModes.contains(compatMin) ) {
+                seenCompatibilityModes.add(compatMin);
+                Core.getCompatManager().learnNewUserMode(compatMin);
+            }
+            if( compatMax != null && !seenCompatibilityModes.contains(compatMax) ) {
+                seenCompatibilityModes.add(compatMax);
+                Core.getCompatManager().learnNewUserMode(compatMax);
+            }
+        }
+    }
+
+    protected void onExpectedHashes(final String id, final NodeMessage nm) {
+        // we only care about the hashes for DOWNLOADS, where it's used
+        // to avoid downloading what the user already has on their disk.
+        if( downloadRequests.containsKey(id) ) {
+            final FcpPersistentGet pg = downloadRequests.get(id);
+            pg.onExpectedHashes(nm);
+            persistenceHandler.persistentRequestUpdated(pg); // forces GUI to see the MD5 (and possibly abort the transfer)
         }
     }
 
@@ -176,6 +239,16 @@ public class FcpPersistentQueue implements NodeMessageListener {
             final FcpPersistentPut fpg = new FcpPersistentPut(nm, id);
             uploadRequests.put(id, fpg);
             persistenceHandler.persistentRequestAdded(fpg);
+        }
+    }
+    protected void onURIGenerated(final String id, final NodeMessage nm) {
+        if( !uploadRequests.containsKey(id) ) {
+            System.out.println("No item in upload queue: "+nm);
+            return;
+        } else {
+            final FcpPersistentPut pg = uploadRequests.get(id);
+            pg.onURIGenerated(nm);
+            persistenceHandler.persistentRequestUpdated(pg);
         }
     }
     protected void onPutSuccessful(final String id, final NodeMessage nm) {

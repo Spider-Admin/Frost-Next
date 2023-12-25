@@ -29,6 +29,7 @@ import frost.fileTransfer.upload.*;
 import frost.messaging.frost.*;
 import frost.util.*;
 import frost.util.gui.translation.*;
+import frost.util.gui.MiscToolkit;
 
 /**
  * Uploads file attachments from unsend messages and updates db table after successful uploads.
@@ -90,11 +91,11 @@ public class FileAttachmentUploadThread extends Thread {
                     final Language language = Language.getInstance();
                     final String title = language.getString("FileAttachmentUploadThread.fileNotFoundError.title");
                     final String txt = language.formatMessage("FileAttachmentUploadThread.fileNotFoundError.text", fa.getFileName());
-                    JOptionPane.showMessageDialog(
-                            MainFrame.getInstance(),
+                    MiscToolkit.showMessageDialog(
+                            null,
                             txt,
                             title,
-                            JOptionPane.ERROR_MESSAGE);
+                            MiscToolkit.ERROR_MESSAGE);
 
                     logger.warning("FileAttachmentUploadThread: unsent file attachment disappeared: "+fa.getInternalFile()+"; "+fa.getFileName());
 
@@ -103,20 +104,33 @@ public class FileAttachmentUploadThread extends Thread {
                     continue;
                 }
 
+                // if the associated message has been deleted from the table then skip this attachment
                 if( msgFileAttachment.isDeleted() ) {
                     continue; // drop
                 }
 
+                // update the GUI to notify the message table that the attachment is being uploaded
+                // NOTE: this works because this queue only handles a single attachment at a time,
+                // so if 3 messages (a,b,c) are waiting with 3 attachments each, then it will do a1,
+                // a2, a3, b1, b2, b3, c1, c2, c3 in that order.
+                final FrostUnsentMessageObject msg = msgFileAttachment.getMessageObject();
+                msg.setUploadingAttachmentName(fa.getInternalFile().getName()); // just the bare filename
                 logger.severe("Starting upload of file: "+fa.getInternalFile().getPath());
 
                 String chkKey = null;
                 try {
+                    // NOTE: file attachments use a "null" FrostUploadItem, which means that they
+                    // default to the normal Freenet settings: COMPAT_CURRENT, compression DISABLED,
+                    // automatic crypto key, and using the default "file upload" priority.
+                    // the fact that compression is disabled is important, since people often attach
+                    // large, already-compressed files, which take a long time to compress for zero gain.
+                    // IMPORTANT: we MUST provide a null ulItem, otherwise it'll use Quickheal Mode if enabled.
                     final FcpResultPut result = FcpHandler.inst().putFile(
                             FcpHandler.TYPE_FILE,
                             "CHK@",
                             fa.getInternalFile(),
                             true,
-                            new FrostUploadItem());
+                            null); // null FrostUploadItem
 
                     if (result.isSuccess() || result.isKeyCollision()) {
                         chkKey = result.getChkKey();
@@ -127,8 +141,15 @@ public class FileAttachmentUploadThread extends Thread {
 
                 logger.severe("Finished upload of "+fa.getInternalFile().getPath()+", key: "+chkKey);
 
-                // if the assiciated msg was deleted by user, forget all updates
+                // the attachment has now been uploaded (or failed), so set the currently uploading
+                // attachment name in the table to none, and update the status for the message queue.
+                // but only do this if the message hasn't been deleted by the user from the outbox!
+                // basically, if the message was deleted from the table then *all* of its attachments
+                // in the queue (incl the current one) will be marked as Deleted and will be skipped.
+                // and there'd be no sense updating the message object anymore, since it's deleted too.
                 if( !msgFileAttachment.isDeleted() ) {
+                    msg.setUploadingAttachmentName(null);
+
                     if( chkKey != null ) {
                         // upload successful, update message
                         fa.setKey(chkKey);

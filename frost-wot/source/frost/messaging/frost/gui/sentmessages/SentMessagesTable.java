@@ -22,6 +22,8 @@ import java.awt.Component;
 import java.awt.Font;
 import java.awt.Point;
 import java.awt.event.*;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.util.List;
 
 import javax.swing.*;
@@ -34,13 +36,16 @@ import frost.util.gui.translation.*;
 import frost.util.model.*;
 
 @SuppressWarnings("serial")
-public class SentMessagesTable extends SortedModelTable<SentMessagesTableItem> {
+public class SentMessagesTable extends SortedModelTable<SentMessagesTableItem> implements PropertyChangeListener {
 
     private final SentMessagesTableModel tableModel;
     private final SentMessagesTableFormat tableFormat;
 
     private PopupMenuSearch popupMenuSearch = null;
     private final Language language = Language.getInstance();
+
+    private final int MINIMUM_ROW_HEIGHT = 20;
+    private final int ROW_HEIGHT_MARGIN = 4;
 
     public SentMessagesTable() {
         this(new SentMessagesTableModel(new SentMessagesTableFormat()));
@@ -57,6 +62,20 @@ public class SentMessagesTable extends SortedModelTable<SentMessagesTableItem> {
         final Listener l = new Listener();
         getTable().addMouseListener(l);
         getScrollPane().addMouseListener(l);
+
+        Core.frostSettings.addPropertyChangeListener(SettingsClass.MESSAGE_LIST_FONT_NAME, this);
+        Core.frostSettings.addPropertyChangeListener(SettingsClass.MESSAGE_LIST_FONT_SIZE, this);
+        Core.frostSettings.addPropertyChangeListener(SettingsClass.MESSAGE_LIST_FONT_STYLE, this);
+    }
+
+    // override the default sort order when clicking different columns
+    @Override
+    public boolean getColumnDefaultAscendingState(final int columnNumber) {
+        if( columnNumber == 4 ) {
+            // sort date descending by default
+            return false;
+        }
+        return true; // all other columns: ascending
     }
 
     public void addSentMessage(final FrostMessageObject i) {
@@ -86,15 +105,29 @@ public class SentMessagesTable extends SortedModelTable<SentMessagesTableItem> {
     }
 
     private void setupTableFont() {
-        final String fontName = Core.frostSettings.getValue(SettingsClass.FILE_LIST_FONT_NAME);
-        final int fontStyle = Core.frostSettings.getIntValue(SettingsClass.FILE_LIST_FONT_STYLE);
-        final int fontSize = Core.frostSettings.getIntValue(SettingsClass.FILE_LIST_FONT_SIZE);
+        final String fontName = Core.frostSettings.getValue(SettingsClass.MESSAGE_LIST_FONT_NAME);
+        final int fontStyle = Core.frostSettings.getIntValue(SettingsClass.MESSAGE_LIST_FONT_STYLE);
+        final int fontSize = Core.frostSettings.getIntValue(SettingsClass.MESSAGE_LIST_FONT_SIZE);
         Font font = new Font(fontName, fontStyle, fontSize);
         if (!font.getFamily().equals(fontName)) {
-            Core.frostSettings.setValue(SettingsClass.FILE_LIST_FONT_NAME, "SansSerif");
-            font = new Font("SansSerif", fontStyle, fontSize);
+            // font not found on the system, fall back to monospaced
+            Core.frostSettings.setValue(SettingsClass.MESSAGE_LIST_FONT_NAME, "Monospaced");
+            font = new Font("Monospaced", fontStyle, fontSize);
         }
+        // adjust row height to font size, add a margin
+        getTable().setRowHeight(Math.max(fontSize + ROW_HEIGHT_MARGIN, MINIMUM_ROW_HEIGHT));
+        // set the font (invalidates the table and forces a repaint)
         getTable().setFont(font);
+    }
+
+    public void propertyChange(final PropertyChangeEvent evt) {
+        if (evt.getPropertyName().equals(SettingsClass.MESSAGE_LIST_FONT_NAME)) {
+            setupTableFont();
+        } else if (evt.getPropertyName().equals(SettingsClass.MESSAGE_LIST_FONT_SIZE)) {
+            setupTableFont();
+        } else if (evt.getPropertyName().equals(SettingsClass.MESSAGE_LIST_FONT_STYLE)) {
+            setupTableFont();
+        }
     }
 
     private void tableDoubleClick(final MouseEvent e) {
@@ -187,27 +220,27 @@ public class SentMessagesTable extends SortedModelTable<SentMessagesTableItem> {
 
         private void deleteSelectedMessages() {
             final List<SentMessagesTableItem> selectedItems = getSelectedItems();
-            if( selectedItems.size() == 0 ) {
+            if( selectedItems == null || selectedItems.size() == 0 ) {
                 return;
             }
             int answer;
             if( selectedItems.size() == 1 ) {
-                answer = JOptionPane.showConfirmDialog(
-                        MainFrame.getInstance(),
+                answer = MiscToolkit.showConfirmDialog(
+                        null,
                         language.getString("SentMessages.confirmDeleteOneMessageDialog.text"),
                         language.getString("SentMessages.confirmDeleteOneMessageDialog.title"),
-                        JOptionPane.YES_NO_OPTION,
-                        JOptionPane.QUESTION_MESSAGE);
+                        MiscToolkit.YES_NO_OPTION,
+                        MiscToolkit.QUESTION_MESSAGE);
             } else {
-                answer = JOptionPane.showConfirmDialog(
-                        MainFrame.getInstance(),
+                answer = MiscToolkit.showConfirmDialog(
+                        null,
                         language.formatMessage("SentMessages.confirmDeleteMessagesDialog.text", Integer.toString(selectedItems.size())),
                         language.getString("SentMessages.confirmDeleteMessagesDialog.title"),
-                        JOptionPane.YES_NO_OPTION,
-                        JOptionPane.QUESTION_MESSAGE);
+                        MiscToolkit.YES_NO_OPTION,
+                        MiscToolkit.QUESTION_MESSAGE);
             }
 
-            if( answer != JOptionPane.YES_OPTION ) {
+            if( answer != MiscToolkit.YES_OPTION ) {
                 return;
             }
 
@@ -222,7 +255,8 @@ public class SentMessagesTable extends SortedModelTable<SentMessagesTableItem> {
         public void show(final Component invoker, final int x, final int y) {
             removeAll();
 
-            if (getSelectedItems().size() == 0) {
+            final List<SentMessagesTableItem> selectedItems = getSelectedItems();
+            if( selectedItems == null || selectedItems.size() == 0 ) {
                 return;
             }
 

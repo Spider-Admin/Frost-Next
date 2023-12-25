@@ -32,8 +32,7 @@ public class JunkPanel extends JPanel {
     private SettingsClass settings = null;
     private Language language = null;
 
-    private final JCheckBox hideJunkMessagesCheckBox = new JCheckBox();
-    private final JCheckBox markJunkIdentityBadCheckBox = new JCheckBox();
+    private final JCheckBox markJunkIdentityBADCheckBox = new JCheckBox();
 
     private final JCheckBox stopBoardUpdatesWhenDosedCheckBox = new JCheckBox();
     private final JLabel LinvalidSubsequentMessagesThreshold = new JLabel();
@@ -79,11 +78,7 @@ public class JunkPanel extends JPanel {
         constraints.insets = insets5555;
         constraints.gridx = 0;
 
-        add(hideJunkMessagesCheckBox, constraints);
-
-        constraints.gridy++;
-
-        add(markJunkIdentityBadCheckBox, constraints);
+        add(markJunkIdentityBADCheckBox, constraints);
 
         constraints.gridy++;
         constraints.fill = GridBagConstraints.HORIZONTAL;
@@ -133,8 +128,7 @@ public class JunkPanel extends JPanel {
      * Load the settings of this panel
      */
     private void loadSettings() {
-        hideJunkMessagesCheckBox.setSelected(settings.getBoolValue(SettingsClass.JUNK_HIDE_JUNK_MESSAGES));
-        markJunkIdentityBadCheckBox.setSelected(settings.getBoolValue(SettingsClass.JUNK_MARK_JUNK_IDENTITY_BAD));
+        markJunkIdentityBADCheckBox.setSelected(settings.getBoolValue(SettingsClass.JUNK_MARK_JUNK_IDENTITY_BAD));
         stopBoardUpdatesWhenDosedCheckBox.setSelected(settings.getBoolValue(SettingsClass.DOS_STOP_BOARD_UPDATES_WHEN_DOSED));
         TfInvalidSubsequentMessagesThreshold.setText(""+settings.getIntValue(SettingsClass.DOS_INVALID_SUBSEQUENT_MSGS_THRESHOLD));
     }
@@ -144,8 +138,7 @@ public class JunkPanel extends JPanel {
     }
 
     private void refreshLanguage() {
-        hideJunkMessagesCheckBox.setText(language.getString("Options.junk.hideJunkMessages"));
-        markJunkIdentityBadCheckBox.setText(language.getString("Options.junk.markJunkIdentityBad"));
+        markJunkIdentityBADCheckBox.setText(language.getString("Options.junk.markJunkIdentityBAD"));
 
         stopBoardUpdatesWhenDosedCheckBox.setText(language.getString("Options.junk.stopBoardUpdatesWhenDosed"));
         LinvalidSubsequentMessagesThreshold.setText(language.getString("Options.junk.invalidSubsequentMessagesThreshold"));
@@ -155,8 +148,7 @@ public class JunkPanel extends JPanel {
      * Save the settings of this panel
      */
     private void saveSettings() {
-        settings.setValue(SettingsClass.JUNK_HIDE_JUNK_MESSAGES, hideJunkMessagesCheckBox.isSelected());
-        settings.setValue(SettingsClass.JUNK_MARK_JUNK_IDENTITY_BAD, markJunkIdentityBadCheckBox.isSelected());
+        settings.setValue(SettingsClass.JUNK_MARK_JUNK_IDENTITY_BAD, markJunkIdentityBADCheckBox.isSelected());
         settings.setValue(SettingsClass.DOS_STOP_BOARD_UPDATES_WHEN_DOSED, stopBoardUpdatesWhenDosedCheckBox.isSelected());
         settings.setValue(SettingsClass.DOS_INVALID_SUBSEQUENT_MSGS_THRESHOLD, TfInvalidSubsequentMessagesThreshold.getText());
     }

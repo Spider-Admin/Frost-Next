@@ -24,7 +24,7 @@ import java.nio.*;
 import java.nio.channels.*;
 import java.security.*;
 import java.security.spec.*;
-import java.util.*;
+import java.util.StringTokenizer; // do not import java.util.*, since its Base64 method clashes with BouncyCastle!
 import java.util.logging.*;
 
 import javax.crypto.*;
@@ -64,7 +64,7 @@ public final class FrostCrypt {
 
     /**
      * Generate a new RSA 1024 bit key pair.
-     * @returns String[0] is private key; String[1] is public key
+     * @return String[0] is private key; String[1] is public key
      */
     public synchronized String[] generateKeys() {
 
@@ -137,34 +137,32 @@ public final class FrostCrypt {
      * Computes the SHA-1 checksum of given file.
      */
     public synchronized String digest(File file) {
-        SHA1Digest stomach = new SHA1Digest();
-        byte[] poop = new byte[64];
-        FileChannel chan = null;
-        try {
-            chan = (new FileInputStream(file)).getChannel();
-        } catch (IOException e) {
-            logger.log(Level.SEVERE, "Exception thrown in digest(File file)", e);
-        }
-        byte[] temp = new byte[4 * 1024];
-        ByteBuffer _temp = ByteBuffer.wrap(temp);
-        try {
-            while (true) {
-                //if (y >= file.length()) break;
-                //if (y > file.length()) y = file.length();
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final FileInputStream fileInputStream = new FileInputStream(file);
+            final FileChannel chan = fileInputStream.getChannel();
+        ) {
+            SHA1Digest stomach = new SHA1Digest();
+
+            byte[] temp = new byte[4 * 1024];
+            ByteBuffer _temp = ByteBuffer.wrap(temp);
+            while( true ) {
                 int pos = _temp.position();
                 int read = chan.read(_temp);
-                if (read == -1)
+                if( read == -1 )
                     break;
                 stomach.update(temp, pos, read);
-                if (_temp.remaining() == 0)
+                if( _temp.remaining() == 0 )
                     _temp.position(0);
             }
-            chan.close();
-        } catch (IOException e) {
+
+            byte[] poop = new byte[64];
+            stomach.doFinal(poop, 0);
+            return (new String(Base64.encode(poop))).substring(0, 27);
+        } catch( final Throwable e ) {
             logger.log(Level.SEVERE, "Exception thrown in digest(File file)", e);
         }
-        stomach.doFinal(poop, 0);
-        return (new String(Base64.encode(poop))).substring(0, 27);
+        return null;
     }
 
     public synchronized String encrypt(String what, String publicKey) {
@@ -189,7 +187,7 @@ public final class FrostCrypt {
      * array and put the result array of 128bytes length into the front of the AES encrypted
      * data.
      *
-     *  @returns null if anything failed.
+     *  @return null if anything failed.
      */
     public synchronized byte[] encrypt(byte[] what, String publicKey) {
 
@@ -548,48 +546,37 @@ public final class FrostCrypt {
      * Computes the SHA256 checksum of a file.
      */
     public String computeChecksumSHA256(File file) {
-        try {
-            FileChannel chan = null;
-            try {
-                chan = (new FileInputStream(file)).getChannel();
-            } catch (Throwable e) {
-                logger.log(Level.SEVERE, "Exception thrown 1", e);
-                return null;
-            }
-            
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final FileInputStream fileInputStream = new FileInputStream(file);
+            final FileChannel chan = fileInputStream.getChannel();
+        ) {
             MessageDigest sha256 = MessageDigest.getInstance("SHA256", "BC");
-            
+
             byte[] temp = new byte[4 * 1024];
             ByteBuffer _temp = ByteBuffer.wrap(temp);
-            try {
-                while (true) {
-                    //if (y >= file.length()) break;
-                    //if (y > file.length()) y = file.length();
-                    int pos = _temp.position();
-                    int read = chan.read(_temp);
-                    if (read == -1)
-                        break;
-                    sha256.update(temp, pos, read);
-                    if (_temp.remaining() == 0)
-                        _temp.position(0);
-                }
-                chan.close();
-            } catch (Throwable e) {
-                logger.log(Level.SEVERE, "Exception thrown 2", e);
+            while( true ) {
+                int pos = _temp.position();
+                int read = chan.read(_temp);
+                if( read == -1 )
+                    break;
+                sha256.update(temp, pos, read);
+                if( _temp.remaining() == 0 )
+                    _temp.position(0);
             }
-            
+
             byte[] poop = sha256.digest();
-            
             StringBuilder sb = new StringBuilder();
-            for (int i=0; i < poop.length; i++) {
+            for( int i=0; i < poop.length; ++i ) {
                 sb.append(Integer.toString( ( poop[i] & 0xff ) + 0x100 , 16).substring(1));
             }
             return sb.toString().toUpperCase();
-            
-        } catch (NoSuchAlgorithmException ex) {
+        } catch( final NoSuchAlgorithmException ex ) {
             logger.log(Level.SEVERE, "Algorithm SHA256 not supported.", ex);
-        } catch (NoSuchProviderException ex) {
+        } catch( final NoSuchProviderException ex ) {
             logger.log(Level.SEVERE, "Provider BC not supported.", ex);
+        } catch( final Throwable ex ) {
+            logger.log(Level.SEVERE, "Exception thrown in computeChecksumSHA256(File file)", ex);
         }
         return null;
     }

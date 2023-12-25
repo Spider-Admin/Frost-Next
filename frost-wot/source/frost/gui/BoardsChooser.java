@@ -29,6 +29,7 @@ import javax.swing.border.*;
 import javax.swing.table.*;
 
 import frost.messaging.frost.boards.*;
+import frost.util.gui.GridJTable;
 import frost.util.gui.translation.*;
 
 @SuppressWarnings("serial")
@@ -54,6 +55,16 @@ public class BoardsChooser extends JDialog {
         // fill given board into our list as BoardListEntries
         boardList = new ArrayList<BoardTableEntry>();
         for( final Board b : boards ) {
+            // do not allow anyone to attach the *dead* legacy Frost announcement board.
+            // furthermore, do not allow anyone to attach the obnoxious "no subject" board, which is
+            // spammed as message attachments by losers with too much time on their hands.
+            final String boardName = b.getName();
+            if( boardName != null ) {
+                if( boardName.toLowerCase().equals("frost-announce") || boardName.toLowerCase().contains("no subject") ) {
+                    continue;
+                }
+            }
+
             final BoardTableEntry e = new BoardTableEntry();
             e.board = b;
             e.isSelected = Boolean.FALSE;
@@ -96,8 +107,8 @@ public class BoardsChooser extends JDialog {
         buttonsPanel.add( Bcancel );
 
         boardsTableModel = new BoardsTableModel(boardList);
-        boardsTable = new JTable(boardsTableModel);
-        boardsTable.setShowGrid(false);
+        boardsTable = new GridJTable(boardsTableModel);
+        ((GridJTable)boardsTable).setEnforcedShowGrid(false); // GridJTable: always show grid even when L&F changes
         boardsTable.setTableHeader(null);
 
         boardsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);

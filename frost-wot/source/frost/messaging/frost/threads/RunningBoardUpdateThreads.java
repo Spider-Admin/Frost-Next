@@ -60,16 +60,16 @@ public class RunningBoardUpdateThreads implements BoardUpdateThreadListener {
      * will be notified if THIS thread is finished
      * before starting a thread you should check if it is'nt updating already.
      */
-    public boolean startMessageDownloadToday(
+    public boolean startMessageDownloadToday( // "Today" message downloader
         final Board board,
         final SettingsClass config,
         final BoardUpdateThreadListener listener) {
 
         final MessageThread tofd = new MessageThread(
-                true,
+                /*downloadToday=*/true,
                 board,
                 board.getMaxMessageDownload(),
-                0);
+                0); // start at day 0 (today)
 
         // register listener and this class as listener
         tofd.addBoardUpdateThreadListener(this);
@@ -88,62 +88,55 @@ public class RunningBoardUpdateThreads implements BoardUpdateThreadListener {
      * will be notified if THIS thread is finished
      * before starting a thread you should check if it is'nt updating already.
      */
-    public boolean startMessageDownloadBack(
+    public boolean startMessageDownloadBack( // "All Days Back" message downloader
         final Board board,
         final SettingsClass config,
         final BoardUpdateThreadListener listener,
-        final boolean downloadCompleteBackload)
-    {
-		return startMessageDownloadBack(board, config, listener, downloadCompleteBackload, false);
-    }
-
-    public boolean startMessageDownloadBack(
-        final Board board,
-        final SettingsClass config,
-        final BoardUpdateThreadListener listener,
-        final boolean downloadCompleteBackload,
         final boolean resume)
     {
-		int daysBackward;
-        int startDay = 1; // SF_EDIT
-        LocalDate resumeFrom = null;
-        
-        if( downloadCompleteBackload ) {
-            daysBackward = board.getMaxMessageDownload();
-            startDay = board.getStartDaysBack(); //SF
-        } else {
-            daysBackward = 1;
+        int maxDaysBack = board.getMaxMessageDownload();
+        // the default start-day value is 1 ("today"), but the user can change it.
+        // NOTE: we subtract 1 because the value is in the human-readable GUI
+        // range, where 1 means "today" (aka a start-day offset of 0 days back),
+        // and where the maximum value is equal to maxDaysBack.
+        // so it's -1 when we *read* the start-day, and +1 when we *display* it in the GUI.
+        // the reason for the use of a GUI-centric value input-range is that
+        // a range of "Day 1/30 (2015-11-17)" to "Day 30/30 (2015-10-19)" makes a LOT
+        // more sense to users than "Day 0/30" to "Day 29/30" (being the final day).
+        int startDay = board.getStartDaysBack() - 1;
+        if( startDay < 0 )
+            startDay = 0;
+
+        if( resume ) {
+            // figure out how many days ago they pressed the "stop refresh" button to stop their scan.
+            DateTime today = new DateTime(DateTimeZone.UTC);
+            DateTime abortDay = board.getLastDayBoardUpdatedObj(); // UTC time of when they pressed "Stop Refresh"
+            int differenceDays = Days.daysBetween(abortDay.withTimeAtStartOfDay(), today.withTimeAtStartOfDay()).getDays();
+            logger.info(board.getName()+ ". RESUME: abortDay="+abortDay.toString("yyyy-MM-dd") + ", today="+today.toString("yyyy-MM-dd") + ", differenceDays="+differenceDays);
+
+            /* EXPLANATION:
+             * Imagine that they aborted the scan on abortDay = 2015-11-15, and that they were
+             *   currently downloading "day 2" (2015-11-13) when they aborted it.
+             * Now imagine that they're resuming on today = 2015-11-18. That's a difference of
+             *   3 days. So to properly resume from the day of 2015-11-13, we need:
+             *   lastDayStarted (2) + differenceDays (3) = start downloading Day 5.
+             *   What is day 5? It's 2015-11-18 - 5 = 2015-11-13.
+             * We must also extend the "max days backwards" by the amount of days that has passed,
+             *   so that a "resume from day 32" will properly run even if max days is i.e. 30.
+             * Since we're extending both start and max by the differenceDays, we'll download
+             *   exactly as many days as the user wants for their "all days back" scan.
+             */
+            startDay = board.getLastAllDayStarted() + differenceDays;
+            maxDaysBack += differenceDays;
+            logger.info(board.getName() + ". lastAllDayStarted: " + board.getLastAllDayStarted());
+            logger.info(board.getName() + ". (adjusted) startDay: " + startDay);
+            logger.info(board.getName() + ". (adjusted) maxDaysBack: " + maxDaysBack);
         }
 
-		if(resume)
-		{
-			resumeFrom = board.getLastDayBoardUpdatedObj();
-			logger.info(board.getName() + ": Resume From: " + resumeFrom);
-			LocalDate today = new LocalDate(DateTimeZone.UTC);
-			logger.info(board.getName() + ": today: " + today);
-			Period period = new Period(resumeFrom, today);
-			logger.info(board.getName() + ": Got Period...");
-
-			int days = period.getDays();
-			int weeks = period.getWeeks();
-			int months = period.getMonths();
-			int years = period.getYears();
-			
-			// Should we add a day or two here or just resume where we left off?
-			// Also who would wait years between frost runs?
-			int differenceDays = (days) + (weeks * 7) + (months * 30) + (years * 365);
-			logger.info(board.getName()+ ". RESUME: differenceDays=" + differenceDays);
-			
-			startDay = board.getLastDayChecked() - differenceDays;
-			logger.info(board.getName() + ". lastDayChecked: " + board.getLastDayChecked());
-			logger.info(board.getName() + ". startday : " + startDay);
-
-	    }
-        
         final MessageThread backload = new MessageThread(
-                false,
+                /*downloadToday=*/false,
                 board,
-                daysBackward,
+                maxDaysBack,
                 startDay);
 
         // register listener and this class as listener
@@ -361,5 +354,24 @@ public class RunningBoardUpdateThreads implements BoardUpdateThreadListener {
             }
         }
         return false;
+    }
+
+    /**
+     * Allows you to stop all running download-threads for a certain board.
+     * There will often be one "all days" thread and one or more "today"-threads,
+     * and this takes care of interrupting *all* threads for the given board.
+     *
+     * This will "gently" tell the threads to stop, by setting a flag on all
+     * threads for that board, telling them to stop after they're done with
+     * the current day they're working on.
+     */
+    public boolean stopAllDownloadThreadsForBoard(final Board board) {
+        boolean hadThreads = false;
+        final List<BoardUpdateThread> threads = getDownloadThreadsForBoard(board);
+        for( int x = 0; x < threads.size(); x++ ) {
+            hadThreads = true;
+            threads.get(x).setStopUpdatingFlag(true);
+        }
+        return hadThreads;
     }
 }

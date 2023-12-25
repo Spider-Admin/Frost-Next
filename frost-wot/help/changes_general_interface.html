@@ -1,0 +1,246 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="Content-Style-Type" content="text/css">
+    <link rel="stylesheet" href="style.css" type="text/css">
+    <title>Changes: General Interface (Frost-Next)</title>
+  </head>
+<body>
+<h1>Changes: General Interface (Frost-Next)</h1>
+<p><a href="index.html">Back to Help Index</a></p>
+<table class="cltable" cellspacing="0" cellpadding="0">
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">1.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>New identity, with a fresh, <i>new logo</i> and a full <i>graphical refresh</i>: This is not Frost, this is <b>Frost-Next</b>.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">2.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Beautiful, new, custom icon set to give the UI a modern refresh. Frost no longer looks like it came from 1993.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">3.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>The splashscreen finally features new progress-messages, for those tired of reading about the same damn "Cannoli" for over a decade.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">4.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Added several new welcome screens to guide you through your first steps, as well as showing you how to open the in-app help where you can read about all of the hundreds of serious bug fixes, enhancements and new features.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">5.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Completely rewrote and redesigned the useless in-app help from the ground up, to comprehensively document Frost-Next and to answer everything that people have been wondering about throughout the years.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">6.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>You can now perform powerful searches in many places in Frost, such as all file tables and message lists and text panes. See the dedicated "Feature Details: Universal Search" page for more information.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">7.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>New, multi-monitor aware screen centering code used throughout the entire GUI. No more "loading screen sitting between two monitors" insanity. The main window now centers on the default screen on first launch, and returns to wherever you last placed it (even other monitors) on subsequent launches. Sub-windows like dialog boxes now center relative to the Frost window (although some re-use your last location, such as the search messages dialog; that way you can rely on it always re-appearing where you last closed it). Message boxes (information such as "your username is invalid") now open relative to the Frost window, instead of the old code which used to make them open between screens.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">8.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>New default main window size. No more ludicrous 700x500 (are we <i>ants</i>?!). It now defaults to a percentage of the user's screen size, such as 1300x800, clamped to make sure it's never <i>too</i> big if the user has a massive screen... This increased window size means that the GUI is a lot better out-of-the-box than ever before.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_new">NEW</div><div class="clindex">9.</div></td>
+  <td class="cldesc"><div class="cldesc_new">
+    <p>Solved Frost's "where the heck did that window go!?" problem by painstakingly re-implementing all Java dialog boxes from the ground up, in a way that supports an "always on top" mode. The loading screen and all startup-messages use this to always appear on top of the desktop, so that you'll never again lose Frost and its startup-questions behind other windows while the program is loading.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">10.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Rewrote hundreds of user interface phrases, to fix the convoluted and difficult-to-decipher mess left behind by the English-challenged legacy author. This was especially important in the Preferences panel, where the options were so poorly worded that most users ran away immediately and never even tried to tweak them.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">11.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>All menu items now have nice icons, and oddly named menu features have been renamed (such as "Options: Manage tracked downloaded files", which is now simply called "Options: Manage downloaded keys").</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">12.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Major improvement to all auto-sorting tables. The sent messages, unsent messages, search table, upload table, download table and <i>many</i> other places now use an advanced algorithm which <b>preserves</b> your item selection <i>while</i> the list is being dynamically re-sorted (meaning whenever table contents change due to rows being added/deleted/updated).</p>
+    <p>What this means is that you can <i>finally</i> select files in your upload/download tables and <i>relax</i> and <i>trust</i> that the selections will be <i>preserved</i> even while the files re-sort themselves as they progress. The selection <i>used to</i> chaotically jump around and select random files (especially when sorted by Block count), which made it <i>absolutely impossible</i> to select in-progress files in the past.</p>
+    <p>Now it <i>no longer matters</i> how chaotically the items are being re-sorted or how much they jump around; your selection remains rock solid and won't miss a single beat. You can even dynamically switch to sorting by another column at any time, and will see your row selections magically and accurately dance around to follow every movement.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">13.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Improved the auto-scrolling in all tables. Most notably, the message list would scroll the desired item out of view if the scrolling was done backwards (upwards) from the current position. The new behavior is to nicely put the target item in the user's view, with a buffer of 3 other items below it (instead of being cramped towards the bottom of the window), while also ensuring that the item is always visible if the scrolling is done backwards.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">14.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Optimized the rendering speed of inserting content into tables (such as the message list, search results, file tables, etc). We no longer cause a full redraw of the <i>whole</i> table anytime a row is added, which means less GUI lag whenever you have lots of queued files or lots of search results.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">15.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Completely rewrote the old, painfully awful "column sorting" code in <i>all</i> of Frost's tables. The old code was <i>ridiculously</i> bad and was <i>full</i> of severe bugs, which manifested itself as an inability to sort properly; i.e. trying to sort by the "Subject" column of the message list gave you a jumbled list of message which wasn't sorted at all. The "From" (sender) column gave you a case-sensitive list where "abc" and "ABC" were placed in completely different parts of the list. And <i>most</i> of Frost's sorting columns actually used plain "text comparison" for its sorting, which meant that things like sorting by the "Filesize" column was completely impossible, since a number like "100 KiB" was seen as <i>larger</i> than "5 MiB", for instance.</p>
+    <p>The old code was completely thrown out, and the new system now has individually adapted, per-column sorting behaviors which reads the <i>exact</i> kind of data in that column and sorts it <i>appropriately</i> for the type of data. There are too many fixes to list them all, but to name but a few, timestamps are now always sorted according to time, filesizes are sorted according to size, and the "Subject" column of messages is sorted according to the case-insensitive subject while <i>ignoring</i> the "Re:" prefix (so that both the <i>initial</i> message of a thread <i>and</i> all of the "Re:" <i>replies</i> are sorted as a single group). Furthermore, the code now intelligently uses a <i>tie-breaking system</i> when sorting. For example, if you sort the message list it uses the Date as the tie-breaker; so if you sort the messages by Subject, it will first order all messages by their subject, and then those groups are further sub-sorted by the <i>date</i> of each message in that thread. This actually makes non-threaded mode almost as powerful as threaded mode, since you can now sort by Subject and read a "thread-like" view of each conversation. In case of file transfers, it uses the filename as the tie-breaker, which means that you can sort by things like progress and see a nicely sorted list of all items at each stage of progress. The new sorting code fixes about 40 different sorting-related bugs and finally makes the GUI behave as you'd wish it had done from day one.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">16.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Fixed a huge annoyance in all sortable tables: They used to keep the <i>previous</i> column's sort-direction (ascending/descending) whenever you clicked on <i>other</i> columns. So if you clicked on the date column to see the dates backwards and then clicked on Subject instead, all of the subjects were also ordered backwards. It now intelligently decides what to do, with a custom per-column behavior: Clicking on the same column multiple times toggles between ascending/descending, but clicking on a different column (than the one currently sorted) switches the order to <i>that</i> column's new default sort order.</p>
+    <p>I've painstakingly gone through <i>every</i> column of <i>every</i> sortable table in Frost and set up default orders for each column, so that the first click is always the most logical order for that particular column (as an example, clicking the "Blocks" column shows the finished transfers first, and then the ones in progress, then the waiting ones, and so on...). Gone are the days of having to click a column multiple times to get the result you wanted!</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">17.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Fixed all "Yes/No" question dialogs in Frost. They were incorrectly programmed so that closing the dialog with the "X" was treated as a "Yes!", which any <i>sane</i> application interprets as a "No". That has now been fixed, so that anyone who reflexively closes a dialog with the X won't be hurt by accidentally being treated as a confirmation.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">18.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Keyboard shortcuts now react when you <i>let go</i> of the keyboard key as opposed to instantly when it's pressed down; this prevents a serious bug where pressing and holding down a key caused the action to be repeated about 10 times per second. Users shouldn't notice the difference, since you usually just tap and release a key anyway. This change simply ensures that we don't repeat the keyboard functions at an extremely high rate.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">19.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>The board list and message list dividers in the GUI now default to larger, non-cramped sizes to take advantage of the extra screen real-estate.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">20.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Adjusted the default column ratios for the message list and the uploads and downloads tables. The new widths are much better suited for large, modern screens.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">21.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Swapped positions and default sizes for the message list columns, so that it now <i>looks great</i> and meets most user's needs out of the box. For instance, the important Subject column is now much larger, Signature has been moved next to From (which it relates to), Date has been moved next to Signature instead of being stuck in the corner, and the less important Junk and Index columns are smaller and now sit on the far right where they're out of the way.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">22.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Swapped positions of the Download Directory and Tries columns in the downloads table, to match the location of the Tries column in the uploads table.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">23.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Massively improved Frost's GUI-thread handling to avoid code repetition and threading bugs whenever code needed to update the GUI.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">24.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Increased the size of the "Configure selected board" window so that it now fits all of the content. It automatically sizes itself to the smallest possible size that fits everything. The content has also been re-arranged so that the order of preferences is more logical.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">25.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Improved the automatic scaling algorithm for the notification area indicator icon (the small "F" which glows blue/green to indicate new messages), so that it's always smoothly rendered instead of ugly and jagged.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">26.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>Workaround for a quirk in Ubuntu's notification icon panel. They report that the panel icons are 24x24, but they're actually 22x24, which means that Frost's tray status icon is cut off if we trust the operating system. All major Linux desktops were investigated and only Ubuntu's Unity window manager has the bug. The workaround was to check for the Unity window manager (which is possible as of Ubuntu 11.10, from Oct 2011) and seeing if it claims exactly 24x24, in which case we scale the icon to 22x24 instead, so that it renders nicely.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_enhanced">ENHANCED</div><div class="clindex">27.</div></td>
+  <td class="cldesc"><div class="cldesc_enhanced">
+    <p>The memory monitor now always displays on top of Frost, and re-appears if you activate its menu item again.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">28.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed two bugs in the message table initialization, which were causing runtime exceptions and destabilizing the GUI:</p>
+    <ul>
+      <li>The cell renderer sometimes incorrectly initialized with strings instead of booleans.</li>
+      <li>The row renderer sometimes initialized with null objects (no message in that row).</li>
+    </ul>
+    <p>Both errors were easily triggered by just casually switching between various boards.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">29.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Revised the code for all table models in Frost to make them all properly thread-safe, which means that rows will no longer risk being added, updated or deleted <i>while</i> Java is busy redrawing the GUI. In the past, it was common to see serious runtime exceptions and GUI instability due to legacy Frost's stunningly stupid lack of any synchronization code.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">30.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed a serious bug in all tables: If your modification-action on the selected items changed the sorting of those items, the subsequent items (while the modification was being performed) would no longer have the correct row index and the change would target the wrong items. That has now been fixed so that we first make a list of all selected objects and <i>then</i> change them, thus being free from the limits of row indexes that may become screwed up as things re-sort themselves.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">31.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed a <i>lot</i> of bugs related to what happens when switching Java's graphical themes (the Look and Feel) without restarting Frost: Message indentation no longer jumps/changes. No more risk of losing the "strikethrough" drawn over deleted Posts. The starred/flagged/junk columns (and other graphical icon columns) no longer become regular, ugly checkboxes. All tables maintain their grid-style (instead of losing the grid in certain L&amp;Fs), and lots of other fixes. You can now freely change theme on-the-fly, but it's still <i>recommended</i> to perform a restart after you change theme so that you get a completely fresh start.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">32.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Fixed all "Suppressible Confirm Dialog" code (that's the dialog with the "Show this dialog again next time?" checkbox at the bottom). It was always rendering with only an "OK" button, which was especially scary when you accidentally chose "Mark ALL messages in this board as read" and saw a dialog with just "OK". Now there are proper Yes/No buttons.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">33.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Moved the "startup messages" display to the core/splashscreen before the main window is shown, since showing messages while the main window is busy initializing could cause it to freeze.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">34.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Removed SnowFlake's "File &gt; Reload Settings File" menu item, which was absolutely insane and was just one of countless ways he's proven that he didn't understand Frost's source code. Regular users have zero need for that menu item, and good developers don't need it either. Frost <i>isn't</i> built to be able to reload frost.ini at runtime, so even though it would "reload" the contents of the file, about 90% of the application wouldn't react to the reloaded settings. Furthermore, reloading the settings caused inconsistent GUI states and bugs, since the settings storage is used by the GUI to keep track of very important information at runtime.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">35.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>The Downloads and Uploads tabs now properly restore the state of <i>all</i> toolbar checkboxes at startup, instead of only loading the leftmost checkbox.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">36.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>Frost <i>no longer</i> switches its taskbar icon to an ugly, ancient-looking image of a yellow letter every time new messages arrive. Switching the taskbar icon on-the-fly was very ugly and error prone, and could often get stuck in the wrong state. You should instead be relying on the notification area indicator icon (the small "F"), which serves the same purpose and glows green when there are new messages, and returns to being blue if you read all of the messages that arrived during the current session. Windows users may want to tell their notification area (next to the clock) to pin Frost-Next's "F" icon there, so that you can always see it.</p>
+  </div></td>
+</tr>
+<tr>
+  <td class="cltype" valign="top"><div class="cltype_fixed">FIXED</div><div class="clindex">37.</div></td>
+  <td class="cldesc"><div class="cldesc_fixed">
+    <p>The "first startup" dialog can no longer be accidentally resized by the user into weird shapes that cut off the text.</p>
+  </div></td>
+</tr>
+</table>
+</body>
+</html>

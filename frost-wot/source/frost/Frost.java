@@ -30,6 +30,11 @@ import frost.util.*;
 import frost.util.gui.*;
 import frost.util.gui.translation.*;
 
+/**
+ * This class is responsible for booting up the core, which in turn starts the threads and GUI.
+ * We're called by FrostLauncher.java via reflection, basically "new Frost(args)".
+ * So the Frost() constructor is the real entry point of Frost.
+ */
 public class Frost {
 
     private static final Logger logger = Logger.getLogger(Frost.class.getName());
@@ -39,26 +44,6 @@ public class Frost {
     private static String cmdLineLocaleFileName = null;
 
     private static boolean offlineMode = false;
-
-    /**
-     * Main method
-     * @param args command line arguments
-     */
-    public static void main(final String[] args) {
-        System.out.println();
-        System.out.println("Frost, Copyright (C) 2001,2011 Frost Project");
-        System.out.println("Frost comes with ABSOLUTELY NO WARRANTY!");
-        System.out.println("This is free software, and you are welcome to");
-        System.out.println("redistribute it under the GPL conditions.");
-        System.out.println("Frost uses code from bouncycastle.org (BSD license),");
-        System.out.println("Kai Toedter (LGPL license), Volker H. Simonis (GPL v2 license)");
-        System.out.println("and McObject LLC (GPL v2 license).");
-        System.out.println();
-
-        parseCommandLine(args);
-
-        new Frost();
-    }
 
     /**
      * This method sets the look and feel specified in the command line arguments.
@@ -191,22 +176,28 @@ public class Frost {
     }
 
     /**
-     * Constructor
+     * Constructor, called by FrostLauncher.java via reflection, if the user passed
+     * the Java version check. This constructor acts identically to a regular
+     * "public void main()" entry point.
+     * @param {String[]} args - the command line arguments
      */
-    public Frost() {
-        System.out.println("Starting Frost "+getClass().getPackage().getSpecificationVersion());
+    public Frost(final String[] args) {
+        // parse the command line
+        parseCommandLine(args);
+
+        // display environment information in the terminal
+        System.out.println("Starting Frost-Next...");
         System.out.println();
         for( final String s : getEnvironmentInformation() ) {
             System.out.println(s);
         }
         System.out.println();
 
-        final Core core = Core.getInstance();
-
+        // check the Java vendor (we officially support Sun and Oracle, but OpenJDK should work too)
         final String jvmVendor = System.getProperty("java.vm.vendor");
         final String jvmVersion = System.getProperty("java.vm.version");
         if( jvmVendor != null && jvmVersion != null ) {
-            if( jvmVendor.indexOf("Sun ") < 0 ) {
+            if( jvmVendor.indexOf("Sun ") < 0 && jvmVendor.indexOf("Oracle ") < 0 ) { // if not using sun or oracle
                 // show dialog only if vendor or version changed
                 boolean skipInfoDialog = false;
                 final String lastUsedVendor = Core.frostSettings.getValue("lastUsedJvm.vendor");
@@ -221,12 +212,15 @@ public class Frost {
                     }
                 }
                 if( !skipInfoDialog ) {
-                    MiscToolkit.showMessage(
-                            "Frost was tested with Java from Sun. Your JVM vendor is "+jvmVendor+".\n"
-                                + "If Frost does not work as expected, get Suns Java from http://java.sun.com\n\n"
+                    MiscToolkit.showMessageDialog(
+                            null,
+                            "Frost was tested with Java from Oracle (previously Sun). Your JVM vendor is "+jvmVendor+".\n"
+                                + "If Frost does not work as expected, get Oracle's Java from http://java.oracle.com\n\n"
                                 + "(This information dialog will not be shown again until your JVM version changed.)",
-                            JOptionPane.WARNING_MESSAGE,
-                            "Untested Java version detected");
+                            "Untested Java version detected",
+                            MiscToolkit.WARNING_MESSAGE,
+                            null,
+                            true); // always on top! ensures it doesn't get lost
                 }
             }
             Core.frostSettings.setValue("lastUsedJvm.vendor", jvmVendor);
@@ -235,6 +229,16 @@ public class Frost {
             System.out.println("Error: JVM vendor or version property is not set!");
         }
 
+        // normally, this should be uncommented while developing, to ensure you never perform
+        // Swing updates outside the GUI thread. however, because Frost is so *extremely poorly
+        // written*, it has hundreds of those errors, and it's just too much work to deal with.
+        // it was written incorrectly to begin with, without any safe/proper threading model.
+        //RepaintManager.setCurrentManager(new DebugRepaintManager());
+
+        // initialize the core instance so that the user's chosen language file is loaded
+        final Core core = Core.getInstance();
+
+        // now boot up the core machinery, which in turn starts the GUI and threads, etc...
         initializeLookAndFeel();
 
         if (!initializeLockFile(Language.getInstance())) {
@@ -267,7 +271,7 @@ public class Frost {
         envInfo.add("OS       : "+System.getProperty("os.name")
                 + "; "+System.getProperty("os.version")
                 + "; "+System.getProperty("os.arch"));
-        envInfo.add("MaxMemory: "+Runtime.getRuntime().maxMemory());
+        envInfo.add("MaxMemory: "+Runtime.getRuntime().maxMemory()+" ("+Mixed.convertBytesToHuman(Runtime.getRuntime().maxMemory())+")");
         return envInfo;
     }
 
@@ -291,13 +295,16 @@ public class Frost {
             Class.forName("org.garret.perst.Persistent");
 
         } catch (final ClassNotFoundException e1) {
-            MiscToolkit.showMessage(
+            MiscToolkit.showMessageDialog(
+                null,
                 "Please start Frost using its start "
                     + "scripts (frost.bat for Windows, frost.sh for Unix).\n"
                     + "If Frost was working and you updated just frost.jar, try updating with frost.zip\n"
                     + "ERROR: The jar file " + jarFileName + " is missing.",
-                JOptionPane.ERROR_MESSAGE,
-                "ERROR: The jar file " + jarFileName + " is missing.");
+                "ERROR: The jar file " + jarFileName + " is missing.",
+                MiscToolkit.ERROR_MESSAGE,
+                null,
+                true); // always on top! ensures it doesn't get lost
             return false;
         }
         return true;
@@ -335,11 +342,14 @@ public class Frost {
         }
 
         if (fileLock == null) {
-            MiscToolkit.showMessage(
+            MiscToolkit.showMessageDialog(
+                null,
                 language.getString("Frost.lockFileFound") + "'" +
                     runLockFile.getAbsolutePath() + "'",
-                JOptionPane.ERROR_MESSAGE,
-                "ERROR: Found Frost lock file 'frost.lock'.");
+                "ERROR: Found Frost lock file 'frost.lock'.",
+                MiscToolkit.ERROR_MESSAGE,
+                null,
+                true); // always on top! ensures it doesn't get lost
             return false;
         }
         return true;

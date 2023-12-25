@@ -20,7 +20,8 @@
 package frost.messaging.frost;
 
 import java.io.*;
-import java.util.*;
+import java.util.List; // do not import java.util.*, since its Base64 method clashes with BouncyCastle!
+import java.util.Iterator;
 import java.util.logging.*;
 
 import org.bouncycastle.util.encoders.*;
@@ -49,7 +50,7 @@ public class MessageXmlFile extends AbstractMessageObject implements XMLizable {
 
     /**
      * Constructor.
-     * Used to construct an instance for a new message.
+     * Used to construct an instance for a new outgoing message, as it's about to be uploaded.
      */
     public MessageXmlFile(final FrostMessageObject mo) {
 
@@ -179,6 +180,28 @@ public class MessageXmlFile extends AbstractMessageObject implements XMLizable {
     }
 
     /**
+     * Takes a string as input and strips all illegal control characters, so that it can
+     * be encoded as XML without giving "invalid character" decoding errors for the recipients.
+     * This banlist follows the XML spec: http://www.w3.org/TR/REC-xml/#NT-Char
+     * "Legal characters are tab, carriage return, line feed, and the legal characters of
+     *  Unicode and ISO/IEC 10646."
+     * Legal characters:
+     * #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]
+     *
+     * We strip away all invisible ASCII control characters (0x0 - 0x8, 0xB-0xC, 0xE-0x1F). This
+     * leaves tab, carriage return, newline and all printable characters from space and
+     * upwards. We don't bother stripping the illegal Unicode characters in the high UTF ranges,
+     * because nobody would accidentally put those in their text. Whereas the ASCII control
+     * characters can sometimes appear in Unix log files and such things, which is why we must
+     * strip illegal control chars so that the message is always decodable by the recipients.
+     */
+    public static String sanitizeStringForXML(final String input) {
+        if( input == null ) { return null; }
+        final String cleanString = input.replaceAll("[\u0000-\u0008\u000B-\u000C\u000E-\u001F]", "");
+        return cleanString;
+    }
+
+    /**
      * @see frost.util.XMLizable#getXMLElement(org.w3c.dom.Document)
      */
     public Element getXMLElement(final Document d) {
@@ -189,14 +212,14 @@ public class MessageXmlFile extends AbstractMessageObject implements XMLizable {
 
         if( getMessageId() != null ) {
             current = d.createElement("MessageId");
-            cdata = d.createCDATASection(getMessageId());
+            cdata = d.createCDATASection(sanitizeStringForXML(getMessageId()));
             current.appendChild(cdata);
             el.appendChild(current);
         }
 
         if( getInReplyTo() != null ) {
             current = d.createElement("InReplyTo");
-            cdata = d.createCDATASection(getInReplyTo());
+            cdata = d.createCDATASection(sanitizeStringForXML(getInReplyTo()));
             current.appendChild(cdata);
             el.appendChild(current);
         }
@@ -215,44 +238,44 @@ public class MessageXmlFile extends AbstractMessageObject implements XMLizable {
 
         //from
         current = d.createElement("From");
-        cdata = d.createCDATASection(getFromName());
+        cdata = d.createCDATASection(sanitizeStringForXML(getFromName()));
         current.appendChild(cdata);
         el.appendChild(current);
 
         //subject
         current = d.createElement("Subject");
-        cdata = d.createCDATASection(getSubject());
+        cdata = d.createCDATASection(sanitizeStringForXML(getSubject()));
         current.appendChild(cdata);
         el.appendChild(current);
 
         //date
         current = d.createElement("Date");
-        cdata = d.createCDATASection(getDateStr());
+        cdata = d.createCDATASection(sanitizeStringForXML(getDateStr()));
         current.appendChild(cdata);
         el.appendChild(current);
 
         //time
         current = d.createElement("Time");
-        cdata = d.createCDATASection(getTimeStr());
+        cdata = d.createCDATASection(sanitizeStringForXML(getTimeStr()));
         current.appendChild(cdata);
         el.appendChild(current);
 
         //body
         current = d.createElement("Body");
-        cdata = d.createCDATASection(getContent());
+        cdata = d.createCDATASection(sanitizeStringForXML(getContent()));
         current.appendChild(cdata);
         el.appendChild(current);
 
         //board
         current = d.createElement("Board");
-        cdata = d.createCDATASection(getBoardName());
+        cdata = d.createCDATASection(sanitizeStringForXML(getBoardName()));
         current.appendChild(cdata);
         el.appendChild(current);
 
         //public Key
         if (getPublicKey() != null && getPublicKey().length() > 0) {
             current = d.createElement("pubKey");
-            cdata = d.createCDATASection(getPublicKey());
+            cdata = d.createCDATASection(sanitizeStringForXML(getPublicKey()));
             current.appendChild(cdata);
             el.appendChild(current);
         }
@@ -260,7 +283,7 @@ public class MessageXmlFile extends AbstractMessageObject implements XMLizable {
         // recipient
         if (getRecipientName() != null && getRecipientName().length() > 0) {
             current = d.createElement("recipient");
-            cdata = d.createCDATASection(getRecipientName());
+            cdata = d.createCDATASection(sanitizeStringForXML(getRecipientName()));
             current.appendChild(cdata);
             el.appendChild(current);
         }
@@ -268,7 +291,7 @@ public class MessageXmlFile extends AbstractMessageObject implements XMLizable {
         // signature V2
         if (getSignatureV2() != null && getSignatureV2().length() > 0) {
             current = d.createElement("SignatureV2");
-            cdata = d.createCDATASection(getSignatureV2());
+            cdata = d.createCDATASection(sanitizeStringForXML(getSignatureV2()));
             current.appendChild(cdata);
             el.appendChild(current);
         }
@@ -277,11 +300,11 @@ public class MessageXmlFile extends AbstractMessageObject implements XMLizable {
 //        if( getSignatureStatus() != SIGNATURESTATUS_UNSET ) {
 //            current = d.createElement("signatureStatus");
 //            if( getSignatureStatus() == SIGNATURESTATUS_TAMPERED ) {
-//                cdata = d.createCDATASection(SIGNATURESTATUS_TAMPERED_STR);
+//                cdata = d.createCDATASection(sanitizeStringForXML(SIGNATURESTATUS_TAMPERED_STR));
 //            } else if( signatureStatus == SIGNATURESTATUS_OLD ) {
-//                cdata = d.createCDATASection(SIGNATURESTATUS_OLD_STR);
+//                cdata = d.createCDATASection(sanitizeStringForXML(SIGNATURESTATUS_OLD_STR));
 //            } else if( signatureStatus == SIGNATURESTATUS_VERIFIED ) {
-//                cdata = d.createCDATASection(SIGNATURESTATUS_VERIFIED_STR);
+//                cdata = d.createCDATASection(sanitizeStringForXML(SIGNATURESTATUS_VERIFIED_STR));
 //            }
 //            current.appendChild(cdata);
 //            el.appendChild(current);
@@ -557,13 +580,13 @@ public class MessageXmlFile extends AbstractMessageObject implements XMLizable {
 
         // recipient
         current = doc.createElement("recipient");
-        cdata = doc.createCDATASection(recipient.getUniqueName());
+        cdata = doc.createCDATASection(sanitizeStringForXML(recipient.getUniqueName()));
         current.appendChild(cdata);
         el.appendChild(current);
 
         // base64 content
         current = doc.createElement("content");
-        cdata = doc.createCDATASection(base64enc);
+        cdata = doc.createCDATASection(sanitizeStringForXML(base64enc));
         current.appendChild(cdata);
         el.appendChild(current);
 

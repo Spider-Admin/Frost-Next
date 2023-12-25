@@ -19,8 +19,10 @@ package frost.fileTransfer.download;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
@@ -28,19 +30,27 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+
 import frost.Core;
 import frost.MainFrame;
 import frost.SettingsClass;
+import frost.ext.Execute;
 import frost.fcp.FcpResultGet;
 import frost.fcp.FreenetKeys;
 import frost.fileTransfer.FileTransferInformation;
 import frost.fileTransfer.FileTransferManager;
 import frost.fileTransfer.FreenetPriority;
+import frost.fileTransfer.download.FrostDownloadItem;
 import frost.storage.ExitSavable;
 import frost.storage.StorageException;
 import frost.storage.perst.TrackDownloadKeys;
 import frost.storage.perst.TrackDownloadKeysStorage;
 import frost.storage.perst.filelist.FileListStorage;
+import frost.util.ArgumentTokenizer;
+import frost.util.CopyToClipboard;
+import frost.util.DateFun;
 import frost.util.FileAccess;
 import frost.util.Mixed;
 
@@ -67,12 +77,12 @@ public class DownloadManager implements ExitSavable {
 	}
 
 	/**
-	 * Start download now (manually).
+	 * Start download now, using either the global queue persistence manager
+	 * or the session-based download ticker thread.
 	 */
 	public boolean startDownload(final FrostDownloadItem dlItem) {
 		if (FileTransferManager.inst().getPersistenceManager() != null) {
-			return FileTransferManager.inst().getPersistenceManager()
-					.startDownload(dlItem);
+			return FileTransferManager.inst().getPersistenceManager().startDownload(dlItem);
 		} else {
 			return ticker.startDownload(dlItem);
 		}
@@ -118,42 +128,6 @@ public class DownloadManager implements ExitSavable {
 		infos.setDownloadsWaiting(waitingItems);
 	}
 
-	/**
-	 * Checks if a file with this name is already in model, and returns a new
-	 * name if needed.
-	 */
-	public String ensureUniqueFilename(final String filename) {
-
-		String newFilename = filename;
-		int count = 2;
-
-		while (true) {
-			boolean loopAgain = false;
-			for (int x = 0; x < getModel().getItemCount(); x++) {
-				final FrostDownloadItem dlItem = (FrostDownloadItem) getModel()
-						.getItemAt(x);
-				if (dlItem.getFileName().equalsIgnoreCase(newFilename)) {
-					loopAgain = true;
-					// we have a duplicate filename
-					// build new filename like "filename_2.ext"
-					final int pos = filename.lastIndexOf('.');
-					if (pos > 0) {
-						final String beforeDot = filename.substring(0, pos);
-						final String afterDot = filename.substring(pos);
-						newFilename = beforeDot + "_" + (count++) + afterDot;
-					} else {
-						// no '.' in filename
-						newFilename = filename + "_" + (count++);
-					}
-				}
-			}
-			if (!loopAgain) {
-				break;
-			}
-		}
-		return newFilename;
-	}
-
 	public DownloadPanel getPanel() {
 		if (panel == null) {
 			panel = new DownloadPanel();
@@ -172,7 +146,7 @@ public class DownloadManager implements ExitSavable {
 
 	private DownloadTicker getTicker() {
 		if (ticker == null) {
-			ticker = new DownloadTicker(getPanel());
+			ticker = new DownloadTicker();
 		}
 		return ticker;
 	}
@@ -185,7 +159,13 @@ public class DownloadManager implements ExitSavable {
 			if (Core.frostSettings.getObjectValue(key) == null) {
 				break;
 			}
-			recentDownloadDirs.add(Core.frostSettings.getValue(key));
+			// add it to the internal list (duplicates are handled properly), and check the clean return value
+			final String cleanValue = addRecentDownloadDirInternal(Core.frostSettings.getValue(key));
+			if( cleanValue != null ) { // null would mean it was rejected
+				// save the cleaned-up version to the settings storage, to make sure Frost.ini is
+				// cleaned up from any old, absolute paths from prior versions of Frost
+				Core.frostSettings.setValue(key, cleanValue);
+			}
 		}
 	}
 
@@ -198,38 +178,56 @@ public class DownloadManager implements ExitSavable {
 		}
 	}
 
-	public void addRecentDownloadDir(final String downloadDir) {
-		final String defaultDlDir = FileAccess
-				.appendSeparator(Core.frostSettings
-						.getValue(SettingsClass.DIR_DOWNLOAD));
-		final String dlDir = FileAccess.appendSeparator(downloadDir);
+	// this internal version doesn't save to global settings storage (Frost.ini) when it's adding an entry,
+	// and it returns the clean string that it added to the storage (or null if the entry was rejected)
+	private String addRecentDownloadDirInternal(final String downloadDirDirty) {
+		if( downloadDirDirty == null ) { return null; }
+
+		// clean up and validate the input, and turn absolute paths that point to subfolders
+		// of the Frost directory, into relative paths instead (this migrates users from older
+		// versions of Frost which stored absolute paths, as well as ensures that any future
+		// paths are always relative where needed)
+		final String defaultDlDir = FrostDownloadItem.getDefaultDownloadDir();
+		String downloadDirClean = Core.pathRelativizer.relativize(downloadDirDirty);
+		if( downloadDirClean == null ) { return null; } // skip invalid paths
+		downloadDirClean = FileAccess.appendSeparator(downloadDirClean); // append trailing slash
+		if( downloadDirClean.equals(defaultDlDir) ){ return null; } // don't add the default download directory
+
+		// now just add the directory to the linked list. they're added in oldest-first order, but if you
+		// try to add the same entry again, it's moved to the tail of the list to make it "most recent".
 		final ListIterator<String> i = recentDownloadDirs.listIterator();
 		boolean found = false;
 
-		if (dlDir == null || dlDir.length() == 0 || dlDir.equals(defaultDlDir)) {
-			return;
-		}
-
-		// If the dlDir is already in the list...
+		// If the download directory is already in the list...
 		while (i.hasNext()) {
 			final String dir = i.next();
-			if (dir.equals(dlDir)) {
+			if (dir.equals(downloadDirClean)) {
 				// ... make it the most recently used.
 				i.remove();
-				recentDownloadDirs.add(dlDir);
+				recentDownloadDirs.add(downloadDirClean);
 				found = true;
 				break;
 			}
 		}
 
+		// Otherwise just add it to the tail of the list (most recent)
 		if (!found) {
-			recentDownloadDirs.add(dlDir);
+			recentDownloadDirs.add(downloadDirClean);
 		}
 
+		// If we've exceeded the maximum number of dirs to remember, then
+		// keep deleting head entries until we're at the right size again
 		while (recentDownloadDirs.size() > MAX_RECENT_DOWNLOAD_DIRS) {
 			recentDownloadDirs.remove();
 		}
 
+		// return the clean string we saved to the linked list
+		return downloadDirClean;
+	}
+
+	// this public version adds a new/reused directory and then writes all dirs to the global settings storage
+	public void addRecentDownloadDir(final String downloadDir) {
+		addRecentDownloadDirInternal(downloadDir);
 		saveRecentDownloadDirs();
 	}
 
@@ -237,21 +235,19 @@ public class DownloadManager implements ExitSavable {
 		return recentDownloadDirs;
 	}
 
-	/**
-	 * Add a new download item to the download table model.
-	 * 
-	 * @param key
-	 *            complete key of download item
-	 * @param fileName
-	 *            file name
-	 */
+	/* THIS SECTION HAS BEEN COMMENTED OUT: Nothing uses these functions, and they contain old code
+	 * which doesn't properly validate/clean up the filenames and keys.
+	 * All downloads are added via the "Add new downloads" dialog instead, as well as a few direct
+	 * model manipulations in appropriate places (such as the "search for files" feature, and the
+	 * download model itself when it loads files from the database at startup).
+	 * So this old, useless and harmful code has been commented out. -- Kitty
 	public FrostDownloadItem addNewDownload(final String key,
 		final String fileName, final String dlDir, final String prefix) {
 		// TODO: enhancement: search for key in shared files, maybe add as shared file
 		final FrostDownloadItem dlItem = new FrostDownloadItem(fileName, key);
 		dlItem.setDownloadDir(dlDir);
 		dlItem.setFilenamePrefix(prefix);
-		model.addDownloadItem(dlItem); // false if file is already in table
+		model.addDownloadItem(dlItem, true); // true = ask to redownload duplicates
 		return dlItem;
 	}
 
@@ -264,90 +260,12 @@ public class DownloadManager implements ExitSavable {
 			final String fileName) {
 		return addNewDownload(key, fileName, null, null);
 	}
-	
-	public static ArrayList<FrostDownloadItem> parseKeys(final String text) {
-		ArrayList<FrostDownloadItem> frostDownloadItemList = new ArrayList<FrostDownloadItem>();
-		
-		final String[] keyList = text.trim().split("[;\n]");
-		if (keyList == null || keyList.length == 0) {
-			return frostDownloadItemList;
-		}
-
-		for (final String element : keyList) {
-			String key = element.trim();
-
-			if (key.length() < 5) {
-				continue;
-			}
-
-			// maybe convert html codes (e.g. %2c -> , )
-			if (key.indexOf("%") > 0) {
-				try {
-					key = java.net.URLDecoder.decode(key, "UTF-8");
-				} catch (final java.io.UnsupportedEncodingException ex) {
-					logger.log(Level.SEVERE, "Decode of HTML code failed", ex);
-				}
-			}
-
-			// find key type (chk,ssk,...)
-			int pos = -1;
-			for (int i = 0; i < FreenetKeys.getFreenetKeyTypes().length; i++) {
-				final String string = FreenetKeys.getFreenetKeyTypes()[i];
-				pos = key.indexOf(string);
-				if (pos >= 0) {
-					break;
-				}
-			}
-			if (pos < 0) {
-				// no valid keytype found
-				continue;
-			}
-
-			// strip all before key type
-			if (pos > 0) {
-				key = key.substring(pos);
-			}
-
-			if (key.length() < 5) {
-				// at least the SSK@? is needed
-				continue;
-			}
-
-			// take the filename from the last part of the key
-			String fileName;
-			final int sepIndex = key.lastIndexOf("/");
-			if (sepIndex > -1) {
-				fileName = key.substring(sepIndex + 1);
-			} else {
-				// fallback: use key as filename
-				fileName = key.substring(4);
-			}
-
-			String checkKey = key;
-			// remove filename from CHK key
-			if (key.startsWith("CHK@") && key.indexOf("/") > -1) {
-				checkKey = key.substring(0, key.indexOf("/"));
-			}
-
-			// On 0.7 we remember the full provided download uri as key.
-			// If the node reports download failed, error code 11 later,
-			// then we strip the filename
-			// from the uri and keep trying with chk only
-
-			// finally check if the key is valid for this network
-			if (!FreenetKeys.isValidKey(checkKey)) {
-				// showInvalidKeyErrorDialog(key);
-				continue;
-			}
-
-			// add valid key to download table
-			frostDownloadItemList.add( new FrostDownloadItem(fileName, key));
-		}
-		return frostDownloadItemList;
-	}
-	
+	*/
 
 	/**
+	 * Called by both the persistent queue and non-persistent mode downloads,
+	 * to perform post-download maintenance.
+	 *
 	 * @return true if request should be retried
 	 */
 	public boolean notifyDownloadFinished(final FrostDownloadItem downloadItem,
@@ -360,6 +278,9 @@ public class DownloadManager implements ExitSavable {
 
 		if (result == null || result.isSuccess() == false) {
 			// download failed
+			// if persistent mode was used, we may need to remove the old global-queue request;
+			// but only if we're going to keep the item in a "waiting" state.
+			String removeGqId = null;
 
 			if (result != null) {
 				downloadItem.setErrorCodeDescription(result
@@ -374,8 +295,8 @@ public class DownloadManager implements ExitSavable {
 				final String newKey = key.substring(0, key.indexOf("/"));
 				downloadItem.setKey(newKey);
 				downloadItem.setState(FrostDownloadItem.STATE_WAITING);
+				removeGqId = downloadItem.getGqIdentifier();
 				downloadItem.setLastDownloadStopTime(0);
-				downloadItem.setInternalRemoveExpected(true);
 				retryImmediately = true;
 
 				logger.warning("Removed all path levels from key: " + key
@@ -388,8 +309,8 @@ public class DownloadManager implements ExitSavable {
 				final String newKey = key.substring(0, key.lastIndexOf("/"));
 				downloadItem.setKey(newKey);
 				downloadItem.setState(FrostDownloadItem.STATE_WAITING);
+				removeGqId = downloadItem.getGqIdentifier();
 				downloadItem.setLastDownloadStopTime(0);
-				downloadItem.setInternalRemoveExpected(true);
 				retryImmediately = true;
 
 				logger.warning("Removed one path level from key: " + key
@@ -400,14 +321,14 @@ public class DownloadManager implements ExitSavable {
 				// permanent redirect, use new uri
 				downloadItem.setKey(result.getRedirectURI());
 				downloadItem.setState(FrostDownloadItem.STATE_WAITING);
-				downloadItem.setInternalRemoveExpected(true);
+				removeGqId = downloadItem.getGqIdentifier();
 				retryImmediately = true;
 
 				logger.warning("Redirected to URI: " + result.getRedirectURI());
 
 			} else if (result != null && result.isFatal()) {
 				// fatal, don't retry
-				// downloadItem.setEnabled(Boolean.FALSE); // keep enabled to
+				// downloadItem.setEnabledfalse); // keep enabled to
 				// allow sending of requests for shared files
 				downloadItem.setState(FrostDownloadItem.STATE_FAILED);
 				logger.warning("FILEDN: Download of " + filename
@@ -419,11 +340,27 @@ public class DownloadManager implements ExitSavable {
 				// set new state -> failed or waiting for another try
 				if (downloadItem.getRetries() > Core.frostSettings
 						.getIntValue(SettingsClass.DOWNLOAD_MAX_RETRIES)) {
-					// downloadItem.setEnabled(Boolean.valueOf(false)); // keep
+					// downloadItem.setEnabled(false); // keep
 					// enabled to allow sending of requests for shared files
 					downloadItem.setState(FrostDownloadItem.STATE_FAILED);
 				} else {
+					// the most common reasons for reaching this "else" is that
+					// we failed to connect to the socket, or failed to write
+					// all or part of the file to disk. we'll retry the transfer,
+					// but won't retry immediately; instead, it will wait until
+					// the user's "Wait-time after each try (minutes)" setting.
 					downloadItem.setState(FrostDownloadItem.STATE_WAITING);
+					removeGqId = downloadItem.getGqIdentifier();
+				}
+			}
+
+			// remove the item from the global queue *if* persistence was used
+			if( removeGqId != null ) {
+				if( FileTransferManager.inst().getPersistenceManager() != null ) {
+					final List<String> requests = new ArrayList<String>(1);
+					requests.add(removeGqId);
+					downloadItem.setInternalRemoveExpected(true);
+					FileTransferManager.inst().getPersistenceManager().removeRequests(requests);
 				}
 			}
 		} else {
@@ -433,7 +370,7 @@ public class DownloadManager implements ExitSavable {
 			// download successful
 			downloadItem.setFileSize(new Long(targetFile.length()));
 			downloadItem.setState(FrostDownloadItem.STATE_DONE);
-			downloadItem.setEnabled(Boolean.valueOf(false));
+			downloadItem.setEnabled(false);
 
 			downloadItem.setDownloadFinishedTime(System.currentTimeMillis());
 
@@ -445,12 +382,15 @@ public class DownloadManager implements ExitSavable {
 								System.currentTimeMillis());
 			}
 
-			// maybe track download
+			// maybe add the finished download to the list of tracked downloads, if the user wants to
+			// and the item hasn't already been added to the tracking
 			if (Core.frostSettings
 					.getBoolValue(SettingsClass.TRACK_DOWNLOADS_ENABLED)
 					&& !downloadItem.isTracked()) {
 				TrackDownloadKeysStorage trackDownloadKeysStorage = TrackDownloadKeysStorage
 						.inst();
+				// NOTE: storeItem() uses a unique key-based index, and won't add the same key more
+				// than a single time, even if we try. that's good as it avoids duplicates.
 				trackDownloadKeysStorage.storeItem(new TrackDownloadKeys(
 						downloadItem.getKey(), downloadItem.getFileName(),
 						downloadItem.getAssociatedBoardName(), downloadItem
@@ -459,66 +399,79 @@ public class DownloadManager implements ExitSavable {
 				downloadItem.setTracked(true);
 			}
 
-			// maybe log successful download to file localdata/downloads.txt
-			if (Core.frostSettings
-					.getBoolValue(SettingsClass.LOG_DOWNLOADS_ENABLED)
+			// if logging is enabled, then log the successful download to localdata/Frost-Downloads_2015-01.log (UTC year/month).
+			// the reason that we use the current year+month in the filename is to avoid creating huge, unwieldy log files over time.
+			if (Core.frostSettings.getBoolValue(SettingsClass.LOG_DOWNLOADS_ENABLED)
 					&& !downloadItem.isLoggedToFile()) {
-				final String line = downloadItem.getKey() + "/"
-						+ downloadItem.getFileName();
-				final String fileName = Core.frostSettings
-						.getValue(SettingsClass.DIR_LOCALDATA)
-						+ "Frost-Downloads.log";
-				final File targetLogFile = new File(fileName);
-				FileAccess.appendLineToTextfile(targetLogFile, line);
+				// generate a basic information string (key-name only)
+				final String infoStr = CopyToClipboard.getItemInformation(downloadItem, false, false);
+
+				// append the log line to the file, along with the current date/time
+				if( infoStr != null ) {
+					// generate date string and the final line
+					final DateTime now = new DateTime(DateTimeZone.UTC);
+					final String dateStr = DateFun.FORMAT_DATE_EXT.print(now)
+						+ " - "
+						+ DateFun.FORMAT_TIME_EXT.print(now);
+					// format: "[ 2015.09.24 - 21:34:19GMT ] CHK@.../filename.ext"
+					final String line = "[ " + dateStr + " ] " + infoStr;
+
+					// output to disk
+					final String fileName = Core.frostSettings.getValue(SettingsClass.DIR_LOCALDATA)
+						+ "Frost-Downloads_" + now.toString("yyyy-MM") + ".log";
+					final File targetLogFile = new File(fileName);
+					FileAccess.appendLineToTextfile(targetLogFile, line);
+				}
+
+				// mark the file as logged, even if we failed to generate an info string for it
 				downloadItem.setLoggedToFile(true);
 			}
 
-			final String execProg = Core.frostSettings
-					.getValue(SettingsClass.EXEC_ON_DOWNLOAD);
-			if (execProg != null && execProg.length() > 0
+			// execute an external program if the user has enabled that option
+			final String execCmd = Core.frostSettings.getValue(SettingsClass.EXEC_ON_DOWNLOAD);
+			if (execCmd != null && execCmd.length() > 0
 					&& !downloadItem.isExternal()
 					&& !downloadItem.isCompletionProgRun()) {
-				final File dir = new File(downloadItem.getDownloadDir());
-				final Map<String, String> oldEnv = System.getenv();
-				final String[] newEnv = new String[oldEnv.size() + 5];
-				final String args[] = new String[6];
-				int i;
 
-				args[0] = execProg;
-				args[1] = downloadItem.getFileName();
-				args[2] = downloadItem.getFilenamePrefix();
-				args[3] = downloadItem.getKey();
-				args[4] = downloadItem.getAssociatedBoardName();
-				args[5] = downloadItem.getAssociatedMessageId();
-
-				for (i = 0; i < args.length; i++) {
-					if (args[i] == null) {
-						args[i] = "";
+				// build a fixed-order list of the file's information and replace nulls with empty strings
+				final String fileInfo[] = new String[5];
+				fileInfo[0] = downloadItem.getFileName();
+				fileInfo[1] = downloadItem.getFilenamePrefix();
+				fileInfo[2] = downloadItem.getKey();
+				fileInfo[3] = downloadItem.getAssociatedBoardName();
+				fileInfo[4] = downloadItem.getAssociatedMessageId();
+				for( int i=0; i<fileInfo.length; ++i ) {
+					if( fileInfo[i] == null ) {
+						fileInfo[i] = "";
 					}
 				}
 
-				i = 0;
-				for (final Map.Entry<String, String> entry : oldEnv.entrySet()) {
-					newEnv[i++] = entry.getKey() + "=" + entry.getValue();
-				}
-				newEnv[i++] = "FROST_FILENAME=" + downloadItem.getFileName();
-				newEnv[i++] = "FROST_FILENAME_PREFIX="
-						+ downloadItem.getFilenamePrefix();
-				newEnv[i++] = "FROST_KEY=" + downloadItem.getKey();
-				newEnv[i++] = "FROST_ASSOC_BOARD_NAME="
-						+ downloadItem.getAssociatedBoardName();
-				newEnv[i++] = "FROST_ASSOC_MSG_ID="
-						+ downloadItem.getAssociatedMessageId();
+				// now parse the exec command into individual arguments, add the additional arguments
+				// to the end of the user's program/argument list, and convert it to a regular array
+				final List<String> argList = ArgumentTokenizer.tokenize(execCmd, false);
+				argList.addAll(Arrays.asList(fileInfo));
+				final String[] args = argList.toArray(new String[argList.size()]);
 
-				try {
-					Runtime.getRuntime().exec(args, newEnv, dir);
-				} catch (final Exception e) {
-					System.out.println("Could not exec " + execProg + ": "
-							+ e.getMessage());
-				}
+				// construct additional environment variables describing the file transfer
+				final Map<String,String> extraEnvironment = new HashMap<String,String>();
+				extraEnvironment.put("FROST_FILENAME", fileInfo[0]);
+				extraEnvironment.put("FROST_FILENAME_PREFIX", fileInfo[1]);
+				extraEnvironment.put("FROST_KEY", fileInfo[2]);
+				extraEnvironment.put("FROST_ASSOC_BOARD_NAME", fileInfo[3]);
+				extraEnvironment.put("FROST_ASSOC_MSG_ID", fileInfo[4]);
+
+				// use the file transfer's folder as the working directory for the new process
+				final File workingDirectory = new File(downloadItem.getDownloadDir());
+
+				// execute the external program asynchronously (non-blocking)
+				// NOTE: if the program couldn't be launched, we won't be notified about it since
+				// it's asynchronous. but the most common failure reason is just that the program
+				// doesn't exist, which is the user's fault (so who cares).
+				Execute.run_async(args, workingDirectory, extraEnvironment);
+
+				// mark the "has completion program executed" as true even if it possibly failed
+				downloadItem.setCompletionProgRun(true);
 			}
-
-			downloadItem.setCompletionProgRun(true);
 
 			// maybe remove finished download immediately
 			if (Core.frostSettings

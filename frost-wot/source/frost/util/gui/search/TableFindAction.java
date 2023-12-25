@@ -21,30 +21,34 @@ package frost.util.gui.search;
 import javax.swing.*;
 import javax.swing.text.*;
 
-//@author Santhosh Kumar T - santhosh@in.fiorano.com 
-@SuppressWarnings("serial")
+// @author The Kitty (complete rewrite of original garbage to make it actually freaking work)
 public class TableFindAction extends FindAction{ 
  
     @Override
-    protected boolean changed(JComponent comp2, String searchString, Position.Bias bias){ 
-        JTable table = (JTable)comp2; 
+    protected boolean changed(
+            final JComponent aSearchComponent,
+            String aSearchText,
+            Position.Bias aBias)
+    {
+        JTable table = (JTable)aSearchComponent; 
         boolean startingFromSelection = true; 
         int max = table.getRowCount(); 
         int increment = 0; 
-        if(bias!=null) 
-            increment = (bias == Position.Bias.Forward) ? 1 : -1; 
+        if(aBias!=null) 
+            increment = (aBias == Position.Bias.Forward) ? 1 : -1; 
         int startingRow = (table.getSelectionModel().getLeadSelectionIndex() + increment + max) % max; 
         if (startingRow < 0 || startingRow >= table.getRowCount()) { 
             startingFromSelection = false; 
             startingRow = 0; 
         } 
  
-        int index = getNextMatch(table, searchString, startingRow, bias); 
+        int index = getNextMatch(table, aSearchText, startingRow, aBias); 
         if (index != -1) { 
             changeSelection(table, index); 
             return true; 
-        } else if (startingFromSelection) { 
-            index = getNextMatch(table, searchString, 0, bias); 
+        } else if (startingFromSelection) {
+            // we fall back to searching whole table since there were no matches from current row
+            index = getNextMatch(table, aSearchText, 0, aBias); 
             if (index != -1) { 
                 changeSelection(table, index); 
                 return true; 
@@ -54,17 +58,15 @@ public class TableFindAction extends FindAction{
     } 
  
     protected void changeSelection(JTable table, int index){ 
-        if(controlDown) 
-            table.addRowSelectionInterval(index, index); 
-        else 
-            table.setRowSelectionInterval(index, index); 
+        //table.addRowSelectionInterval(index, index); // TODO: maybe make it possible to "add to selection" somehow
+        table.setRowSelectionInterval(index, index);
         int column = table.getSelectedColumn(); 
         if(column==-1) 
             column = 0; 
         table.scrollRectToVisible(table.getCellRect(index, column, true)); 
     } 
  
-    public int getNextMatch(JTable table, String prefix, int startIndex, Position.Bias bias){ 
+    public int getNextMatch(JTable table, String prefix, int startIndex, Position.Bias aBias){ 
         int column = table.getSelectedColumn(); 
         if(column==-1) 
             column = 0; 
@@ -76,18 +78,18 @@ public class TableFindAction extends FindAction{
             throw new IllegalArgumentException(); 
         } 
  
-        if(ignoreCase) 
+        if(fIgnoreCase) 
             prefix = prefix.toUpperCase(); 
  
         // start search from the next element after the selected element 
-        int increment = (bias==null || bias==Position.Bias.Forward) ? 1 : -1; 
+        int increment = (aBias==null || aBias==Position.Bias.Forward) ? 1 : -1; 
         int index = startIndex; 
         do{ 
             Object item = table.getValueAt(index, column); 
  
             if(item!=null){ 
                 String text = item.toString(); 
-                if(ignoreCase) 
+                if(fIgnoreCase) 
                     text = text.toUpperCase(); 
 //System.out.println("comp:"+prefix+","+text+","+item);
                 // we search for any occurence

@@ -40,6 +40,8 @@ import java.awt.image.*;
 
 import javax.swing.*;
 
+import frost.MainFrame;
+
 /**
  * Tracks Memory allocated & used, displayed in graph form.
  */
@@ -64,7 +66,7 @@ public class MemoryMonitor extends JPanel {
         if( dialog == null ) {
             dialog = new JFrame();
             dialog.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
-//            dialog.setAlwaysOnTop(true); // TODO: since 1.5 !!!
+            dialog.setAlwaysOnTop(true); // display the memory monitor on top of all other desktop windows
             dialog.getContentPane().add(this);
             dialog.setSize(225,130);
             dialog.setTitle("Frost Memory Monitor");
@@ -78,25 +80,17 @@ public class MemoryMonitor extends JPanel {
                     dialog.setVisible(false);
                 }
             });
-            // center on screen
-            final Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-            final Dimension splashscreenSize = dialog.getSize();
-            if (splashscreenSize.height > screenSize.height) {
-                splashscreenSize.height = screenSize.height;
-            }
-            if (splashscreenSize.width > screenSize.width) {
-                splashscreenSize.width = screenSize.width;
-            }
-            dialog.setLocation(
-                (screenSize.width - splashscreenSize.width) / 2,
-                (screenSize.height - splashscreenSize.height) / 2);
-
         }
+
+        // center this window relative to Frost's main window
+        dialog.setLocationRelativeTo( MainFrame.getInstance() );
+
         return dialog;
     }
 
     public void showDialog() {
         if( isShown ) {
+            if( dialog != null ){ dialog.toFront(); }
             return;
         }
         surf.start();

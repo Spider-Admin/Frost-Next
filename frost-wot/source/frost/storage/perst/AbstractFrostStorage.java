@@ -71,16 +71,14 @@ public abstract class AbstractFrostStorage {
         initStorage();
 
         // backup storage contents (=compact)
-        FileWriter writer = null;
-        try {
-            writer = new FileWriter(xmlFile);
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            // also note that it's closed before the catch-block executes.
+            final FileWriter writer = new FileWriter(xmlFile);
+        ) {
             getStorage().exportXML(writer);
-            writer.close();
         } catch(final Exception t) {
             // error occured, delete bakFile
-            if( writer != null ) {
-                try { writer.close(); } catch(final Exception t2) {}
-            }
             xmlFile.delete();
             throw t;
         }
@@ -104,16 +102,15 @@ public abstract class AbstractFrostStorage {
         initStorage();
 
         // backup storage contents (=compact)
-        BufferedOutputStream bakStream = null;
-        try {
-            bakStream = new BufferedOutputStream(new FileOutputStream(bakFile));
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            // also note that they're closed before the catch-block executes.
+            final FileOutputStream fileOutputStream = new FileOutputStream(bakFile);
+            final BufferedOutputStream bakStream = new BufferedOutputStream(fileOutputStream);
+        ) {
             getStorage().backup(bakStream);
-            bakStream.close();
         } catch(final Exception t) {
             // error occured, delete bakFile
-            if( bakStream != null ) {
-                try { bakStream.close(); } catch(final Exception t2) {}
-            }
             bakFile.delete();
             throw t;
         }

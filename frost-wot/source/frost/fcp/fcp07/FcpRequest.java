@@ -48,6 +48,10 @@ public class FcpRequest {
      * @param htl request htl
      * @param doRedirect If true, getFile redirects if possible and downloads the file it was redirected to.
      * @return True if download was successful, else false.
+     *
+     * NOTE: This is the file-writer used by non-persistent (non-global queue) gets whenever persistence
+     * is disabled in Frost. if persistence is enabled, it uses
+     * FcpMultiRequestConnectionFileTransferTools.java:startDirectPersistentGet() instead.
      */
     public static FcpResultGet getFile(
             final int type,
@@ -59,6 +63,13 @@ public class FcpRequest {
             final boolean createTempFile,
             final FrostDownloadItem dlItem)
     {
+        // ensure that the target parent directory exists
+        final File parentDir = target.getParentFile();
+        if( parentDir != null ) { // path specified a parent directory
+            FileAccess.createDir(parentDir); // attempts to create if missing
+        }
+
+        // decide which file we'll be writing the temporary data to
         File tempFile = null;
         if( createTempFile ) {
             tempFile = FileAccess.createTempFile("getFile_", ".tmp");
@@ -66,16 +77,19 @@ public class FcpRequest {
             tempFile = new File( target.getPath() + ".tmp" );
         }
 
-        // First we just download the file, not knowing what lies ahead
+        // now just download the file to the temp-file
         final FcpResultGet results = getKey(type, key, tempFile, maxSize, maxRetries, dlItem);
 
         if( results.isSuccess() ) {
-
-            // If the target file exists, we remove it
+            // if the real (non-.tmp) target file exists, we remove it
             if( target.isFile() ) {
                 target.delete();
             }
 
+            // paranoia: ensure (again) that the target parent directory still exists
+            if( parentDir != null ) { FileAccess.createDir(parentDir); }
+
+            // now rename the .tmp file to the real target name
             final boolean wasOK = tempFile.renameTo(target);
             if( wasOK == false ) {
                logger.severe("ERROR: Could not move file '" + tempFile.getPath() + "' to '" + target.getPath() + "'.\n" +

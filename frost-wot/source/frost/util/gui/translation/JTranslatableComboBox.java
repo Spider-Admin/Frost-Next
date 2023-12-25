@@ -25,9 +25,9 @@ import javax.swing.*;
  * @version $Revision$
  */
 @SuppressWarnings("serial")
-public class JTranslatableComboBox extends JComboBox implements LanguageListener {
+public class JTranslatableComboBox extends JComboBox<JTranslatableComboBox.CheckBoxItem> implements LanguageListener {
 
-	private class CheckBoxItem {
+	public class CheckBoxItem {
 
 		private String key = null;
 		private String value = null;
@@ -96,7 +96,7 @@ public class JTranslatableComboBox extends JComboBox implements LanguageListener
 	 */
 	private void refreshLanguage() {
 		for (int i = 0; i < keys.length; i++) {
-			CheckBoxItem item = (CheckBoxItem) getItemAt(i);
+			CheckBoxItem item = getItemAt(i);
 			String newValue = language.getString(item.getKey());
 			item.setValue(newValue);
 		}
@@ -123,13 +123,13 @@ public class JTranslatableComboBox extends JComboBox implements LanguageListener
 	 * @param aKey the key of the item to select
 	 */
 	public void setSelectedKey(String aKey) {
-		boolean found = false;
-		for (int i = 0;(i < getItemCount()) && !found; i++) {
+		if( aKey == null ) { return; } // no string provided, selection remains unchanged
+		for( int i = 0; i < getItemCount(); ++i ) {
 			Object item = getItemAt(i);
-			if (item instanceof CheckBoxItem) {
-				if (((CheckBoxItem) item).getKey().equals(aKey)) {
+			if( item instanceof CheckBoxItem ) {
+				if( ((CheckBoxItem) item).getKey().equals(aKey) ) {
 					setSelectedIndex(i);
-					found = true;
+					break; // found; stop scanning
 				}
 			}
 		}

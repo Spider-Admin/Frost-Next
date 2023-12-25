@@ -23,9 +23,10 @@ import frost.*;
 import frost.fileTransfer.*;
 import frost.util.*;
 
+// NOTE: This download ticker starts new downloads every second *if*
+// persistence (global queue) is disabled. But if the global queue is
+// used, then the persistence manager is responsible for downloads instead.
 public class DownloadTicker extends Thread {
-
-	private final DownloadPanel panel;
 
 	/**
 	 * The number of allocated threads is used to limit the total of threads
@@ -37,9 +38,8 @@ public class DownloadTicker extends Thread {
 
 	private final Object threadCountLock = new Object();
 
-	public DownloadTicker(final DownloadPanel newPanel) {
+	public DownloadTicker() {
 		super("Download");
-		panel = newPanel;
 	}
 
 	/**
@@ -85,61 +85,21 @@ public class DownloadTicker extends Thread {
 	/* (non-Javadoc)
 	 * @see java.lang.Runnable#run()
 	 */
-	@Override
+    @Override
     public void run() {
-		super.run();
-		long loopTempMillSeconds = 0; 
-		int seconds = 0;
-		long loopStartMillSeconds = (new java.util.Date()).getTime();
-		while (true) {
-			Mixed.wait(1000);
-			
-			if( PersistenceManager.isPersistenceEnabled() == false ) {
-				startDownloadThread();
-			} else {
+        super.run();
+        while (true) {
+            Mixed.wait(1000);
 
-				// No need to check every second if persistance was enabled
-				Mixed.wait(29000);
-			}
-
-			loopTempMillSeconds = (new java.util.Date()).getTime();
-			seconds = (int) (loopTempMillSeconds - loopStartMillSeconds) / 1000;
-			if( seconds >= 60 ) {
-				increaseDownloadItemRuntime(seconds);
-				
-				loopStartMillSeconds = loopTempMillSeconds;
-			}
-		}
-	}
-
-	/**
-	 * Increase the runtime of shared, running download items.
-	 * Called each X seconds, adds the specified amount of seconds to the runtime.
-	 */
-	private void increaseDownloadItemRuntime(final int incSecs) {
-	    // if we use persistence, check if we are currently connected
-	    if( FileTransferManager.inst().getPersistenceManager() != null ) {
-	        if( !FileTransferManager.inst().getPersistenceManager().isConnected() ) {
-	            // we are not connected, don't count runtime
-	            return;
-	        }
-	    }
-
-	    final DownloadModel model = FileTransferManager.inst().getDownloadManager().getModel();
-	    for(int x=0; x < model.getItemCount(); x++ ) {
-	        final FrostDownloadItem item = (FrostDownloadItem)model.getItemAt(x);
-	        if( item == null ) {
-	            continue;
-	        }
-	        if( !item.isSharedFile() ) {
-	            continue;
-	        }
-	        if( item.getState() != FrostDownloadItem.STATE_PROGRESS ) {
-	            continue;
-	        }
-	        item.addToRuntimeSecondsWithoutProgress(incSecs);
-	    }
-	}
+            if( PersistenceManager.isPersistenceEnabled() == false ) {
+                startDownloadThread();
+            } else {
+                // since persistence is enabled, we don't need to check every second if we should
+                // start a non-persistent download thread... so wait half a minute instead...
+                Mixed.wait(29000);
+            }
+        }
+    }
 
 	/**
 	 * This method is usually called from a thread to notify the ticker that
@@ -162,32 +122,54 @@ public class DownloadTicker extends Thread {
     /**
      * Maybe start a new download automatically.
      */
-	private void startDownloadThread() {
-        if( Core.isFreenetOnline() && panel.isDownloadingActivated() && canAllocateDownloadThread() ) {
-            final FrostDownloadItem dlItem = FileTransferManager.inst().getDownloadManager().selectNextDownloadItem();
-            startDownload(dlItem);
+    private void startDownloadThread() {
+        if( ! Core.frostSettings.getBoolValue(SettingsClass.DOWNLOADING_ACTIVATED) ||
+            ! Core.isFreenetOnline() ||
+            ! canAllocateDownloadThread() ) {
+            return;
         }
+
+        final FrostDownloadItem dlItem = FileTransferManager.inst().getDownloadManager().selectNextDownloadItem();
+        startDownload(dlItem);
     }
 
-	public boolean startDownload(final FrostDownloadItem dlItem) {
-
-	    if (!Core.isFreenetOnline() ) {
+    /**
+     * Performs a download using Frost's own internal, non-persistent queue. This function is
+     * normally not called, since Frost has the persistent queue enabled by default.
+     * The persistent queue downloads are handled by PersistenceManager.java:startDownload() instead.
+     *
+     * NOTE: The synchronized attribute ensures that the user's "start selected downloads now" and
+     * "restart selected downloads" features don't trigger startDownload multiple times for the same
+     * file (autostart thread+the menu item). They'll still trigger, but they'll all execute in
+     * series thanks to the synchronization, which means that the first execution takes care of
+     * setting the state for the file. the additional calls will then see the new state and won't
+     * waste any time trying to download the same file again.
+     *
+     * @param {FrostDownloadItem} dlItem - the model item to begin downloading
+     * @return - false if the download cannot start (such as if the item is missing,
+     * or isn't a waiting item, etc), true if the download began
+     */
+    public synchronized boolean startDownload(final FrostDownloadItem dlItem) {
+        if( ! Core.frostSettings.getBoolValue(SettingsClass.DOWNLOADING_ACTIVATED) ||
+            ! Core.isFreenetOnline() ||
+            ! canAllocateDownloadThread() ) {
             return false;
         }
+
         if( dlItem == null || dlItem.getState() != FrostDownloadItem.STATE_WAITING ) {
             return false;
         }
 
-        dlItem.setDownloadStartedTime(System.currentTimeMillis());
-
         // increase allocated threads
         allocateDownloadThread();
 
+        // start the download
+        dlItem.setDownloadStartedTime(System.currentTimeMillis());
         dlItem.setState(FrostDownloadItem.STATE_TRYING);
 
-        final File targetFile = new File(Core.frostSettings.getValue(SettingsClass.DIR_DOWNLOAD) + dlItem.getFileName());
+        final File targetFile = new File(dlItem.getDownloadFilename());
         final DownloadThread newRequest = new DownloadThread(this, dlItem, targetFile);
         newRequest.start();
         return true;
-	}
+    }
 }

@@ -136,7 +136,7 @@ public class MessageUploadFailedDialog extends JDialog {
     }
 
     public int startDialog() {
-        retryButton.requestFocus();
+        retryButton.requestFocusInWindow();
         timer.start();
         setModal(true); // paranoia
         setVisible(true);

@@ -71,6 +71,16 @@ public class UnsentMessagesTableItem extends ModelItem<UnsentMessagesTableItem> 
         }
     }
 
+    // null if nothing, otherwise a string with the current name of the attachment being uploaded
+    // before the main message can be uploaded. this enhances the status so that instead of msgs
+    // with attachments forever sitting as "WAITING", we can now actually display status about
+    // which file it's currently uploading, which helps avoid user confusion.
+    // recommendation: If getState() is STATE_UPLOADING, then display that. otherwise if STATE_WAITING,
+    // then check this value to see if an attachment is being uploaded. otherwise, just show "Waiting".
+    public String getUploadingAttachmentName() {
+        return messageObject.getUploadingAttachmentName();
+    }
+
     @Override
     public void fireChange() {
         super.fireChange();

@@ -40,6 +40,8 @@ public class NodeMessage {
     private final HashMap<String,String> items;
     private String messageEndMarker = null;
 
+    // NOTE: we do not own the input stream; it's borrowed from the connection that
+    // uses us, so we should NOT try to close this stream after we're done!
     private BufferedInputStream fcpInStream = null;
 
     /////////////////////////////////////////////////////////////////////////////////////////
@@ -142,6 +144,14 @@ public class NodeMessage {
                 }
             }
         } catch (final Throwable e) {
+            // NOTE: the most common error here is a SocketTimeoutException,
+            // because there is a bug in Freenet where you open an FCP socket
+            // and send it a message, but it *never* gives any response,
+            // so the read() call above times out. for that reason, it's
+            // extremely important to make sure the socket is set to the
+            // "default timeout" from FcpSocket.java (which it is by default),
+            // before sending any message that requires a socket-response.
+            // otherwise you'll block for a very long time, waiting for a reply.
             logger.log(Level.SEVERE, "Throwable catched", e);
             return null;
         }

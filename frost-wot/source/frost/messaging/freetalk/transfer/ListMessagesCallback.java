@@ -171,7 +171,7 @@ public class ListMessagesCallback implements FreetalkNodeMessageCallback {
                 final Enumeration<FreetalkMessage> e = rootNode.breadthFirstEnumeration();
                 while (e.hasMoreElements()) {
                 	
-                    final FreetalkMessage freetalkMessage =  e.nextElement();
+                    final FreetalkMessage freetalkMessage = e.nextElement();
                     if (parentMsgIdString.equals(freetalkMessage.getMsgId())) {
                         freetalkMessageIterator.remove();
                         freetalkMessage.add(newMsg, false);

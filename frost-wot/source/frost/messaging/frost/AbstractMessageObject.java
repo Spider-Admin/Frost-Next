@@ -19,6 +19,8 @@
 
 package frost.messaging.frost;
 
+import java.util.Vector;
+
 /**
  * This class holds the basic variables of a message.
  * It is used by the MessageObjectFile (XML file representation)

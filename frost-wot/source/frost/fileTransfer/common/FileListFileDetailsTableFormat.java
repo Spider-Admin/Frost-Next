@@ -43,9 +43,9 @@ public class FileListFileDetailsTableFormat extends SortedTableFormat<FileListFi
 
     private final Language language = Language.getInstance();;
 
+    private static ImageIcon ICON_FRIEND = null;
     private static ImageIcon ICON_GOOD = null;
-    private static ImageIcon ICON_OBSERVE = null;
-    private static ImageIcon ICON_CHECK = null;
+    private static ImageIcon ICON_NEUTRAL = null;
     private static ImageIcon ICON_BAD = null;
 
     private final static int COLUMN_COUNT = 9;
@@ -73,11 +73,11 @@ public class FileListFileDetailsTableFormat extends SortedTableFormat<FileListFi
     }
 
     private void loadIcons() {
-        if( ICON_GOOD == null ) {
+        if( ICON_FRIEND == null ) {
             // load all icons
-            ICON_GOOD = MiscToolkit.getScaledImage("/data/toolbar/weather-clear.png", 12, 12);
-            ICON_OBSERVE = MiscToolkit.getScaledImage("/data/toolbar/weather-few-clouds.png", 12, 12);
-            ICON_CHECK = MiscToolkit.getScaledImage("/data/toolbar/weather-overcast.png", 12, 12);
+            ICON_FRIEND = MiscToolkit.getScaledImage("/data/toolbar/weather-clear.png", 12, 12);
+            ICON_GOOD = MiscToolkit.getScaledImage("/data/toolbar/weather-few-clouds.png", 12, 12);
+            ICON_NEUTRAL = MiscToolkit.getScaledImage("/data/toolbar/weather-overcast.png", 12, 12);
             ICON_BAD = MiscToolkit.getScaledImage("/data/toolbar/weather-storm.png", 12, 12);
         }
     }
@@ -170,7 +170,7 @@ public class FileListFileDetailsTableFormat extends SortedTableFormat<FileListFi
         {
             final int sortedColumn = Core.frostSettings.getIntValue(CFGKEY_SORTSTATE_SORTEDCOLUMN);
             final boolean isSortedAsc = Core.frostSettings.getBoolValue(CFGKEY_SORTSTATE_SORTEDASCENDING);
-            if( sortedColumn > -1 ) {
+            if( sortedColumn > -1 && sortedColumn < modelTable.getTable().getColumnModel().getColumnCount() ) {
                 modelTable.setSortedColumn(sortedColumn, isSortedAsc);
             }
         } else {
@@ -383,12 +383,12 @@ public class FileListFileDetailsTableFormat extends SortedTableFormat<FileListFi
             final Identity id = (Identity) value;
             if( id == null ) {
                 setIcon(null);
+            } else if( id.isFRIEND() ) {
+                setIcon(ICON_FRIEND);
             } else if( id.isGOOD() ) {
                 setIcon(ICON_GOOD);
-            } else if( id.isOBSERVE() ) {
-                setIcon(ICON_OBSERVE);
-            } else if( id.isCHECK() ) {
-                setIcon(ICON_CHECK);
+            } else if( id.isNEUTRAL() ) {
+                setIcon(ICON_NEUTRAL);
             } else if( id.isBAD() ) {
                 setIcon(ICON_BAD);
             } else {

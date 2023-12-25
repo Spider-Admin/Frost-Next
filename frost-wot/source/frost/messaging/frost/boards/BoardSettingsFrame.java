@@ -21,6 +21,8 @@ package frost.messaging.frost.boards;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -56,11 +58,22 @@ public class BoardSettingsFrame extends JDialog {
         }
     }
 
+    private class TypingListener implements KeyListener {
+        public void keyReleased(final KeyEvent e) {
+            overrideTextField_keyReleased(e);
+        }
+        public void keyTyped(final KeyEvent e) {
+        }
+        public void keyPressed(final KeyEvent e) {
+        }
+    }
+
     private final Language language;
     private final AbstractNode node;
     private final JFrame parentFrame;
 
     private final Listener listener = new Listener();
+    private final TypingListener typingListener = new TypingListener();
 
     //SF_EDIT    
     private final JTextField startDayToDownload_value = new JTextField(6);
@@ -79,20 +92,24 @@ public class BoardSettingsFrame extends JDialog {
     private final JRadioButton storeSentMessages_true = new JRadioButton();
     private final JLabel storeSentMessagesLabel = new JLabel();
 
-    private final JRadioButton hideBad_default = new JRadioButton();
-    private final JRadioButton hideBad_false = new JRadioButton();
-    private final JRadioButton hideBad_true = new JRadioButton();
-    private final JLabel hideBadMessagesLabel = new JLabel();
+    private final JRadioButton hideUnsigned_default = new JRadioButton();
+    private final JRadioButton hideUnsigned_false = new JRadioButton();
+    private final JRadioButton hideUnsigned_true = new JRadioButton();
 
-    private final JRadioButton hideCheck_default = new JRadioButton();
-    private final JRadioButton hideCheck_false = new JRadioButton();
-    private final JRadioButton hideCheck_true = new JRadioButton();
-    private final JLabel hideCheckMessagesLabel = new JLabel();
+    private final JRadioButton hideBAD_default = new JRadioButton();
+    private final JRadioButton hideBAD_false = new JRadioButton();
+    private final JRadioButton hideBAD_true = new JRadioButton();
+    private final JLabel hideBADMessagesLabel = new JLabel();
 
-    private final JRadioButton hideObserve_default = new JRadioButton();
-    private final JRadioButton hideObserve_false = new JRadioButton();
-    private final JRadioButton hideObserve_true = new JRadioButton();
-    private final JLabel hideObserveMessagesLabel = new JLabel();
+    private final JRadioButton hideNEUTRAL_default = new JRadioButton();
+    private final JRadioButton hideNEUTRAL_false = new JRadioButton();
+    private final JRadioButton hideNEUTRAL_true = new JRadioButton();
+    private final JLabel hideNEUTRALMessagesLabel = new JLabel();
+
+    private final JRadioButton hideGOOD_default = new JRadioButton();
+    private final JRadioButton hideGOOD_false = new JRadioButton();
+    private final JRadioButton hideGOOD_true = new JRadioButton();
+    private final JLabel hideGOODMessagesLabel = new JLabel();
     private final JLabel hideUnsignedMessagesLabel = new JLabel();
 
     private final JRadioButton hideMessageCount_default = new JRadioButton();
@@ -124,14 +141,11 @@ public class BoardSettingsFrame extends JDialog {
 
     private final JRadioButton secureBoardRadioButton = new JRadioButton();
 
-    private final JRadioButton signedOnly_default = new JRadioButton();
-    private final JRadioButton signedOnly_false = new JRadioButton();
-    private final JRadioButton signedOnly_true = new JRadioButton();
-
     JPanel settingsPanel = new JPanel(new GridBagLayout());
 
-    private final JLabel descriptionLabel = new JLabel();
-    private final JTextArea descriptionTextArea = new JTextArea(3, 40);
+// NOTE:XXX: the "Description:" text label had to be removed to get more window space
+//    private final JLabel descriptionLabel = new JLabel();
+    private final JTextArea descriptionTextArea = new JTextArea(3, 40); // 3 rows, at least 40 cols
     private JScrollPane descriptionScrollPane;
 
     /**
@@ -148,9 +162,10 @@ public class BoardSettingsFrame extends JDialog {
         setModal(true);
         enableEvents(AWTEvent.WINDOW_EVENT_MASK);
         initialize();
-        //pack();
-        setSize(430,648);
-        setLocationRelativeTo(parentFrame);
+
+        // pack the frame to the optimal size that fits 3 lines of description and all (long) labels
+        pack();
+        setLocationRelativeTo(parentFrame); // center relative to main window
     }
 
     /**
@@ -181,8 +196,8 @@ public class BoardSettingsFrame extends JDialog {
                 publicKeyTextField.setText(kp.getPublicBoardKey());
             }
         } catch (final Throwable ex) {
-            JOptionPane.showMessageDialog(parentFrame, ex.toString(), // message
-                    language.getString("BoardSettings.generateKeyPairErrorDialog.title"), JOptionPane.WARNING_MESSAGE);
+            MiscToolkit.showMessageDialog(parentFrame, ex.toString(), // message
+                    language.getString("BoardSettings.generateKeyPairErrorDialog.title"), MiscToolkit.WARNING_MESSAGE);
         }
     }
 
@@ -213,21 +228,21 @@ public class BoardSettingsFrame extends JDialog {
         bg1.add(maxMessageDownload_default);
         bg1.add(maxMessageDownload_set);
         final ButtonGroup bg3 = new ButtonGroup();
-        bg3.add(signedOnly_default);
-        bg3.add(signedOnly_false);
-        bg3.add(signedOnly_true);
+        bg3.add(hideUnsigned_default);
+        bg3.add(hideUnsigned_false);
+        bg3.add(hideUnsigned_true);
         final ButtonGroup bg4 = new ButtonGroup();
-        bg4.add(hideBad_default);
-        bg4.add(hideBad_true);
-        bg4.add(hideBad_false);
+        bg4.add(hideBAD_default);
+        bg4.add(hideBAD_true);
+        bg4.add(hideBAD_false);
         final ButtonGroup bg5 = new ButtonGroup();
-        bg5.add(hideCheck_default);
-        bg5.add(hideCheck_true);
-        bg5.add(hideCheck_false);
+        bg5.add(hideNEUTRAL_default);
+        bg5.add(hideNEUTRAL_true);
+        bg5.add(hideNEUTRAL_false);
         final ButtonGroup bg6 = new ButtonGroup();
-        bg6.add(hideObserve_default);
-        bg6.add(hideObserve_true);
-        bg6.add(hideObserve_false);
+        bg6.add(hideGOOD_default);
+        bg6.add(hideGOOD_true);
+        bg6.add(hideGOOD_false);
         final ButtonGroup bg7 = new ButtonGroup();
         bg7.add(storeSentMessages_default);
         bg7.add(storeSentMessages_true);
@@ -251,6 +266,22 @@ public class BoardSettingsFrame extends JDialog {
         constraints.insets = new Insets(5, 25, 0, 5);
         settingsPanel.add(autoUpdateEnabled, constraints);
         constraints.gridy++;
+        
+        constraints.gridwidth = 3;
+        constraints.gridx = 0;
+        constraints.insets = new Insets(3, 25, 0, 5);
+        settingsPanel.add(maxMessageDownloadDaysLabel, constraints);
+        constraints.insets = new Insets(0, 35, 0, 5);
+        constraints.gridwidth = 1;
+        constraints.gridy++;
+        constraints.gridx = 0;
+        settingsPanel.add(maxMessageDownload_default, constraints);
+        constraints.insets = new Insets(0, 0, 0, 5);
+        constraints.gridx = 1;
+        settingsPanel.add(maxMessageDownload_set, constraints);
+        constraints.gridx = 2;
+        settingsPanel.add(maxMessageDownload_value, constraints);
+        constraints.gridy++;
 
         //SF_EDIT
         constraints.gridwidth = 3;
@@ -269,7 +300,7 @@ public class BoardSettingsFrame extends JDialog {
         settingsPanel.add(startDayToDownload_value, constraints);
         constraints.gridy++;
         //END_EDIT
-        
+
         constraints.gridwidth = 3;
         constraints.gridx = 0;
         constraints.insets = new Insets(3, 25, 0, 5);
@@ -289,81 +320,65 @@ public class BoardSettingsFrame extends JDialog {
         constraints.gridwidth = 3;
         constraints.gridx = 0;
         constraints.insets = new Insets(3, 25, 0, 5);
-        settingsPanel.add(maxMessageDownloadDaysLabel, constraints);
-        constraints.insets = new Insets(0, 35, 0, 5);
-        constraints.gridwidth = 1;
-        constraints.gridy++;
-        constraints.gridx = 0;
-        settingsPanel.add(maxMessageDownload_default, constraints);
-        constraints.insets = new Insets(0, 0, 0, 5);
-        constraints.gridx = 1;
-        settingsPanel.add(maxMessageDownload_set, constraints);
-        constraints.gridx = 2;
-        settingsPanel.add(maxMessageDownload_value, constraints);
-        constraints.gridy++;
-
-        constraints.gridwidth = 3;
-        constraints.gridx = 0;
-        constraints.insets = new Insets(3, 25, 0, 5);
         settingsPanel.add(hideUnsignedMessagesLabel, constraints);
         constraints.insets = new Insets(0, 35, 0, 5);
         constraints.gridwidth = 1;
         constraints.gridy++;
         constraints.gridx = 0;
-        settingsPanel.add(signedOnly_default, constraints);
+        settingsPanel.add(hideUnsigned_default, constraints);
         constraints.insets = new Insets(0, 0, 0, 5);
         constraints.gridx = 1;
-        settingsPanel.add(signedOnly_true, constraints);
+        settingsPanel.add(hideUnsigned_true, constraints);
         constraints.gridx = 2;
-        settingsPanel.add(signedOnly_false, constraints);
+        settingsPanel.add(hideUnsigned_false, constraints);
         constraints.gridy++;
 
         constraints.gridwidth = 3;
         constraints.gridx = 0;
         constraints.insets = new Insets(3, 25, 0, 5);
-        settingsPanel.add(hideBadMessagesLabel, constraints);
+        settingsPanel.add(hideBADMessagesLabel, constraints);
         constraints.insets = new Insets(0, 35, 0, 5);
         constraints.gridwidth = 1;
         constraints.gridy++;
         constraints.gridx = 0;
-        settingsPanel.add(hideBad_default, constraints);
+        settingsPanel.add(hideBAD_default, constraints);
         constraints.insets = new Insets(0, 0, 0, 5);
         constraints.gridx = 1;
-        settingsPanel.add(hideBad_true, constraints);
+        settingsPanel.add(hideBAD_true, constraints);
         constraints.gridx = 2;
-        settingsPanel.add(hideBad_false, constraints);
+        settingsPanel.add(hideBAD_false, constraints);
         constraints.gridy++;
 
         constraints.gridwidth = 3;
         constraints.gridx = 0;
         constraints.insets = new Insets(3, 25, 0, 5);
-        settingsPanel.add(hideCheckMessagesLabel, constraints);
+        settingsPanel.add(hideNEUTRALMessagesLabel, constraints);
         constraints.insets = new Insets(0, 35, 0, 5);
         constraints.gridwidth = 1;
         constraints.gridy++;
         constraints.gridx = 0;
-        settingsPanel.add(hideCheck_default, constraints);
+        settingsPanel.add(hideNEUTRAL_default, constraints);
         constraints.insets = new Insets(0, 0, 0, 5);
         constraints.gridx = 1;
-        settingsPanel.add(hideCheck_true, constraints);
+        settingsPanel.add(hideNEUTRAL_true, constraints);
         constraints.gridx = 2;
-        settingsPanel.add(hideCheck_false, constraints);
+        settingsPanel.add(hideNEUTRAL_false, constraints);
         constraints.gridy++;
 
         constraints.gridwidth = 3;
         constraints.gridx = 0;
         constraints.insets = new Insets(3, 25, 0, 5);
-        settingsPanel.add(hideObserveMessagesLabel, constraints);
+        settingsPanel.add(hideGOODMessagesLabel, constraints);
         constraints.insets = new Insets(0, 35, 5, 5);
         constraints.gridwidth = 1;
         constraints.gridy++;
         constraints.gridx = 0;
-        settingsPanel.add(hideObserve_default, constraints);
+        settingsPanel.add(hideGOOD_default, constraints);
         constraints.insets = new Insets(0, 0, 0, 5);
         constraints.gridx = 1;
-        settingsPanel.add(hideObserve_true, constraints);
+        settingsPanel.add(hideGOOD_true, constraints);
         constraints.gridx = 2;
-        settingsPanel.add(hideObserve_false, constraints);
+        settingsPanel.add(hideGOOD_false, constraints);
         constraints.gridy++;
 
         constraints.gridwidth = 3;
@@ -399,10 +414,61 @@ public class BoardSettingsFrame extends JDialog {
 
         // Adds listeners
         overrideSettingsCheckBox.addActionListener(listener);
+        // Keyboard listeners for the override textfields
+        startDayToDownload_value.addKeyListener(typingListener);
+        maxMessageDisplay_value.addKeyListener(typingListener);
+        maxMessageDownload_value.addKeyListener(typingListener);
+        hideMessageCount_value.addKeyListener(typingListener);
 
         setPanelEnabled(settingsPanel, (node.isBoard())?((Board)node).isConfigured():false);
 
         return settingsPanel;
+    }
+
+    private void overrideTextField_keyReleased(final KeyEvent e) {
+        // when the user types, we check what's in the text field. if it's empty,
+        // we set it back to the "Default" radio button, otherwise we set it to
+        // the "Set to:" radio button. this makes it easier for the user to change
+        // values without having to fiddle with the radio buttons manually.
+        // NOTE: this event fires in the GUI thread, after the new text is fetchable,
+        // so we don't need to invokeLater anything here...
+        
+        // "Days backwards to start at"
+        if( e.getSource() == startDayToDownload_value ) {
+            final String text = startDayToDownload_value.getText();
+            if( text == null || text.equals("") ) {
+                if( !startDayToDownload_default.isSelected() ) { startDayToDownload_default.doClick(); }
+            } else {
+                if( !startDayToDownload_set.isSelected() ) { startDayToDownload_set.doClick(); }
+            }
+        }
+        // "Number of days to display"
+        else if( e.getSource() == maxMessageDisplay_value ) {
+            final String text = maxMessageDisplay_value.getText();
+            if( text == null || text.equals("") ) {
+                if( !maxMessageDisplay_default.isSelected() ) { maxMessageDisplay_default.doClick(); }
+            } else {
+                if( !maxMessageDisplay_set.isSelected() ) { maxMessageDisplay_set.doClick(); }
+            }
+        }
+        // "Number of days to download backwards"
+        else if( e.getSource() == maxMessageDownload_value ) {
+            final String text = maxMessageDownload_value.getText();
+            if( text == null || text.equals("") ) {
+                if( !maxMessageDownload_default.isSelected() ) { maxMessageDownload_default.doClick(); }
+            } else {
+                if( !maxMessageDownload_set.isSelected() ) { maxMessageDownload_set.doClick(); }
+            }
+        }
+        // "Hide messages from identities with fewer than X messages"
+        else if( e.getSource() == hideMessageCount_value ) {
+            final String text = hideMessageCount_value.getText();
+            if( text == null || text.equals("") ) {
+                if( !hideMessageCount_default.isSelected() ) { hideMessageCount_default.doClick(); }
+            } else {
+                if( !hideMessageCount_set.isSelected() ) { hideMessageCount_set.doClick(); }
+            }
+        }
     }
 
     private void initialize() {
@@ -431,9 +497,9 @@ public class BoardSettingsFrame extends JDialog {
         constraints.gridy = 0;
         contentPanel.add(getKeysPanel(), constraints);
 
-        constraints.gridx = 0;
-        constraints.gridy = 1;
-        contentPanel.add(descriptionLabel, constraints);
+//        constraints.gridx = 0;
+//        constraints.gridy = 1;
+//        contentPanel.add(descriptionLabel, constraints);
         constraints.gridx = 0;
         constraints.gridy = 2;
         constraints.weightx = 1;
@@ -460,7 +526,7 @@ public class BoardSettingsFrame extends JDialog {
         constraints.gridy = 4;
         contentPanel.add(cancelButton, constraints);
 
-        descriptionLabel.setEnabled(false);
+//        descriptionLabel.setEnabled(false);
         descriptionTextArea.setEnabled(false);
         publicBoardRadioButton.setSelected(true);
         privateKeyTextField.setEnabled(false);
@@ -470,7 +536,7 @@ public class BoardSettingsFrame extends JDialog {
         // Adds listeners
         okButton.addActionListener(listener);
         cancelButton.addActionListener(listener);
-
+        
         loadKeypair();
         loadBoardSettings();
     }
@@ -549,13 +615,13 @@ public class BoardSettingsFrame extends JDialog {
     private void loadBoardSettings() {
         if( node.isFolder() ) {
 
-            descriptionLabel.setEnabled(false);
+//            descriptionLabel.setEnabled(false);
             descriptionTextArea.setEnabled(false);
             overrideSettingsCheckBox.setSelected(false);
 
         } else if( node.isBoard() ) {
             final Board board = (Board)node;
-            descriptionLabel.setEnabled(true);
+//            descriptionLabel.setEnabled(true);
             descriptionTextArea.setEnabled(true);
             // its a single board
             if (board.getDescription() != null) {
@@ -593,36 +659,36 @@ public class BoardSettingsFrame extends JDialog {
                 autoUpdateEnabled.setSelected(false);
             }
 
-            if (!board.isConfigured() || board.getShowSignedOnlyObj() == null) {
-                signedOnly_default.setSelected(true);
-            } else if (board.getShowSignedOnly()) {
-                signedOnly_true.setSelected(true);
+            if (!board.isConfigured() || board.getHideUnsignedObj() == null) {
+                hideUnsigned_default.setSelected(true);
+            } else if (board.getHideUnsigned()) {
+                hideUnsigned_true.setSelected(true);
             } else {
-                signedOnly_false.setSelected(true);
+                hideUnsigned_false.setSelected(true);
             }
 
-            if (!board.isConfigured() || board.getHideBadObj() == null) {
-                hideBad_default.setSelected(true);
-            } else if (board.getHideBad()) {
-                hideBad_true.setSelected(true);
+            if (!board.isConfigured() || board.getHideBADObj() == null) {
+                hideBAD_default.setSelected(true);
+            } else if (board.getHideBAD()) {
+                hideBAD_true.setSelected(true);
             } else {
-                hideBad_false.setSelected(true);
+                hideBAD_false.setSelected(true);
             }
 
-            if (!board.isConfigured() || board.getHideCheckObj() == null) {
-                hideCheck_default.setSelected(true);
-            } else if (board.getHideCheck()) {
-                hideCheck_true.setSelected(true);
+            if (!board.isConfigured() || board.getHideNEUTRALObj() == null) {
+                hideNEUTRAL_default.setSelected(true);
+            } else if (board.getHideNEUTRAL()) {
+                hideNEUTRAL_true.setSelected(true);
             } else {
-                hideCheck_false.setSelected(true);
+                hideNEUTRAL_false.setSelected(true);
             }
 
-            if (!board.isConfigured() || board.getHideObserveObj() == null) {
-                hideObserve_default.setSelected(true);
-            } else if (board.getHideObserve()) {
-                hideObserve_true.setSelected(true);
+            if (!board.isConfigured() || board.getHideGOODObj() == null) {
+                hideGOOD_default.setSelected(true);
+            } else if (board.getHideGOOD()) {
+                hideGOOD_true.setSelected(true);
             } else {
-                hideObserve_false.setSelected(true);
+                hideGOOD_false.setSelected(true);
             }
 
             if (!board.isConfigured() || board.getHideMessageCountObj() == null) {
@@ -694,13 +760,13 @@ public class BoardSettingsFrame extends JDialog {
         if( node.isBoard() ) {
             // if board was secure before and now its public, ask user if ok to remove the keys
             if( publicBoardRadioButton.isSelected() && ((Board)node).isPublicBoard() == false ) {
-                final int result = JOptionPane.showConfirmDialog(
+                final int answer = MiscToolkit.showConfirmDialog(
                         this,
                         language.getString("BoardSettings.looseKeysWarningDialog.body"),
                         language.getString("BoardSettings.looseKeysWarningDialog.title"),
-                        JOptionPane.YES_NO_OPTION,
-                        JOptionPane.WARNING_MESSAGE);
-                if (result == JOptionPane.NO_OPTION) {
+                        MiscToolkit.YES_NO_OPTION,
+                        MiscToolkit.WARNING_MESSAGE);
+                if( answer != MiscToolkit.YES_OPTION ) {
                     return;
                 }
             }
@@ -741,9 +807,12 @@ public class BoardSettingsFrame extends JDialog {
 
             if( startDayToDownload_default.isSelected() || startDayToDownload_set.isSelected() ) {
                 if (startDayToDownload_default.isSelected() == false) {
-					int check = new Integer(startDayToDownload_value.getText());
-					if (check >= board.getMaxMessageDownload())
-						check = board.getMaxMessageDownload() -1;
+                    int check = new Integer(startDayToDownload_value.getText());
+                    // the valid range is 1(today) to the max number of days to download
+                    if( check < 1 )
+                        check = 1;
+                    else if( check > board.getMaxMessageDownload() )
+                        check = board.getMaxMessageDownload();
                     board.setStartDaysBack(check);
                 } else {
                     board.setStartDaysBack(null);
@@ -764,32 +833,32 @@ public class BoardSettingsFrame extends JDialog {
                     board.setMaxMessageDownload(null);
                 }
             }
-            if( signedOnly_default.isSelected() || signedOnly_true.isSelected() || signedOnly_false.isSelected() ) {
-                if (signedOnly_default.isSelected() == false) {
-                    board.setShowSignedOnly(Boolean.valueOf(signedOnly_true.isSelected()));
+            if( hideUnsigned_default.isSelected() || hideUnsigned_true.isSelected() || hideUnsigned_false.isSelected() ) {
+                if (hideUnsigned_default.isSelected() == false) {
+                    board.setHideUnsigned(Boolean.valueOf(hideUnsigned_true.isSelected()));
                 } else {
-                    board.setShowSignedOnly(null);
+                    board.setHideUnsigned(null);
                 }
             }
-            if( hideBad_default.isSelected() || hideBad_true.isSelected() || hideBad_false.isSelected() ) {
-                if (hideBad_default.isSelected() == false) {
-                    board.setHideBad(Boolean.valueOf(hideBad_true.isSelected()));
+            if( hideBAD_default.isSelected() || hideBAD_true.isSelected() || hideBAD_false.isSelected() ) {
+                if (hideBAD_default.isSelected() == false) {
+                    board.setHideBAD(Boolean.valueOf(hideBAD_true.isSelected()));
                 } else {
-                    board.setHideBad(null);
+                    board.setHideBAD(null);
                 }
             }
-            if( hideCheck_default.isSelected() || hideCheck_true.isSelected() || hideCheck_false.isSelected() ) {
-                if (hideCheck_default.isSelected() == false) {
-                    board.setHideCheck(Boolean.valueOf(hideCheck_true.isSelected()));
+            if( hideNEUTRAL_default.isSelected() || hideNEUTRAL_true.isSelected() || hideNEUTRAL_false.isSelected() ) {
+                if (hideNEUTRAL_default.isSelected() == false) {
+                    board.setHideNEUTRAL(Boolean.valueOf(hideNEUTRAL_true.isSelected()));
                 } else {
-                    board.setHideCheck(null);
+                    board.setHideNEUTRAL(null);
                 }
             }
-            if( hideObserve_default.isSelected() || hideObserve_true.isSelected() || hideObserve_false.isSelected() ) {
-                if (hideObserve_default.isSelected() == false) {
-                    board.setHideObserve(Boolean.valueOf(hideObserve_true.isSelected()));
+            if( hideGOOD_default.isSelected() || hideGOOD_true.isSelected() || hideGOOD_false.isSelected() ) {
+                if (hideGOOD_default.isSelected() == false) {
+                    board.setHideGOOD(Boolean.valueOf(hideGOOD_true.isSelected()));
                 } else {
-                    board.setHideObserve(null);
+                    board.setHideGOOD(null);
                 }
             }
             if( hideMessageCount_default.isSelected() || hideMessageCount_set.isSelected() ) {
@@ -857,25 +926,25 @@ public class BoardSettingsFrame extends JDialog {
             } else {
                 board.setMaxMessageDownload(null);
             }
-            if (signedOnly_default.isSelected() == false) {
-                board.setShowSignedOnly(Boolean.valueOf(signedOnly_true.isSelected()));
+            if (hideUnsigned_default.isSelected() == false) {
+                board.setHideUnsigned(Boolean.valueOf(hideUnsigned_true.isSelected()));
             } else {
-                board.setShowSignedOnly(null);
+                board.setHideUnsigned(null);
             }
-            if (hideBad_default.isSelected() == false) {
-                board.setHideBad(Boolean.valueOf(hideBad_true.isSelected()));
+            if (hideBAD_default.isSelected() == false) {
+                board.setHideBAD(Boolean.valueOf(hideBAD_true.isSelected()));
             } else {
-                board.setHideBad(null);
+                board.setHideBAD(null);
             }
-            if (hideCheck_default.isSelected() == false) {
-                board.setHideCheck(Boolean.valueOf(hideCheck_true.isSelected()));
+            if (hideNEUTRAL_default.isSelected() == false) {
+                board.setHideNEUTRAL(Boolean.valueOf(hideNEUTRAL_true.isSelected()));
             } else {
-                board.setHideCheck(null);
+                board.setHideNEUTRAL(null);
             }
-            if (hideObserve_default.isSelected() == false) {
-                board.setHideObserve(Boolean.valueOf(hideObserve_true.isSelected()));
+            if (hideGOOD_default.isSelected() == false) {
+                board.setHideGOOD(Boolean.valueOf(hideGOOD_true.isSelected()));
             } else {
-                board.setHideObserve(null);
+                board.setHideGOOD(null);
             }
             if (hideMessageCount_default.isSelected() == false) {
                 board.setHideMessageCount(new Integer(hideMessageCount_value.getText()));
@@ -972,18 +1041,18 @@ public class BoardSettingsFrame extends JDialog {
         maxMessageDisplay_set.setText(language.getString("BoardSettings.label.setTo") + ":");
         maxMessageDownload_default.setText(useDefault);
         maxMessageDownload_set.setText(language.getString("BoardSettings.label.setTo") + ":");
-        signedOnly_default.setText(useDefault);
-        signedOnly_true.setText(yes);
-        signedOnly_false.setText(no);
-        hideBad_default.setText(useDefault);
-        hideBad_true.setText(yes);
-        hideBad_false.setText(no);
-        hideCheck_default.setText(useDefault);
-        hideCheck_true.setText(yes);
-        hideCheck_false.setText(no);
-        hideObserve_default.setText(useDefault);
-        hideObserve_true.setText(yes);
-        hideObserve_false.setText(no);
+        hideUnsigned_default.setText(useDefault);
+        hideUnsigned_true.setText(yes);
+        hideUnsigned_false.setText(no);
+        hideBAD_default.setText(useDefault);
+        hideBAD_true.setText(yes);
+        hideBAD_false.setText(no);
+        hideNEUTRAL_default.setText(useDefault);
+        hideNEUTRAL_true.setText(yes);
+        hideNEUTRAL_false.setText(no);
+        hideGOOD_default.setText(useDefault);
+        hideGOOD_true.setText(yes);
+        hideGOOD_false.setText(no);
         hideMessageCount_default.setText(useDefault);
         hideMessageCount_set.setText(language.getString("BoardSettings.label.setTo") + ":");
         storeSentMessages_default.setText(useDefault);
@@ -995,16 +1064,16 @@ public class BoardSettingsFrame extends JDialog {
         privateKeyLabel.setText(language.getString("BoardSettings.label.privateKey") + " :");
         maxMessageDisplayDaysLabel.setText(language.getString("BoardSettings.label.maximumMessageDisplay"));
         maxMessageDownloadDaysLabel.setText(language.getString("BoardSettings.label.maximumMessageDownload"));
-        hideUnsignedMessagesLabel.setText(language.getString("BoardSettings.label.hideUnsignedMessages"));
-        hideBadMessagesLabel.setText(language.getString("BoardSettings.label.hideBadMessages"));
-        hideCheckMessagesLabel.setText(language.getString("BoardSettings.label.hideCheckMessages"));
-        hideObserveMessagesLabel.setText(language.getString("BoardSettings.label.hideObserveMessages"));
+        hideUnsignedMessagesLabel.setText(language.getString("BoardSettings.label.hideNONEMessages"));
+        hideBADMessagesLabel.setText(language.getString("BoardSettings.label.hideBADMessages"));
+        hideNEUTRALMessagesLabel.setText(language.getString("BoardSettings.label.hideNEUTRALMessages"));
+        hideGOODMessagesLabel.setText(language.getString("BoardSettings.label.hideGOODMessages"));
         hideMessageCountLabel.setText(language.getString("BoardSettings.label.hideMessageCountDisplay"));
         storeSentMessagesLabel.setText(language.getString("BoardSettings.label.storeSentMessages"));
         
-        startDayToDownloadLabel.setText(language.getString("BoardSettings.label.startDay") + " :");
+        startDayToDownloadLabel.setText(language.getString("BoardSettings.label.startDay"));
         
-        descriptionLabel.setText(language.getString("BoardSettings.label.description"));
+//        descriptionLabel.setText(language.getString("BoardSettings.label.description"));
     }
 
     public boolean runDialog() {

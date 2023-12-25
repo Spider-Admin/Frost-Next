@@ -122,16 +122,17 @@ public class XMLTools {
      * This method writes a DOM document to a file.
      */
     public static boolean writeXmlFile(final Document doc, final File file) {
-        try {
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final FileOutputStream fileOut = new FileOutputStream(file);
+        ) {
             final Transformer tr = TransformerFactory.newInstance().newTransformer();
             tr.setOutputProperty(OutputKeys.INDENT, "no");
             tr.setOutputProperty(OutputKeys.METHOD, "xml");
             tr.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
             final Source input = new DOMSource(doc);
-            final FileOutputStream fileout = new FileOutputStream(file);
-            final StreamResult output = new StreamResult(fileout);
+            final StreamResult output = new StreamResult(fileOut);
             tr.transform(input, output);
-            fileout.close();
             return true;
         } catch (final Exception ex) {
             logger.log(Level.SEVERE, "Exception thrown in writeXmlFile(Document doc, String filename)", ex);

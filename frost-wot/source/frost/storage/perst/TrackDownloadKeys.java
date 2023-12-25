@@ -20,10 +20,12 @@ package frost.storage.perst;
 
 import org.garret.perst.*;
 
+import frost.util.CopyToClipboardItem;
+
 /**
  * Represents the item for the TrackDownloadKey.
  */
-public class TrackDownloadKeys extends Persistent {
+public class TrackDownloadKeys extends Persistent implements CopyToClipboardItem {
 
 	private String chkKey;
 	private String fileName;
@@ -51,7 +53,7 @@ public class TrackDownloadKeys extends Persistent {
 		this.downloadFinishedTime = trackDownloadKey.downloadFinishedTime;
 	}
 
-	public String getChkKey() {
+	public String getKey() {
 		return chkKey;
 	}
 
@@ -67,8 +69,8 @@ public class TrackDownloadKeys extends Persistent {
 		return fileSize;
 	}
 
-	public void setChkKey(String chkKey) {
-		this.chkKey = chkKey;
+	public void setKey(final String newKey) {
+		this.chkKey = newKey;
 	}
 
 	public long getDownloadFinishedTime() {

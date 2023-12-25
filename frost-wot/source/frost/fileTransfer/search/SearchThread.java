@@ -85,10 +85,10 @@ class SearchThread extends Thread implements FileListCallback {
             }
         }
 
-        // hideFiles: show file if no bad/check/observe owner; or if at least 1 owner is good/observe
-        if( searchParams.isHideBadUserFiles() 
-                || searchParams.isHideCheckUserFiles()
-                || searchParams.isHideObserveUserFiles()) 
+        // hideFiles: show file if no BAD/NEUTRAL/GOOD owner; or if at least 1 owner is GOOD/FRIEND
+        if( searchParams.isHideBADUserFiles() 
+                || searchParams.isHideNEUTRALUserFiles()
+                || searchParams.isHideGOODUserFiles()) 
         {
             boolean accept = true;
             for( Iterator<FrostFileListFileObjectOwner> i = fo.getFrostFileListFileObjectOwnerIterator(); i.hasNext(); ) {
@@ -97,17 +97,17 @@ class SearchThread extends Thread implements FileListCallback {
                     Identity id = Core.getIdentities().getIdentity(ob.getOwner());
                     if (id != null ) { 
                         
-                        if( id.isBAD() && searchParams.isHideBadUserFiles() ) {
-                            accept = false; // dont break, maybe there is a good
-                        } else if( id.isCHECK() && searchParams.isHideCheckUserFiles() ) {
-                            accept = false; // dont break, maybe there is a good
-                        } else if( id.isOBSERVE() && searchParams.isHideObserveUserFiles() ) {
-                            accept = false; // dont break, maybe there is a good
+                        if( id.isBAD() && searchParams.isHideBADUserFiles() ) {
+                            accept = false; // dont break, maybe there is a FRIEND
+                        } else if( id.isNEUTRAL() && searchParams.isHideNEUTRALUserFiles() ) {
+                            accept = false; // dont break, maybe there is a FRIEND
+                        } else if( id.isGOOD() && searchParams.isHideGOODUserFiles() ) {
+                            accept = false; // dont break, maybe there is a FRIEND
                         }
                         
-                        if( id.isGOOD() || (id.isOBSERVE() && !searchParams.isHideObserveUserFiles()) ) {
+                        if( id.isFRIEND() || (id.isGOOD() && !searchParams.isHideGOODUserFiles()) ) {
                             accept = true;
-                            break; // break, one GOOD is enough to accept
+                            break; // break, one FRIEND is enough to accept
                         }
                     }                
                 }

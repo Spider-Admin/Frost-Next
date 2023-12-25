@@ -22,6 +22,8 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.*;
 import java.util.List;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.InterruptedException;
 
 import javax.swing.*;
 import javax.swing.text.*;
@@ -33,7 +35,9 @@ import frost.gui.model.*;
 import frost.messaging.frost.*;
 import frost.messaging.frost.boards.*;
 import frost.messaging.frost.gui.*;
+import frost.messaging.frost.gui.messagetreetable.MessageTreeTable;
 import frost.messaging.frost.threads.*;
+import frost.util.Mixed;
 import frost.util.gui.*;
 import frost.util.gui.translation.*;
 import frost.util.gui.tristatecheckbox.*;
@@ -60,6 +64,7 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
     private JPanel PbuttonsRight = null;
     private JPanel PbuttonsLeft = null;
     private JButton BopenMsg = null;
+    private JButton BgotoMsg = null;
     private JPanel Pattachments = null;
     private JCheckBox attachment_CBmustContainBoards = null;
     private JCheckBox attachment_CBmustContainFiles = null;
@@ -90,12 +95,12 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
     private JRadioButton truststate_RBall = null;
     private JRadioButton truststate_RBchosed = null;
     private JPanel truststate_PtrustStates = null;
-    private JCheckBox truststate_CBgood = null;
-    private JCheckBox truststate_CBobserve = null;
-    private JCheckBox truststate_CBcheck = null;
-    private JCheckBox truststate_CBbad = null;
-    private JCheckBox truststate_CBnone = null;
-    private JCheckBox truststate_CBtampered = null;
+    private JCheckBox truststate_CBFRIEND = null;
+    private JCheckBox truststate_CBGOOD = null;
+    private JCheckBox truststate_CBNEUTRAL = null;
+    private JCheckBox truststate_CBBAD = null;
+    private JCheckBox truststate_CBNONE = null;
+    private JCheckBox truststate_CBTAMPERED = null;
     private JPanel Parchive = null;
     private JRadioButton archive_RBkeypoolAndArchive = null;
     private JRadioButton archive_RBkeypoolOnly = null;
@@ -242,7 +247,7 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
         if( Bsearch == null ) {
             Bsearch = new JButton();
             // enter key anywhere in dialog (except in table where it opens a msg) starts or stops searching
-            Bsearch.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke("ENTER"), "startStopSearch");
+            Bsearch.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0, true), "startStopSearch");
             final Action action = new AbstractAction() {
                 public void actionPerformed(final ActionEvent arg0) {
                     if( getBsearch().isEnabled() ) {
@@ -795,12 +800,12 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
             gridBagConstraints19.insets = new java.awt.Insets(1,0,1,5);
             truststate_PtrustStates = new JPanel();
             truststate_PtrustStates.setLayout(new GridBagLayout());
-            truststate_PtrustStates.add(getTruststate_CBgood(), gridBagConstraints19);
-            truststate_PtrustStates.add(getTruststate_CBobserve(), gridBagConstraints20);
-            truststate_PtrustStates.add(getTruststate_CBcheck(), gridBagConstraints21);
-            truststate_PtrustStates.add(getTruststate_CBbad(), gridBagConstraints22);
-            truststate_PtrustStates.add(getTruststate_CBnone(), gridBagConstraints23);
-            truststate_PtrustStates.add(getTruststate_CBtampered(), gridBagConstraints24);
+            truststate_PtrustStates.add(getTruststate_CBFRIEND(), gridBagConstraints19);
+            truststate_PtrustStates.add(getTruststate_CBGOOD(), gridBagConstraints20);
+            truststate_PtrustStates.add(getTruststate_CBNEUTRAL(), gridBagConstraints21);
+            truststate_PtrustStates.add(getTruststate_CBBAD(), gridBagConstraints22);
+            truststate_PtrustStates.add(getTruststate_CBNONE(), gridBagConstraints23);
+            truststate_PtrustStates.add(getTruststate_CBTAMPERED(), gridBagConstraints24);
         }
         return truststate_PtrustStates;
     }
@@ -810,11 +815,11 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
      *
      * @return javax.swing.JCheckBox
      */
-    private JCheckBox getTruststate_CBgood() {
-        if( truststate_CBgood == null ) {
-            truststate_CBgood = new JCheckBox();
+    private JCheckBox getTruststate_CBFRIEND() {
+        if( truststate_CBFRIEND == null ) {
+            truststate_CBFRIEND = new JCheckBox();
         }
-        return truststate_CBgood;
+        return truststate_CBFRIEND;
     }
 
     /**
@@ -822,11 +827,11 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
      *
      * @return javax.swing.JCheckBox
      */
-    private JCheckBox getTruststate_CBobserve() {
-        if( truststate_CBobserve == null ) {
-            truststate_CBobserve = new JCheckBox();
+    private JCheckBox getTruststate_CBGOOD() {
+        if( truststate_CBGOOD == null ) {
+            truststate_CBGOOD = new JCheckBox();
         }
-        return truststate_CBobserve;
+        return truststate_CBGOOD;
     }
 
     /**
@@ -834,11 +839,11 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
      *
      * @return javax.swing.JCheckBox
      */
-    private JCheckBox getTruststate_CBcheck() {
-        if( truststate_CBcheck == null ) {
-            truststate_CBcheck = new JCheckBox();
+    private JCheckBox getTruststate_CBNEUTRAL() {
+        if( truststate_CBNEUTRAL == null ) {
+            truststate_CBNEUTRAL = new JCheckBox();
         }
-        return truststate_CBcheck;
+        return truststate_CBNEUTRAL;
     }
 
     /**
@@ -846,11 +851,11 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
      *
      * @return javax.swing.JCheckBox
      */
-    private JCheckBox getTruststate_CBbad() {
-        if( truststate_CBbad == null ) {
-            truststate_CBbad = new JCheckBox();
+    private JCheckBox getTruststate_CBBAD() {
+        if( truststate_CBBAD == null ) {
+            truststate_CBBAD = new JCheckBox();
         }
-        return truststate_CBbad;
+        return truststate_CBBAD;
     }
 
     /**
@@ -858,11 +863,11 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
      *
      * @return javax.swing.JCheckBox
      */
-    private JCheckBox getTruststate_CBnone() {
-        if( truststate_CBnone == null ) {
-            truststate_CBnone = new JCheckBox();
+    private JCheckBox getTruststate_CBNONE() {
+        if( truststate_CBNONE == null ) {
+            truststate_CBNONE = new JCheckBox();
         }
-        return truststate_CBnone;
+        return truststate_CBNONE;
     }
 
     /**
@@ -870,11 +875,11 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
      *
      * @return javax.swing.JCheckBox
      */
-    private JCheckBox getTruststate_CBtampered() {
-        if( truststate_CBtampered == null ) {
-            truststate_CBtampered = new JCheckBox();
+    private JCheckBox getTruststate_CBTAMPERED() {
+        if( truststate_CBTAMPERED == null ) {
+            truststate_CBTAMPERED = new JCheckBox();
         }
-        return truststate_CBtampered;
+        return truststate_CBTAMPERED;
     }
 
     /**
@@ -907,7 +912,6 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
             gridBagConstraints26.fill = java.awt.GridBagConstraints.NONE;
             Parchive = new JPanel();
             Parchive.setLayout(new GridBagLayout());
-            Parchive.setPreferredSize(new java.awt.Dimension(517,25));
             Parchive.setBorder(javax.swing.BorderFactory.createCompoundBorder(javax.swing.BorderFactory.createEmptyBorder(3,3,3,3), javax.swing.BorderFactory.createEtchedBorder(javax.swing.border.EtchedBorder.LOWERED)));
             Parchive.add(getArchive_RBkeypoolOnly(), gridBagConstraints27);
             Parchive.add(getArchive_RBarchiveOnly(), gridBagConstraints28);
@@ -924,7 +928,6 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
     private JRadioButton getArchive_RBkeypoolAndArchive() {
         if( archive_RBkeypoolAndArchive == null ) {
             archive_RBkeypoolAndArchive = new JRadioButton();
-            archive_RBkeypoolAndArchive.setPreferredSize(new java.awt.Dimension(195,20));
         }
         return archive_RBkeypoolAndArchive;
     }
@@ -937,7 +940,6 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
     private JRadioButton getArchive_RBkeypoolOnly() {
         if( archive_RBkeypoolOnly == null ) {
             archive_RBkeypoolOnly = new JRadioButton();
-            archive_RBkeypoolOnly.setPreferredSize(new java.awt.Dimension(152,20));
         }
         return archive_RBkeypoolOnly;
     }
@@ -950,7 +952,6 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
     private JRadioButton getArchive_RBarchiveOnly() {
         if( archive_RBarchiveOnly == null ) {
             archive_RBarchiveOnly = new JRadioButton();
-            archive_RBarchiveOnly.setPreferredSize(new java.awt.Dimension(150,20));
         }
         return archive_RBarchiveOnly;
     }
@@ -1162,17 +1163,20 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
                 @Override
                 public void mousePressed(final MouseEvent e) {
                     if(SwingUtilities.isLeftMouseButton(e) && e.getClickCount() == 2) {
-                        openSelectedMessage();
+                        openSelectedMessage(); // double click opens message
                     }
                 }
             });
 
+            // remove all default Enter assignments from table (default assignment makes Enter select the next row)
+            searchResultTable.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).getParent().remove(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0));
+
             // enter should not jump to next message, but open the selected msg (if any)
-            searchResultTable.getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke("ENTER"), "openMessage");
+            searchResultTable.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0, true), "openMessage");
             final Action action = new AbstractAction() {
                 public void actionPerformed(final ActionEvent arg0) {
                     if( getBopenMsg().isEnabled() ) {
-                        openSelectedMessage();
+                        openSelectedMessage(); // enter opens message
                     }
                 }
             };
@@ -1259,10 +1263,10 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
         // get and sort all boards
         final List<Board> allBoards = MainFrame.getInstance().getFrostMessageTab().getTofTreeModel().getAllBoards();
         if (allBoards.size() == 0) {
-            JOptionPane.showMessageDialog(this,
+            MiscToolkit.showMessageDialog(this,
                     language.getString("SearchMessages.errorDialogs.noBoardsToChoose"),
                     language.getString("SearchMessages.errorDialogs.title"),
-                    JOptionPane.ERROR_MESSAGE);
+                    MiscToolkit.ERROR_MESSAGE);
             return;
         }
         Collections.sort(allBoards);
@@ -1307,9 +1311,29 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
 
         final SearchMessagesConfig scfg = new SearchMessagesConfig();
 
-        scfg.setSenderString(getSearch_TFsender().getText().trim(), !senderCaseCheckBox.isSelected());
-        scfg.setSubjectString(getSearch_TFsubject().getText().trim(), !subjectCaseCheckBox.isSelected());
-        scfg.setContentString(getSearch_TFcontent().getText().trim(), !contentCaseCheckBox.isSelected());
+        // visibly trim the user-provided search fields so that there's no leading/trailing
+        // whitespace (they probably don't mean to do that, and it would affect the search).
+        getSearch_TFsender().setText(getSearch_TFsender().getText().trim());
+        getSearch_TFsubject().setText(getSearch_TFsubject().getText().trim());
+        getSearch_TFcontent().setText(getSearch_TFcontent().getText().trim());
+
+        // compile the regex patterns (each pattern becomes a non-null value if a valid
+        // regex was provided for that field).
+        scfg.setSearchSender(getSearch_TFsender().getText(), senderCaseCheckBox.isSelected());
+        scfg.setSearchSubject(getSearch_TFsubject().getText(), subjectCaseCheckBox.isSelected());
+        scfg.setSearchContent(getSearch_TFcontent().getText(), contentCaseCheckBox.isSelected());
+
+        // validate all provided search patterns to make sure they're syntactically correct
+        if( (!scfg.senderString.isEmpty() && scfg.senderPattern==null)
+            || (!scfg.subjectString.isEmpty() && scfg.subjectPattern==null)
+            || (!scfg.contentString.isEmpty() && scfg.contentPattern==null) ) {
+            // one or more of the user-provided patterns had a string provided, but didn't get a
+            // valid regex. that means that the regex compilation failed due to syntax errors,
+            // so refuse to perform this search until the user has fixed their search pattern.
+            // the user has already been warned via a dialog box from the regex compiler, so no
+            // further error boxes are required here.
+            return null; // no search config = search won't take place
+        }
 
         scfg.searchPrivateMsgsOnly = getSearch_CBprivateMsgsOnly().getBooleanState();
         scfg.searchFlaggedMsgsOnly = getSearch_CBflaggedMsgsOnly().getBooleanState();
@@ -1322,10 +1346,10 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
 //            scfg.searchBoards = SearchConfig.BOARDS_EXISTING_DIRS;
         } else if( getBoards_RBchosed().isSelected() ) {
             if( chosedBoardsList.size() == 0 ) {
-                JOptionPane.showMessageDialog(this,
+                MiscToolkit.showMessageDialog(this,
                         language.getString("SearchMessages.errorDialogs.noBoardsChosen"),
                         language.getString("SearchMessages.errorDialogs.title"),
-                        JOptionPane.ERROR_MESSAGE);
+                        MiscToolkit.ERROR_MESSAGE);
                 return null;
             }
             scfg.searchBoards = SearchMessagesConfig.BOARDS_CHOSED;
@@ -1345,17 +1369,17 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
 
                 // check start before end
                 if( scfg.startDate > scfg.endDate ) {
-                    JOptionPane.showMessageDialog(this,
+                    MiscToolkit.showMessageDialog(this,
                             language.getString("SearchMessages.errorDialogs.startDateIsAfterEndDate"),
                             language.getString("SearchMessages.errorDialogs.title"),
-                            JOptionPane.ERROR_MESSAGE);
+                            MiscToolkit.ERROR_MESSAGE);
                     return null;
                 }
             } catch(final Exception ex) {
-                JOptionPane.showMessageDialog(this,
+                MiscToolkit.showMessageDialog(this,
                         language.getString("SearchMessages.errorDialogs.invalidStartOrEndDate"),
                         language.getString("SearchMessages.errorDialogs.title"),
-                        JOptionPane.ERROR_MESSAGE);
+                        MiscToolkit.ERROR_MESSAGE);
                 return null;
             }
         } else if( getDate_RBdaysBackward().isSelected() ) {
@@ -1371,20 +1395,20 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
             scfg.searchTruststates = SearchMessagesConfig.TRUST_ALL;
         } else if( getTruststate_RBchosed().isSelected() ) {
             scfg.searchTruststates = SearchMessagesConfig.TRUST_CHOSED;
-            scfg.trust_good = getTruststate_CBgood().isSelected();
-            scfg.trust_observe = getTruststate_CBobserve().isSelected();
-            scfg.trust_check = getTruststate_CBcheck().isSelected();
-            scfg.trust_bad = getTruststate_CBbad().isSelected();
-            scfg.trust_none = getTruststate_CBnone().isSelected();
-            scfg.trust_tampered = getTruststate_CBtampered().isSelected();
+            scfg.trust_FRIEND = getTruststate_CBFRIEND().isSelected();
+            scfg.trust_GOOD = getTruststate_CBGOOD().isSelected();
+            scfg.trust_NEUTRAL = getTruststate_CBNEUTRAL().isSelected();
+            scfg.trust_BAD = getTruststate_CBBAD().isSelected();
+            scfg.trust_NONE = getTruststate_CBNONE().isSelected();
+            scfg.trust_TAMPERED = getTruststate_CBTAMPERED().isSelected();
 
-            if( !scfg.trust_good && !scfg.trust_observe && !scfg.trust_check &&
-                !scfg.trust_bad && !scfg.trust_none && !scfg.trust_tampered )
+            if( !scfg.trust_FRIEND && !scfg.trust_GOOD && !scfg.trust_NEUTRAL &&
+                !scfg.trust_BAD && !scfg.trust_NONE && !scfg.trust_TAMPERED )
             {
-                JOptionPane.showMessageDialog(this,
+                MiscToolkit.showMessageDialog(this,
                         language.getString("SearchMessages.errorDialogs.noTrustStateSelected"),
                         language.getString("SearchMessages.errorDialogs.title"),
-                        JOptionPane.ERROR_MESSAGE);
+                        MiscToolkit.ERROR_MESSAGE);
                 return null;
             }
         }
@@ -1489,10 +1513,10 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
     private void closePressed() {
         if( getRunningSearchThread() != null ) {
             // close not allowed, search must be stopped
-            JOptionPane.showMessageDialog(this,
+            MiscToolkit.showMessageDialog(this,
                     language.getString("SearchMessages.errorDialog.stopSearchBeforeClose"),
                     language.getString("SearchMessages.errorDialogs.title"),
-                    JOptionPane.ERROR_MESSAGE);
+                    MiscToolkit.ERROR_MESSAGE);
             return;
         }
         saveWindowState();
@@ -1525,6 +1549,7 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
         getBsearch().setText(stopSearchStr);
 
         getBopenMsg().setEnabled(false);
+        getBgotoMsg().setEnabled(false);
 
         setRunningSearchThread(new SearchMessagesThread(this, searchMessagesConfig));
         getRunningSearchThread().setPriority(Thread.MIN_PRIORITY); // low prio
@@ -1555,10 +1580,164 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
                 if( !getBopenMsg().isEnabled() ) {
                     getBopenMsg().setEnabled(true);
                 }
+                if( !getBgotoMsg().isEnabled() ) {
+                    getBgotoMsg().setEnabled(true);
+                }
             }
         });
     }
-// TODO: add 'jump to msg in board'. not for archived msgs
+
+    private class GotoSelectedMessageThread extends Thread {
+        private FrostMessageObject msgObj; // the actual frost message object describing the message
+        private Component dialogParentFrame; // used for parenting any error dialog boxes to the search frame
+        private int resultRow; // just used to force an "update" of the result row after we're done, to show the message as read
+
+        public GotoSelectedMessageThread(final FrostMessageObject msgObj, final Component dialogParentFrame, final int resultRow) {
+            this.msgObj = msgObj;
+            this.dialogParentFrame = dialogParentFrame;
+            this.resultRow = resultRow;
+        }
+
+        private void cleanup() {
+            // runs these jobs on the main AWT event queue, so that the GUI updates happen at the correct time
+            SwingUtilities.invokeLater(new Runnable() {
+                public void run() {
+                    // re-enable the "go to message" GUI button
+                    BgotoMsg.setEnabled(true);
+                }
+            });
+        }
+
+        public void run() {
+            // get a reference to the "news" tab (the one containing the board tree, message list, etc.
+            // NOTE: we grab the "Frost" message tab since Frost's search only deals with Frost
+            // messages, so we don't have to worry about Freetalk at all.
+            final FrostMessageTab newsTab = MainFrame.getInstance().getFrostMessageTab();
+
+            // ensure that the board exists in the board tree and select it (if not already selected).
+            // we unfortunately NEED to select the board first, so that it'll load all messages into
+            // the message tree, before we can actually check if the message exists in the board.
+            final int boardSelResult = newsTab.getTofTree().setSelectedBoard(msgObj.getBoard());
+            if( boardSelResult < 0 ) { // board does not exist, or exists but could not be selected
+                if( boardSelResult == -1 ) {
+                    // the message's board isn't in their list of subscribed boards, so warn the user and abort
+                    MiscToolkit.showMessageDialog(dialogParentFrame,
+                            language.getString("SearchMessages.errorDialogs.gotoCannotFindBoard"),
+                            language.getString("SearchMessages.errorDialogs.title"),
+                            MiscToolkit.ERROR_MESSAGE);
+                }
+                cleanup();
+                return;
+            }
+
+            // we know that the board exists and is selected. now make sure that the main Frost
+            // window is displaying the "News" tab; the switch takes place in the GUI thread, and
+            // therefore happens instantly as long as the GUI thread isn't busy... either way,
+            // we will wait until the tab switch is complete!
+            // NOTE: we can instantly call "invokeAndWait" without having to check if we're already
+            // running in the main GUI thread, since the "go to message" thread is *always* an
+            // independent worker-thread.
+            try {
+                SwingUtilities.invokeAndWait(new Runnable() {
+                    public void run() {
+                        MainFrame.getInstance().selectTabbedPaneTab("MainFrame.tabbedPane.news");
+                    }
+                });
+            } catch( InterruptedException e ) {
+                return; // if the dispatched job was interrupted (such as the GUI shutting down), then simply abort this thread
+            } catch( InvocationTargetException e ) {
+                return; // same thing if any of the called functions threw a runtime exception
+            }
+
+            // if the board selection has changed (either by us, or externally), then we need to
+            // give Frost some time to load the messages from disk before we try handling them.
+            // NOTE: we *could* check "if boardSelResult > 0" to see if *we* triggered a board
+            // switch; but it's safer to do this check at all times, so that it never tries to
+            // scan for the message while *any* form of message list refresh is in progress.
+            final TOF tof = TOF.getInstance();
+            int msWaited = 0;
+            while( tof.isLoadingMessages() ) {
+                // wait for the board messages to load into the table view
+                Mixed.wait(150);
+                msWaited += 150;
+                if( msWaited >= 15000 ) {
+                    // we've waited for 15 seconds for the board to load its messages; no boards
+                    // should be taking this long (usually they take ~1 second or less), so let's
+                    // give up... the user can simply click the "go to message" button again
+                    // when the board has finished loading, if they really want to.
+                    // UPDATE: Thanks to Frost-Next's rewritten board loader, even massive boards
+                    // with tens of thousands of messages now load in less than a second instead
+                    // of several minutes, so this is NEVER going to reach 15s and abort! ;-)
+                    cleanup();
+                    return; // loading of board messages is taking way too long; abort silently...
+                }
+            }
+
+            // alright the board exists, is selected and all messages are loaded...
+            // now look for our message in the message tree view...
+
+            // get a reference to the "message tree table", which is the tree within the
+            // messagepanel that contains the list of all loaded messages for that board,
+            // and tell it to select (and scroll to) the desired message, if possible
+            final int msgSelResult = newsTab.getMessagePanel().getMessageTable().setSelectedMessage(msgObj);
+            if( msgSelResult < 0 ) {
+                    // a <0 result means the message does not exist (may be hidden by view-filter),
+                    // or exists but could not be selected (-2; but we treat that as "not found",
+                    // since it should never be able to happen).
+                    // the message wasn't found in the board, most likely because of the user's
+                    // filtering, so warn the user and abort.
+                    // most common filtering reasons: frost is set to only "display X days" (but
+                    // user has done a "search: date: search all dates" (even invisible ones)),
+                    // or they've hit the "show only unread messages" toolbar button, or enabled
+                    // "hide anonymous users", and things like that.
+                    // NOTE: we are NOT going to change the user's board view filters for them;
+                    // that's intrusive. let them decide!
+                    MiscToolkit.showMessageDialog(dialogParentFrame,
+                            language.getString("SearchMessages.errorDialogs.gotoCannotFindMessage"),
+                            language.getString("SearchMessages.errorDialogs.title"),
+                            MiscToolkit.ERROR_MESSAGE);
+                cleanup();
+                return;
+            }
+
+            // if the message was marked as "unread" in the search results table, then mark it as
+            // read instead. this is just a nice little cosmetic bonus. note that the resultRow is
+            // model-based and therefore always correct even if the user quickly re-sorts the table
+            // before the update triggers.
+            if( msgObj.isNew() ) {
+                SwingUtilities.invokeLater(new Runnable() {
+                    public void run() {
+                        msgObj.setNew(false);
+                        getSearchMessagesTableModel().fireTableRowsUpdated(resultRow, resultRow);
+                    }
+                });
+            }
+
+            // we're done! the message has been selected; now just re-enable the "go to message" button!
+            cleanup();
+        }
+    }
+    private void gotoSelectedMessage() {
+        // retrieve the frost message object for the selected message
+        final int row = getSearchResultTable().getSelectedRow();
+        if (row < 0) {
+            return;
+        }
+        final FrostSearchResultMessageObject resultMsgObj = (FrostSearchResultMessageObject)getSearchMessagesTableModel().getRow(row);
+        if( resultMsgObj == null ) {
+            return;
+        }
+        final FrostMessageObject mo = resultMsgObj.getMessageObject();
+
+        // disable the "go to message" button, so that the user can't start multiple "go to
+        // message" jobs by spamming the button
+        BgotoMsg.setEnabled(false);
+
+        // start a separate thread to do the message selection, so that we don't lock up the main GUI
+        final GotoSelectedMessageThread gotoThread = new GotoSelectedMessageThread(mo, this, row);
+        gotoThread.start();
+    }
+
     private void openSelectedMessage() {
         final int row = getSearchResultTable().getSelectedRow();
         if (row < 0) {
@@ -1627,31 +1806,18 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
         final boolean lastMaximized = Core.frostSettings.getBoolValue("searchMessagesDialog.lastFrameMaximized");
 
         if( lastHeight <= 0 || lastWidth <= 0 ) {
-            // first call
+            // first time the user opens the search dialog; use the default search window size
             setSize(700,550);
             setLocationRelativeTo(MainFrame.getInstance());
             return;
         }
 
-        final Dimension scrSize = Toolkit.getDefaultToolkit().getScreenSize();
-
-        if (lastWidth < 100) {
+	// resize to default dimensions if the user made the window too small last time
+        if (lastWidth < 200) {
             lastWidth = 700;
         }
-        if (lastHeight < 100) {
+        if (lastHeight < 200) {
             lastHeight = 550;
-        }
-
-        if ((lastPosX + lastWidth) > scrSize.width) {
-            setSize(700,550);
-            setLocationRelativeTo(MainFrame.getInstance());
-            return;
-        }
-
-        if ((lastPosY + lastHeight) > scrSize.height) {
-            setSize(700,550);
-            setLocationRelativeTo(MainFrame.getInstance());
-            return;
         }
 
         setBounds(lastPosX, lastPosY, lastWidth, lastHeight);
@@ -1685,12 +1851,13 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
             PbuttonsLeft = new JPanel();
             PbuttonsLeft.add(getBhelp(), null);
             PbuttonsLeft.add(getBopenMsg(), null);
+            PbuttonsLeft.add(getBgotoMsg(), null);
         }
         return PbuttonsLeft;
     }
 
     /**
-     * This method initializes Bfocus
+     * This method initializes BopenMsg
      *
      * @return javax.swing.JButton
      */
@@ -1707,6 +1874,24 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
         return BopenMsg;
     }
 
+    /**
+     * This method initializes BgotoMsg
+     *
+     * @return javax.swing.JButton
+     */
+    private JButton getBgotoMsg() {
+        if( BgotoMsg == null ) {
+            BgotoMsg = new JButton();
+            BgotoMsg.addActionListener(new java.awt.event.ActionListener() {
+                public void actionPerformed(final java.awt.event.ActionEvent e) {
+                    gotoSelectedMessage();
+                }
+            });
+            BgotoMsg.setEnabled(false);
+        }
+        return BgotoMsg;
+    }
+
     public void languageChanged(final LanguageEvent e) {
 
         resultCountPrefix = language.getString("SearchMessages.label.results") + ": ";
@@ -1720,6 +1905,7 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
         }
 
         getBopenMsg().setText(language.getString("SearchMessages.button.openMessage"));
+        getBgotoMsg().setText(language.getString("SearchMessages.button.gotoMessage"));
         getBhelp().setText(language.getString("SearchMessages.button.help"));
         getBcancel().setText(language.getString("SearchMessages.button.close"));
 
@@ -1743,12 +1929,12 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
         getTruststate_RBdisplayed().setText(language.getString("SearchMessages.trustState.searchInMessagesThatWouldBeDisplayed"));
         getTruststate_RBchosed().setText(language.getString("SearchMessages.trustState.searchOnlyInMessagesWithFollowingTrustState"));
 
-        getTruststate_CBtampered().setText(language.getString("SearchMessages.trustState.tampered"));
-        getTruststate_CBnone().setText(language.getString("SearchMessages.trustState.none"));
-        getTruststate_CBbad().setText(language.getString("SearchMessages.trustState.bad"));
-        getTruststate_CBcheck().setText(language.getString("SearchMessages.trustState.check"));
-        getTruststate_CBobserve().setText(language.getString("SearchMessages.trustState.observe"));
-        getTruststate_CBgood().setText(language.getString("SearchMessages.trustState.good"));
+        getTruststate_CBTAMPERED().setText(language.getString("SearchMessages.trustState.TAMPERED"));
+        getTruststate_CBNONE().setText(language.getString("SearchMessages.trustState.NONE"));
+        getTruststate_CBBAD().setText(language.getString("SearchMessages.trustState.BAD"));
+        getTruststate_CBNEUTRAL().setText(language.getString("SearchMessages.trustState.NEUTRAL"));
+        getTruststate_CBGOOD().setText(language.getString("SearchMessages.trustState.GOOD"));
+        getTruststate_CBFRIEND().setText(language.getString("SearchMessages.trustState.FRIEND"));
 
         getArchive_RBarchiveOnly().setText(language.getString("SearchMessages.archive.searchOnlyInArchive"));
         getArchive_RBkeypoolOnly().setText(language.getString("SearchMessages.archive.searchOnlyInKeypool"));
@@ -1831,7 +2017,7 @@ public class SearchMessagesDialog extends JFrame implements LanguageListener {
             } else {
                 Bhelp.addActionListener(new java.awt.event.ActionListener() {
                     public void actionPerformed(final java.awt.event.ActionEvent e) {
-                        MainFrame.getInstance().showHtmlHelp("searchDialog.html");
+                        MainFrame.getInstance().showHtmlHelp("feature_details.html");
                     }
                 });
             }

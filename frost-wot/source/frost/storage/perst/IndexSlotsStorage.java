@@ -98,7 +98,12 @@ public class IndexSlotsStorage extends AbstractFrostStorage implements ExitSavab
     public int cleanup(final int maxDaysOld) {
 
         // millis before maxDaysOld days
-        final long date = new LocalDate().minusDays(maxDaysOld + 1).toDateTimeAtMidnight(DateTimeZone.UTC).getMillis();
+        // NOTE: we do not specify UTC here; we want the local day/time offset, then subtract the
+        // number of days to keep messages, then convert that to the local start of day (midnight).
+        // the result is a UTC timestamp representing the *local* start of that day, so if the user
+        // is in GMT+7, the resulting timestamp would find any message older than X days -7 hours (UTC),
+        // thereby deleting any messages that are X days older than the user's *local* time, exactly as we want it.
+        final long date = new DateTime().minusDays(maxDaysOld + 1).withTimeAtStartOfDay().getMillis(); 
         final Long dateObj = new Long(date);
 
         // delete all items with msgDate < maxDaysOld
@@ -131,20 +136,30 @@ public class IndexSlotsStorage extends AbstractFrostStorage implements ExitSavab
         return deletedCount;
     }
 
-    public IndexSlot getSlotForDate(final int indexName, final long date) {
-        final Key dateKey = new Key(indexName, date);
+    /**
+     * Returns the slotindex for a particular day, or creates a new one if the index doesn't exist..
+     * It is *crucial* that the date you pass in is the MIDNIGHT MILLISECOND TIMESTAMP
+     * of the day you're interested in. To get that, use "x.withTimeAtStartOfDay().getMillis()"
+     * on a *UTC* DateTime object.
+     * NOTE: The "withTimeAtStartOfDay" is the replacement of the "midnight" methods in older
+     * versions of Joda Time, and it doesn't have to refer to 00:00 due to things like daylight
+     * savings time; however, it *always* refers to 00:00 midnight when regarding UTC timestamps.
+     * As for the "indexName", it's always supposed to be the boardId of a Board object.
+     */
+    public IndexSlot getSlotForDateMidnightMillis(final int indexName, final long millisMidnight) {
+        final Key dateKey = new Key(indexName, millisMidnight);
         if( !beginCooperativeThreadTransaction() ) {
             logger.severe("Failed to gather cooperative storage lock, returning new indexslot!");
-            return new IndexSlot(indexName, date);
+            return new IndexSlot(indexName, millisMidnight);
         }
         IndexSlot gis;
         try {
             gis = storageRoot.slotsIndexIL.get(dateKey);
 //        String s = "";
-//        s += "getSlotForDate: indexName="+indexName+", date="+date+"\n";
+//        s += "getSlotForDateMidnightMillis: indexName="+indexName+", millisMidnight="+millisMidnight+"\n";
             if( gis == null ) {
                 // not yet in storage
-                gis = new IndexSlot(indexName, date);
+                gis = new IndexSlot(indexName, millisMidnight);
             }
         } finally {
             endThreadTransaction();

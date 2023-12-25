@@ -30,7 +30,7 @@ import javax.swing.text.*;
  * @author ET
  */
 @SuppressWarnings("serial")
-public class LinkEditorKit extends StyledEditorKit {
+public class LinkEditorKit extends WrapEditorKit { // NOTE: WrapEditorKit is derived from StyledEditorKit but forces line wrapping for extra-long words
 
 	/**
 	 *  attribute on inline elements

@@ -130,36 +130,36 @@ public class SearchPanel extends JPanel implements LanguageListener {
 
     private JSkinnablePopupMenu buildSearchOptionsMenu() {
         final JSkinnablePopupMenu searchOptionsMenu = new JSkinnablePopupMenu();
-        final JMenuItem hideBadUserFilesCheckBox = new JCheckBoxMenuItem(language.getString("SearchPane.toolbar.searchOptions.hideFilesFromPeopleMarkedBad"));
-        final JMenuItem hideCheckUserFilesCheckBox = new JCheckBoxMenuItem(language.getString("SearchPane.toolbar.searchOptions.hideFilesFromPeopleMarkedCheck"));
-        final JMenuItem hideObserveUserFilesCheckBox = new JCheckBoxMenuItem(language.getString("SearchPane.toolbar.searchOptions.hideFilesFromPeopleMarkedObserve"));
+        final JMenuItem hideBADUserFilesCheckBox = new JCheckBoxMenuItem(language.getString("SearchPane.toolbar.searchOptions.hideFilesFromPeopleMarkedBAD"));
+        final JMenuItem hideNEUTRALUserFilesCheckBox = new JCheckBoxMenuItem(language.getString("SearchPane.toolbar.searchOptions.hideFilesFromPeopleMarkedNEUTRAL"));
+        final JMenuItem hideGOODUserFilesCheckBox = new JCheckBoxMenuItem(language.getString("SearchPane.toolbar.searchOptions.hideFilesFromPeopleMarkedGOOD"));
         final JMenuItem hideFilesWithoutChkCheckBox = new JCheckBoxMenuItem(language.getString("SearchPane.toolbar.searchOptions.hideFilesWithoutChk"));
 
-        hideBadUserFilesCheckBox.setSelected(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_BAD));
-        hideCheckUserFilesCheckBox.setSelected(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_CHECK));
-        hideObserveUserFilesCheckBox.setSelected(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_OBSERVE));
+        hideBADUserFilesCheckBox.setSelected(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_BAD));
+        hideNEUTRALUserFilesCheckBox.setSelected(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_NEUTRAL));
+        hideGOODUserFilesCheckBox.setSelected(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_GOOD));
         hideFilesWithoutChkCheckBox.setSelected(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_FILES_WITHOUT_CHK));
 
-        hideBadUserFilesCheckBox.addItemListener( new ItemListener() {
+        hideBADUserFilesCheckBox.addItemListener( new ItemListener() {
             public void itemStateChanged(final ItemEvent e) {
-                Core.frostSettings.setValue(SettingsClass.SEARCH_HIDE_BAD, hideBadUserFilesCheckBox.isSelected());
+                Core.frostSettings.setValue(SettingsClass.SEARCH_HIDE_BAD, hideBADUserFilesCheckBox.isSelected());
             } });
-        hideCheckUserFilesCheckBox.addItemListener( new ItemListener() {
+        hideNEUTRALUserFilesCheckBox.addItemListener( new ItemListener() {
             public void itemStateChanged(final ItemEvent e) {
-                Core.frostSettings.setValue(SettingsClass.SEARCH_HIDE_CHECK, hideCheckUserFilesCheckBox.isSelected());
+                Core.frostSettings.setValue(SettingsClass.SEARCH_HIDE_NEUTRAL, hideNEUTRALUserFilesCheckBox.isSelected());
             } });
-        hideObserveUserFilesCheckBox.addItemListener( new ItemListener() {
+        hideGOODUserFilesCheckBox.addItemListener( new ItemListener() {
             public void itemStateChanged(final ItemEvent e) {
-                Core.frostSettings.setValue(SettingsClass.SEARCH_HIDE_OBSERVE, hideObserveUserFilesCheckBox.isSelected());
+                Core.frostSettings.setValue(SettingsClass.SEARCH_HIDE_GOOD, hideGOODUserFilesCheckBox.isSelected());
             } });
         hideFilesWithoutChkCheckBox.addItemListener( new ItemListener() {
             public void itemStateChanged(final ItemEvent e) {
                 Core.frostSettings.setValue(SettingsClass.SEARCH_HIDE_FILES_WITHOUT_CHK, hideFilesWithoutChkCheckBox.isSelected());
             } });
 
-        searchOptionsMenu.add(hideBadUserFilesCheckBox);
-        searchOptionsMenu.add(hideCheckUserFilesCheckBox);
-        searchOptionsMenu.add(hideObserveUserFilesCheckBox);
+        searchOptionsMenu.add(hideBADUserFilesCheckBox);
+        searchOptionsMenu.add(hideNEUTRALUserFilesCheckBox);
+        searchOptionsMenu.add(hideGOODUserFilesCheckBox);
         searchOptionsMenu.addSeparator();
         searchOptionsMenu.add(hideFilesWithoutChkCheckBox);
 
@@ -222,9 +222,9 @@ public class SearchPanel extends JPanel implements LanguageListener {
             final SearchParameters sp = new SearchParameters(true);
             sp.setExtensions(searchComboBox.getSelectedKey());
             sp.setSimpleSearchString(searchTextField.getText());
-            sp.setHideBadUserFiles(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_BAD));
-            sp.setHideCheckUserFiles(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_CHECK));
-            sp.setHideObserveUserFiles(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_OBSERVE));
+            sp.setHideBADUserFiles(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_BAD));
+            sp.setHideNEUTRALUserFiles(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_NEUTRAL));
+            sp.setHideGOODUserFiles(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_GOOD));
             sp.setHideFilesWithoutChkKey(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_FILES_WITHOUT_CHK));
             return sp;
         }
@@ -324,7 +324,7 @@ public class SearchPanel extends JPanel implements LanguageListener {
          */
         @Override
         public void doLayout() {
-            // Note: BoxLayout uses the maximumSize!
+            // NOTE: BoxLayout uses the maximumSize!
             int nonJtextfieldComponentsWidth = 0;
             final java.util.List<Integer> jtextfieldIndices = new ArrayList<Integer>(); // yes we use autoboxing
             for (int x=0; x<getComponentCount(); x++) {
@@ -442,9 +442,9 @@ public class SearchPanel extends JPanel implements LanguageListener {
             sp.setCommentString(searchCommentTextField.getText());
             sp.setKeywordString(searchKeywordsTextField.getText());
             sp.setOwnerString(searchOwnerTextField.getText());
-            sp.setHideBadUserFiles(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_BAD));
-            sp.setHideCheckUserFiles(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_CHECK));
-            sp.setHideObserveUserFiles(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_OBSERVE));
+            sp.setHideBADUserFiles(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_BAD));
+            sp.setHideNEUTRALUserFiles(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_NEUTRAL));
+            sp.setHideGOODUserFiles(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_GOOD));
             sp.setHideFilesWithoutChkKey(Core.frostSettings.getBoolValue(SettingsClass.SEARCH_HIDE_FILES_WITHOUT_CHK));
             return sp;
         }

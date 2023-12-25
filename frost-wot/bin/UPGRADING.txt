@@ -1,0 +1,51 @@
+To upgrade from one of the old versions of Frost (legacy, Sadao and/or SnowFlake),
+you need to carefully follow this *exact* procedure.
+
+This upgrade must be done by *only* copying your old database into Next; otherwise
+you risk creating a bad mix of old and new code which won't work properly!
+
+Also note that Frost-Next will upgrade your frost.ini and databases to a new format,
+which means that you *cannot* downgrade after you've started Next. (You must back
+up your *whole* old Frost folder if you want the ability to downgrade to it later.)
+
+
+
+# Step 1:
+Make sure that your *old* Frost and Frost-Next are *both* CLOSED DOWN.
+
+
+# Step 2:
+Unpack "Frost-Next.zip" to a *new* folder. Do NOT put it in your old Frost folder (yet).
+
+
+# Step 3:
+Move/Copy these *exact* files from your *old* Frost to your new Frost-Next folder,
+and remember to overwrite all conflicting files and folders:
+
+- config/boards.xml (file): Your list of currently subscribed boards. Important!
+- config/frost.ini (file): Your main application configuration. Important!
+- downloads (folder): Only move if you want to move your previously finished downloads.
+- store (folder): Contains the databases (messages, queued files, etc). Important!
+
+This is the full list. Do NOT move/copy ANYTHING else from the old Frost folder.
+Most importantly, do NOT copy "the whole config folder", since you would overwrite
+some new files from Frost-Next. You must carefully follow the instructions above!
+
+
+# Step 4:
+You can now place your finished Frost-Next folder anywhere you want it.
+
+Tip: I suggest using the same path and folder name as your old Frost installation,
+so that Frost-Next will be able to relativize (simplify) your previous list of
+download-folders from unwieldy, absolute paths to ones that are relative to the
+Frost folder. After the first launch (when the path relativization takes place),
+you can then simply shut down Next and rename its folder to "frost-next" again.
+
+
+# Step 5:
+Start Frost-Next via frost.bat (Windows) or frost.sh (Linux/Mac).
+All of your previous data will be migrated and upgraded on the first launch.
+
+Enjoy!
+
+

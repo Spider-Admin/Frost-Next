@@ -20,6 +20,7 @@
 package frost.gui;
 
 import java.awt.*;
+import java.util.Vector;
 
 import javax.swing.*;
 import javax.swing.tree.*;
@@ -27,6 +28,7 @@ import javax.swing.tree.*;
 import frost.messaging.frost.boards.*;
 import frost.util.gui.*;
 import frost.util.gui.translation.*;
+import frost.MainFrame;
 
 /**
  * This class let the user choose a folder from the folders in tofTree.
@@ -87,12 +89,10 @@ public class TargetFolderChooser extends JDialog {
      * @return void
      */
     private void initialize() {
-        final int dlgSizeX = 350;
-        final int dlgSizeY = 400;
-        final Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
-        final int x = (screen.width-dlgSizeX)/2;
-        final int y = (screen.height-dlgSizeY)/2;
-        setBounds(x,y,dlgSizeX,dlgSizeY);
+        this.setSize(350,400);
+
+        // center this window relative to Frost's main window
+        this.setLocationRelativeTo( MainFrame.getInstance() );
 
         this.setDefaultCloseOperation(javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE);
         this.setModal(true);
@@ -146,6 +146,7 @@ public class TargetFolderChooser extends JDialog {
     private JTree getFolderTree() {
         if( folderTree == null ) {
             folderTree = new JTree(treeModel);
+            folderTree.setToggleClickCount(0); // disable double-click to expand/collapse
             folderTree.setCellRenderer(new CellRenderer());
             folderTree.setSelectionRow(0);
         }

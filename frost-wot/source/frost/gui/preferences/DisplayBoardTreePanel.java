@@ -214,8 +214,8 @@ public class DisplayBoardTreePanel extends JPanel {
         showBoardUpdateVisualizationCheckBox.setSelected(settings.getBoolValue(SettingsClass.BOARD_UPDATE_VISUALIZATION_ENABLED));
         refreshUpdateState();
 
-        selectedColor = (Color) settings.getObjectValue(SettingsClass.BOARD_UPDATE_VISUALIZATION_BGCOLOR_SELECTED);
-        notSelectedColor = (Color) settings.getObjectValue(SettingsClass.BOARD_UPDATE_VISUALIZATION_BGCOLOR_NOT_SELECTED);
+        selectedColor = settings.getColorValue(SettingsClass.COLORS_BOARD_UPDATE_VISUALIZATION_BACKGROUND_SELECTED);
+        notSelectedColor = settings.getColorValue(SettingsClass.COLORS_BOARD_UPDATE_VISUALIZATION_BACKGROUND_NOTSELECTED);
         selectedColorLabel.setBackground(selectedColor);
         notSelectedColorLabel.setBackground(notSelectedColor);
     }
@@ -263,8 +263,8 @@ public class DisplayBoardTreePanel extends JPanel {
         settings.setValue(SettingsClass.SHOW_BOARDTREE_FLAGGEDSTARRED_INDICATOR, showFlaggedStarredIndicators.isSelected());
 
         settings.setValue(SettingsClass.BOARD_UPDATE_VISUALIZATION_ENABLED, showBoardUpdateVisualizationCheckBox.isSelected());
-        settings.setObjectValue(SettingsClass.BOARD_UPDATE_VISUALIZATION_BGCOLOR_SELECTED, selectedColor);
-        settings.setObjectValue(SettingsClass.BOARD_UPDATE_VISUALIZATION_BGCOLOR_NOT_SELECTED, notSelectedColor);
+        settings.setObjectValue(SettingsClass.COLORS_BOARD_UPDATE_VISUALIZATION_BACKGROUND_SELECTED, selectedColor);
+        settings.setObjectValue(SettingsClass.COLORS_BOARD_UPDATE_VISUALIZATION_BACKGROUND_NOTSELECTED, notSelectedColor);
     }
 
     private void selectedColorPressed() {

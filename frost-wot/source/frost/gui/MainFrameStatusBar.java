@@ -26,6 +26,8 @@ import java.awt.event.*;
 import javax.swing.*;
 import javax.swing.border.*;
 
+import org.joda.time.*;
+
 import frost.*;
 import frost.MainFrame;
 import frost.messaging.frost.boards.*;
@@ -117,6 +119,7 @@ public class MainFrameStatusBar extends JPanel {
         p2.setAlignmentY(Component.CENTER_ALIGNMENT);
 
         JPanel p3 = null;
+        /* //#DIEFILESHARING: This entire block has been commented out since filesharing is removed in Frost-Next.
         // shown only if filesharing is enabled
         if( Core.isFreenetOnline() && !Core.frostSettings.getBoolValue(SettingsClass.FILESHARING_DISABLE)) {
             fileListDownloadQueueSizeLabel = new JLabel() {
@@ -134,6 +137,7 @@ public class MainFrameStatusBar extends JPanel {
             p3.setBorder(BorderFactory.createBevelBorder(BevelBorder.LOWERED));
             p3.setAlignmentY(Component.CENTER_ALIGNMENT);
         }
+        */
 
         statusLabelBoard = new JLabel();
         final JPanel p4 = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
@@ -281,6 +285,7 @@ public class MainFrameStatusBar extends JPanel {
 		Board selectedBoard = null;
 		boolean isUpdating = false;
 		int day = -1;
+		int maxDays = -1;
 		String name = selectedNode.getName();
 		if(selectedNode.isBoard())
 		{
@@ -289,7 +294,8 @@ public class MainFrameStatusBar extends JPanel {
 			if (selectedBoard.isUpdating())
 			{
 				isUpdating = true;
-				day = selectedBoard.getLastDayChecked();
+				day = selectedBoard.getLastAllDayStarted();
+				maxDays = selectedBoard.getLastAllMaxDays();
 			}
 		}
 
@@ -298,10 +304,20 @@ public class MainFrameStatusBar extends JPanel {
             .append(language.getString("MainFrame.statusBar.selectedBoard")).append(": ")
             .append(name);
             
-			 if(isUpdating) {
-				sb.append(", " + language.getString("MainFrame.statusBar.updateDay") + " ");
-                sb.append(Integer.toString(day));
-              }
+        if( isUpdating && selectedBoard.isAllDaysUpdating() ) {
+            // this "Day X/Y (YYYY-MM-DD)" indicator is ONLY shown for "all days" scans
+            sb.append(", ").append(language.getString("MainFrame.statusBar.downloadingDay")).append(" ");
+
+            // calculate what the day-offset actually *means*
+            DateTime currentDay = selectedBoard.getLastAllDayStartedDate();
+            if( currentDay == null ) { // calculate it if no object is available
+                currentDay = new DateTime(DateTimeZone.UTC).minusDays(day);
+            }
+
+            // NOTE: we add 1 to day so that we see "Day 1/10" (human speak) instead of "Day 0/10" (computer speak).
+            sb.append(Integer.toString(day+1)).append("/").append(Integer.toString(maxDays));
+            sb.append(" (").append(currentDay.toString("yyyy-MM-dd")).append(")");
+        }
 
         statusLabelBoard.setText(sb.toString());
         //END_EDIT

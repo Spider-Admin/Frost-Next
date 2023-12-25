@@ -21,6 +21,10 @@ package frost;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
+import java.beans.PropertyChangeSupport;
+import java.io.File;
 import java.util.*;
 import java.util.List;
 import java.util.logging.*;
@@ -33,6 +37,7 @@ import javax.swing.tree.*;
 import org.joda.time.*;
 
 import frost.fileTransfer.*;
+import frost.fileTransfer.download.FrostDownloadItem;
 import frost.gui.*;
 import frost.gui.help.*;
 import frost.gui.preferences.*;
@@ -48,7 +53,10 @@ import frost.storage.perst.identities.*;
 import frost.storage.perst.messagearchive.*;
 import frost.storage.perst.messages.*;
 import frost.util.*;
+import frost.util.DesktopUtils;
+import frost.util.SingleTaskWorker;
 import frost.util.gui.*;
+import frost.util.gui.KeyConversionUtility;
 import frost.util.gui.translation.*;
 import frost.util.translate.*;
 
@@ -57,14 +65,16 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
 
     private static final Logger logger = Logger.getLogger(MainFrame.class.getName());
 
-    private final ImageIcon frameIconDefault = MiscToolkit.loadImageIcon("/data/jtc.jpg");
-    private final ImageIcon frameIconNewMessage = MiscToolkit.loadImageIcon("/data/newmessage.gif");
+    private final ImageIcon frameIconDefault = MiscToolkit.loadImageIcon("/data/frost.png");
+    //private final ImageIcon frameIconNewMessage = MiscToolkit.loadImageIcon("/data/newmessage.gif");
 
     private final FrostMessageTab frostMessageTab = new FrostMessageTab(this);
     private final FreetalkMessageTab freetalkMessageTab = new FreetalkMessageTab(this);
+    private final MessageColorManager messageColorManager = new MessageColorManager();
 
     private HelpBrowserFrame helpBrowser = null;
     private MemoryMonitor memoryMonitor = null;
+    private ManageTrackedDownloads manageTrackedDownloads = null;
 
     private long todaysDateMillis = 0;
 
@@ -74,17 +84,16 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
 
     private long counter = 55;
 
-    private static java.util.List<StartupMessage> queuedStartupMessages = new LinkedList<StartupMessage>();
-
     //File Menu
     private final JMenu fileMenu = new JMenu();
     private final JMenuItem fileExitMenuItem = new JMenuItem();
-    private final JMenuItem fileReloadSettings = new JMenuItem();
+    private final JMenuItem fileOpenDownloadDirMenuItem = new JMenuItem();
     private final JMenuItem fileStatisticsMenuItem = new JMenuItem();
 
     private final JMenuItem helpAboutMenuItem = new JMenuItem();
     private final JMenuItem helpHelpMenuItem = new JMenuItem();
     private final JMenuItem helpMemMonMenuItem = new JMenuItem();
+    private final JMenuItem helpKeyConversionUtilityMenuItem = new JMenuItem();
 
     //Help Menu
     private final JMenu helpMenu = new JMenu();
@@ -237,6 +246,11 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
         return tabbedPane;
     }
 
+    /**
+     * Selects the named top-bar tab in the main Frost window.
+     * @param title - The name of the tab; should be given in the following internal name format:
+     * "MainFrame.tabbedPane.news", "MainFrame.tabbedPane.sharing", etc
+     */
     public void selectTabbedPaneTab(final String title) {
         final int position = getTabbedPane().indexOfTab(title);
         if (position != -1) {
@@ -262,15 +276,15 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
 
             tofAutomaticUpdateMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/mail-send-receive.png", 16, 16));
 
-            fileExitMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/system-log-out.png", 16, 16));
-            fileStatisticsMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/x-office-spreadsheet.png", 16, 16));
-            fileReloadSettings.setIcon(MiscToolkit.getScaledImage("/data/toolbar/arrow_switch.png", 16, 16));
+            fileExitMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/system-shutdown.png", 16, 16));
+            fileOpenDownloadDirMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/folder-open.png", 16, 16));
+            fileStatisticsMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/x-office-presentation.png", 16, 16));
             lookAndFeelMenu.setIcon(MiscToolkit.getScaledImage("/data/toolbar/preferences-desktop-theme.png", 16, 16));
             optionsManageIdentitiesMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/group.png", 16, 16));
-            //optionsManageTrackedDownloadsMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/filelist.png", 16, 16));
+            optionsManageTrackedDownloadsMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/document-properties.png", 16, 16));
             optionsManageLocalIdentitiesMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/user.png", 16, 16));
             optionsPreferencesMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/preferences-system.png", 16, 16));
-            helpAboutMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/award_star_silver_3.png", 16, 16));
+            helpAboutMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/about-icon.png", 16, 16));
             pluginTranslateMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/arrow_switch.png", 16, 16));
 
             // add action listener
@@ -279,14 +293,14 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
                     fileExitMenuItem_actionPerformed();
                 }
             });
+            fileOpenDownloadDirMenuItem.addActionListener(new ActionListener() {
+                public void actionPerformed(final ActionEvent e) {
+                    fileOpenDownloadDirMenuItem_actionPerformed(e);
+                }
+            });
             fileStatisticsMenuItem.addActionListener(new ActionListener() {
                 public void actionPerformed(final ActionEvent e) {
                     fileStatisticsMenuItem_actionPerformed(e);
-                }
-            });
-            fileReloadSettings.addActionListener(new ActionListener() {
-                public void actionPerformed(final ActionEvent e) {
-                    fileReloadSettings_actionPerformed();
                 }
             });
             optionsPreferencesMenuItem.addActionListener(new ActionListener() {
@@ -340,11 +354,21 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
                 }
             });
 
+            helpKeyConversionUtilityMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/key-utility.png", 16, 16));
+            helpKeyConversionUtilityMenuItem.addActionListener(new ActionListener() {
+                public void actionPerformed(final ActionEvent e) {
+                    // create a new dialog every time, thus letting the user open multiple ones
+                    (new KeyConversionUtility(MainFrame.this)).startDialog();
+                }
+            });
+
             // construct menu
 
             // File Menu
+            if( DesktopUtils.canPerformOpen() ) {
+                fileMenu.add(fileOpenDownloadDirMenuItem);
+            }
             fileMenu.add(fileStatisticsMenuItem);
-            fileMenu.add(fileReloadSettings);
             fileMenu.addSeparator();
             fileMenu.add(fileExitMenuItem);
             // News Menu
@@ -363,6 +387,7 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
             LanguageGuiSupport.getInstance().buildInitialLanguageMenu(languageMenu);
             // Help Menu
             helpMenu.add(helpMemMonMenuItem);
+            helpMenu.add(helpKeyConversionUtilityMenuItem);
             helpMenu.add(helpHelpMenuItem);
             helpMenu.addSeparator();
             helpMenu.add(helpAboutMenuItem);
@@ -480,39 +505,32 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
     }
 
     /**
-     * File | Reload Settings action performed
-     */
-    public void fileReloadSettings_actionPerformed() {
-		frostSettings.readSettingsFile();
-    }
-
-    /**
      * File | Exit action performed
      */
     public void fileExitMenuItem_actionPerformed() {
 
         // warn if create message windows are open
         if (MessageFrame.getOpenInstanceCount() > 0 || FreetalkMessageFrame.getOpenInstanceCount() > 0) {
-            final int result = JOptionPane.showConfirmDialog(
+            final int answer = MiscToolkit.showConfirmDialog(
                     this,
                     language.getString("MainFrame.openCreateMessageWindows.body"),
                     language.getString("MainFrame.openCreateMessageWindows.title"),
-                    JOptionPane.YES_NO_OPTION,
-                    JOptionPane.QUESTION_MESSAGE);
-            if (result == JOptionPane.NO_OPTION) {
+                    MiscToolkit.YES_NO_OPTION,
+                    MiscToolkit.QUESTION_MESSAGE);
+            if( answer != MiscToolkit.YES_OPTION ) {
                 return;
             }
         }
 
         // warn if messages are currently uploading
         if (UnsentMessagesManager.getRunningMessageUploads() > 0 ) {
-            final int result = JOptionPane.showConfirmDialog(
+            final int answer = MiscToolkit.showConfirmDialog(
                     this,
                     language.getString("MainFrame.runningUploadsWarning.body"),
                     language.getString("MainFrame.runningUploadsWarning.title"),
-                    JOptionPane.YES_NO_OPTION,
-                    JOptionPane.QUESTION_MESSAGE);
-            if (result == JOptionPane.NO_OPTION) {
+                    MiscToolkit.YES_NO_OPTION,
+                    MiscToolkit.QUESTION_MESSAGE);
+            if( answer != MiscToolkit.YES_OPTION ) {
                 return;
             }
         }
@@ -520,6 +538,30 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
         saveLayout();
 
         System.exit(0);
+    }
+
+    /**
+     * File | OpenDownloadDir action performed
+     */
+    private void fileOpenDownloadDirMenuItem_actionPerformed(final ActionEvent evt) {
+        // attempt to open the user's default download dir (the one from the preferences;
+        // not from the download panel's textfield, although they're usually identical
+        // since the latter textfield is set to the default download dir at every startup).
+        final File thisDir = new File(FrostDownloadItem.getDefaultDownloadDir());
+        boolean success = false;
+        if( thisDir.isDirectory() ) {
+            success = DesktopUtils.openDirectory(thisDir);
+        }
+
+        // directory didn't exist or somehow failed to open?
+        if( !success ) {
+            MiscToolkit.showMessageDialog( // borrow error-translation from downloadpane
+                    this,
+                    language.formatMessage("DownloadPane.openDirectoryError.body",
+                        thisDir.toString()),
+                    language.getString("DownloadPane.openDirectoryError.title"),
+                    MiscToolkit.ERROR_MESSAGE);
+        }
     }
 
     /**
@@ -601,37 +643,41 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
         int lastPosX = frostSettings.getIntValue(SettingsClass.MAINFRAME_LAST_X);
         int lastPosY = frostSettings.getIntValue(SettingsClass.MAINFRAME_LAST_Y);
         final boolean lastMaximized = frostSettings.getBoolValue(SettingsClass.MAINFRAME_LAST_MAXIMIZED);
-        final Dimension scrSize = Toolkit.getDefaultToolkit().getScreenSize();
 
-        if (lastWidth < 100) {
-            lastWidth = 700;
+        // revert to an acceptable size if the window has been made too small during the previous
+        // run (this will be overridden with the screen ratio if first run)
+        if (lastWidth < 200) {
+            lastWidth = 900;
         }
-        if (lastWidth > scrSize.width) {
-            lastWidth = scrSize.width;
-        }
-
-        if (lastHeight < 100) {
-            lastHeight = 500;
-        }
-        if (lastHeight > scrSize.height) {
-            lastWidth = scrSize.height;
+        if (lastHeight < 200) {
+            lastHeight = 600;
         }
 
+        // we'll center the window on the default (usually leftmost) monitor if this is the first
+        // run (x and y are both -1) and resize it to a ratio of that screen's size (but clamped
+        // so that it's never too big)
+        if (lastPosX < 0 && lastPosY < 0) {
+            final Rectangle gcfBounds = MiscToolkit.getSafeScreenRectangle( MiscToolkit.getDefaultScreen() );
+            // initialize the window size to a ratio of the screen (so a 16:10 screen will see a 16:10 window)
+            int newPotentialWidth = (int)Math.floor( gcfBounds.width * 0.7 ); // 70% of the screen width
+            int newPotentialHeight = (int)Math.floor( gcfBounds.height * 0.7 ); // 70% of the screen height
+            if( newPotentialWidth > 1300 ){ newPotentialWidth = 1300; } // make sure the values are not too big if the user has a massive screen
+            if( newPotentialHeight > 820 ){ newPotentialHeight = 820; }
+            lastWidth = newPotentialWidth;
+            lastHeight = newPotentialHeight;
+            // center the window
+            lastPosX = gcfBounds.x + ( (gcfBounds.width - lastWidth) / 2 );
+            lastPosY = gcfBounds.y + ( (gcfBounds.height - lastHeight) / 2 );
+        }
+
+        // make sure that no coordinates are lower than the virtual screen space (so if the
+        // window has been pushed past the top or left boundary, it'll be returned to the
+        // leftmost or topmost position as required)
         if (lastPosX < 0) {
             lastPosX = 0;
         }
         if (lastPosY < 0) {
             lastPosY = 0;
-        }
-
-        if ((lastPosX + lastWidth) > scrSize.width) {
-            lastPosX = scrSize.width / 10;
-            lastWidth = (int) ((scrSize.getWidth() / 10.0) * 8.0);
-        }
-
-        if ((lastPosY + lastHeight) > scrSize.height) {
-            lastPosY = scrSize.height / 10;
-            lastHeight = (int) ((scrSize.getHeight() / 10.0) * 8.0);
         }
 
         setBounds(lastPosX, lastPosY, lastWidth, lastHeight);
@@ -663,6 +709,7 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
     /**
      * Options | Preferences action performed
      */
+    private OptionsFrame optionsDlg = null;
     private void optionsPreferencesMenuItem_actionPerformed() {
         try {
             frostSettings.exitSave();
@@ -670,10 +717,10 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
             logger.log(Level.SEVERE, "Error while saving the settings.", se);
         }
 
-        final OptionsFrame optionsDlg = new OptionsFrame(this, frostSettings);
+        optionsDlg = new OptionsFrame(this, frostSettings);
         final boolean okPressed = optionsDlg.runDialog();
         if (okPressed) {
-            // check if signed only+hideCheck+hideBad or blocking words settings changed
+            // check if any of the message-hiding Preferences were changed by the user
             if (optionsDlg.shouldReloadMessages()) {
                 // update the new msg. count for all boards
                 TOF.getInstance().searchAllUnreadMessages(true);
@@ -704,6 +751,13 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
         }
     }
 
+    public OptionsFrame getVisibleOptionsFrame()
+    {
+        if( optionsDlg != null && optionsDlg.isVisible() )
+            return optionsDlg;
+        return null;
+    }
+
     private void optionsManageLocalIdentitiesMenuItem_actionPerformed(final ActionEvent e) {
         final ManageLocalIdentitiesDialog dlg = new ManageLocalIdentitiesDialog();
         dlg.setVisible(true); // modal
@@ -718,7 +772,7 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
     }
 
     private void optionsManageTrackedDownloadsMenuItem_actionPerformed(final ActionEvent e) {
-    	new ManageTrackedDownloads(this).startDialog(this);
+		getManageTrackedDownloads().showDialog();
     }
 
     /**
@@ -772,7 +826,7 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
 
         // check all 60 seconds if the day changed
         if( getTodaysDateMillis() == 0 || (counter % 60) == 0 ) {
-            final long millis = now.toDateMidnight().getMillis();
+            final long millis = now.withTimeAtStartOfDay().getMillis();
             if( getTodaysDateMillis() != millis ) {
                 setTodaysDateMillis(millis);
             }
@@ -814,15 +868,15 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
         getFrostMessageTab().boardTree_actionPerformed();
     }
 
-    public void tofTree_actionPerformed(final TreeSelectionEvent e, final boolean reload) {
-        getFrostMessageTab().boardTree_actionPerformed(reload);
+    public void tofTree_actionPerformed(final TreeSelectionEvent e, final boolean reselectCurrentMessageFallback) {
+        getFrostMessageTab().boardTree_actionPerformed(reselectCurrentMessageFallback);
     }
 
     private void translateMainMenu() {
         fileMenu.setText(language.getString("MainFrame.menu.file"));
         fileExitMenuItem.setText(language.getString("Common.exit"));
+        fileOpenDownloadDirMenuItem.setText(language.getString("MainFrame.menu.file.openDownloadDir"));
         fileStatisticsMenuItem.setText(language.getString("MainFrame.menu.file.statistics"));
-        fileReloadSettings.setText(language.getString("MainFrame.menu.file.reload"));
         tofMenu.setText(language.getString("MainFrame.menu.news"));
         tofAutomaticUpdateMenuItem.setText(language.getString("MainFrame.menu.news.automaticBoardUpdate"));
         optionsMenu.setText(language.getString("MainFrame.menu.options"));
@@ -835,6 +889,7 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
         languageMenu.setText(language.getString("MainFrame.menu.language"));
         helpMenu.setText(language.getString("MainFrame.menu.help"));
         helpMemMonMenuItem.setText(language.getString("MainFrame.menu.help.showMemoryMonitor"));
+        helpKeyConversionUtilityMenuItem.setText(language.getString("MainFrame.menu.help.showKeyConversionUtility"));
         helpHelpMenuItem.setText(language.getString("MainFrame.menu.help.help"));
         helpAboutMenuItem.setText(language.getString("MainFrame.menu.help.aboutFrost"));
     }
@@ -858,6 +913,10 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
             }
         }
 
+        /* NOTE:XXX: commented out so that we no longer show a super ugly 24x24 pixel gif as the application
+         * icon when there are new messages; the tray icon does a much cleaner job of showing new
+         * messages, *and* most importantly, the "setIconImage" call can only be done once on Linux,
+         * so the application icon couldn't update/switch anyway and just got stuck as the wrong one.
         final ImageIcon iconToSet;
         if (showNewMessageIcon) {
             iconToSet = frameIconNewMessage;
@@ -865,6 +924,7 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
             iconToSet = frameIconDefault;
         }
         setIconImage(iconToSet.getImage());
+        */
     }
 
     /**
@@ -880,6 +940,13 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
 
     public boolean isAutomaticBoardUpdateEnabled() {
         return tofAutomaticUpdateMenuItem.isSelected();
+    }
+
+    private ManageTrackedDownloads getManageTrackedDownloads() {
+        if( manageTrackedDownloads == null ) {
+            manageTrackedDownloads = new ManageTrackedDownloads();
+        }
+        return manageTrackedDownloads;
     }
 
     private MemoryMonitor getMemoryMonitor() {
@@ -898,7 +965,7 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
             return;
         }
         if( helpBrowser == null ) {
-            helpBrowser = new HelpBrowserFrame(frostSettings.getValue(SettingsClass.LANGUAGE_LOCALE), "help/help.zip");
+            helpBrowser = new HelpBrowserFrame(frostSettings.getValue(SettingsClass.LANGUAGE_LOCALE), Mixed.getFrostDirFile("help/help.zip", true));
         }
         // show first time or bring to front
         helpBrowser.setVisible(true);
@@ -1009,32 +1076,128 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
         repaint();
     }
 
-    /**
-     * Enqueue a message that is shown after the mainframe became visible.
-     * Used to show messages about problems occured during loading (e.g. missing shared files).
-     */
-    public static void enqueueStartupMessage(final StartupMessage sm) {
-        queuedStartupMessages.add( sm );
-    }
-
-    /**
-     * Show the enqueued messages and finally clear the messages queue.
-     */
-    public void showStartupMessages() {
-        for( final StartupMessage sm : queuedStartupMessages ) {
-            sm.display(this);
-        }
-        // cleanup
-        StartupMessage.cleanup();
-        queuedStartupMessages.clear();
-        queuedStartupMessages = null;
-    }
-
     public FrostMessageTab getFrostMessageTab() {
         return frostMessageTab;
     }
 
     public FreetalkMessageTab getFreetalkMessageTab() {
         return freetalkMessageTab;
+    }
+
+    public MessageColorManager getMessageColorManager()
+    {
+        return messageColorManager;
+    }
+
+    /**
+     * Takes care of keeping track of all message colors and fires a single update event when
+     * all of them change.
+     */
+    public class MessageColorManager
+            implements PropertyChangeListener
+    {
+        private final PropertyChangeSupport fChangeSupport;
+        private SingleTaskWorker fDelayedChangeAnnouncer;
+
+        private Color fMsgNormalColor;
+        private Color fMsgPrivColor;
+        private Color fMsgWithAttachmentsColor;
+        private Color fMsgUnsignedColor;
+
+        public MessageColorManager()
+        {
+            // sets up the ability for us to announce changes to our listeners
+            fChangeSupport = new PropertyChangeSupport(this);
+            fDelayedChangeAnnouncer = new SingleTaskWorker();
+
+            // we want to listen to the core settings for changes to the colors we're interested in
+            Core.frostSettings.addPropertyChangeListener(SettingsClass.COLORS_MESSAGE_NORMALMSG, this);
+            Core.frostSettings.addPropertyChangeListener(SettingsClass.COLORS_MESSAGE_PRIVMSG, this);
+            Core.frostSettings.addPropertyChangeListener(SettingsClass.COLORS_MESSAGE_WITHATTACHMENTS, this);
+            Core.frostSettings.addPropertyChangeListener(SettingsClass.COLORS_MESSAGE_UNSIGNEDMSG, this);
+
+            // read the initial color values from the settings, without announcing any changes to listeners
+            updateColors(false);
+        }
+
+        // color-getters for our listeners; the color objects are immutable so they can't be modified
+        public Color getNormalColor()
+        {
+            return fMsgNormalColor;
+        }
+        public Color getPrivColor()
+        {
+            return fMsgPrivColor;
+        }
+        public Color getWithAttachmentsColor()
+        {
+            return fMsgWithAttachmentsColor;
+        }
+        public Color getUnsignedColor()
+        {
+            return fMsgUnsignedColor;
+        }
+
+        // PropertyChangeListener deals with changes to any of the colors we're listening for
+        @Override
+        public void propertyChange(
+                final PropertyChangeEvent evt)
+        {
+            if( evt.getPropertyName().equals(SettingsClass.COLORS_MESSAGE_NORMALMSG)
+             || evt.getPropertyName().equals(SettingsClass.COLORS_MESSAGE_PRIVMSG)
+             || evt.getPropertyName().equals(SettingsClass.COLORS_MESSAGE_WITHATTACHMENTS)
+             || evt.getPropertyName().equals(SettingsClass.COLORS_MESSAGE_UNSIGNEDMSG) ) {
+                updateColors(true); // announce change to listeners
+            }
+        }
+
+        // reads the colors from the core settings, and optionally announces to our listeners
+        private void updateColors(
+                final boolean aAnnounceChange)
+        {
+            fMsgNormalColor = Core.frostSettings.getColorValue(SettingsClass.COLORS_MESSAGE_NORMALMSG);
+            fMsgPrivColor = Core.frostSettings.getColorValue(SettingsClass.COLORS_MESSAGE_PRIVMSG);
+            fMsgWithAttachmentsColor = Core.frostSettings.getColorValue(SettingsClass.COLORS_MESSAGE_WITHATTACHMENTS);
+            fMsgUnsignedColor = Core.frostSettings.getColorValue(SettingsClass.COLORS_MESSAGE_UNSIGNEDMSG);
+
+            // if we've been asked to announce the change to our listeners, we'll do it on a timer
+            // so that it happens 100ms after the latest color property change. this ensures that all
+            // observed colors will be updated as a single change-event instead of firing one per color.
+            if( aAnnounceChange ) {
+                fDelayedChangeAnnouncer.schedule(100, new Runnable() {
+                    @Override
+                    public void run() {
+                        // this is a dummy event which says that the old value is false and the new is true,
+                        // which is necessary in order to trigger a change. the important part is that
+                        // people listen for the "MessageColorsChanged" property event.
+                        fChangeSupport.firePropertyChange("MessageColorsChanged", false, true);
+                    }
+                });
+            }
+        }
+
+        /*
+         * Simply register a listener to be notified when one or more of the colors have changed.
+         * The property change event is called "MessageColorsChanged".
+         * WARNING: Your listeners may not be getting the event on the GUI thread, so always invokeLater any GUI changes!
+         */
+        public synchronized void addPropertyChangeListener(
+                final PropertyChangeListener aListener)
+        {
+            if( aListener == null ) { return; }
+            fChangeSupport.addPropertyChangeListener(aListener);
+        }
+
+        public synchronized void removePropertyChangeListener(
+                final PropertyChangeListener aListener)
+        {
+            if( aListener == null ) { return; }
+            fChangeSupport.removePropertyChangeListener(aListener);
+        }
+
+        public synchronized PropertyChangeListener[] getPropertyChangeListeners()
+        {
+            return fChangeSupport.getPropertyChangeListeners();
+        }
     }
 }

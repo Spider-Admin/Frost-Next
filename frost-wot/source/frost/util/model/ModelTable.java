@@ -27,6 +27,8 @@ import java.util.logging.*;
 import javax.swing.*;
 import javax.swing.table.*;
 
+import frost.util.gui.GridJTable;
+
 /**
  * This subclass of AbstractTableModel is passed an OrderedModel and a
  * TableFormat in the constructor. It then creates a JTable and displays
@@ -185,7 +187,8 @@ abstract public class ModelTable<T extends ModelItem<T>> extends AbstractTableMo
 			visibleColumns.add(new Integer(i));
 		}
 
-		table = new JTable(this);
+		table = new GridJTable(this);
+        ((GridJTable)table).setEnforcedShowGrid(true); // GridJTable: always show grid even when L&F changes
 		scrollPane = new JScrollPane(table);
 
         scrollPane.setWheelScrollingEnabled(true);
@@ -240,12 +243,25 @@ abstract public class ModelTable<T extends ModelItem<T>> extends AbstractTableMo
 	}
 
 	/**
+	 * This method deselects all selected columns and rows.
+	 */
+	public void clearSelection() {
+		table.clearSelection();
+	}
+
+	/**
 	 * This method returns an array of all the ModelItems that are
 	 * selected in the JTable.
-	 * @return an array containing the ModelItems that are selected
+	 * @return an array containing the ModelItems that are selected, may be null if nothing is selected
 	 */
 	public List<T> getSelectedItems() {
-		return new SelectionGetter().getSelectedItems();
+		// NOTE: counting rows before trying to grab items prevents SelectionGetter hang if called
+		// during GUI loading, and also avoids needlessly spawning threads if there is no selection.
+		if( table.getSelectedRowCount() > 0 ) {
+			return new SelectionGetter().getSelectedItems();
+		} else {
+			return null;
+		}
 	}
 
 	/**
@@ -255,15 +271,68 @@ abstract public class ModelTable<T extends ModelItem<T>> extends AbstractTableMo
 	 * 			several of them. null if there was none.
 	 */
 	public T getSelectedItem() {
-		return new SelectionGetter().getSelectedItem();
+		// NOTE: counting rows before trying to grab items prevents SelectionGetter hang if called
+		// during GUI loading, and also avoids needlessly spawning threads if there is no selection.
+		if( table.getSelectedRowCount() > 0 ) {
+			return new SelectionGetter().getSelectedItem();
+		} else {
+			return null;
+		}
 	}
 
 	/**
 	 * This method returns the number of rows that are selected.
 	 * @return the number of rows that are selected.
 	 */
-	public int getSelectedCount() {
+	public int getSelectedRowCount() {
 		return table.getSelectedRowCount();
+	}
+
+	/**
+	 * This method returns the indices of all selected rows.
+	 */
+	public int[] getSelectedRows() {
+		return table.getSelectedRows();
+	}
+
+	/**
+	 * This method returns the index if the first selected row, -1 if no row is selected.
+	 */
+	public int getSelectedRow() {
+		return table.getSelectedRow();
+	}
+
+	/**
+	 * This method selects the rows from index0 to index1, inclusive.
+	 */
+	public void setRowSelectionInterval(final int index0, final int index1) {
+		table.setRowSelectionInterval(index0, index1);
+	}
+
+	/**
+	 * This method adds the rows from index0 to index1, inclusive, to the current selection.
+	 */
+	public void addRowSelectionInterval(final int index0, final int index1) {
+		table.addRowSelectionInterval(index0, index1);
+	}
+
+	/**
+	 * This method sets the table's selection mode to allow only single selections,
+	 * a single contiguous interval, or multiple intervals.
+	 * NOTE: the "getSelectionModel()" call is used here because JTable lacks shortcuts for
+	 * dealing with the selection mode. All of the other selection related things in the other
+	 * functions above (such as table.addRowSelectionInterval()) actually internally use the
+	 * selectionmodel too, without having to specify it, but that's just a JTable shortcut.
+	 */
+	public void setSelectionMode(int selectionMode) {
+		table.getSelectionModel().setSelectionMode(selectionMode);
+	}
+
+	/**
+	 * This method returns the current selection mode.
+	 */
+	public int getSelectionMode() {
+		return table.getSelectionModel().getSelectionMode();
 	}
 
 	/**

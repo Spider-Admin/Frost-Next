@@ -32,7 +32,7 @@ import frost.util.Logging;
  * Operates either on the shared FcpSocket and uses a NodeMessageListener to receive node messages;
  * or operates directly on FcpSocket and needs exclusive use of it.
  * 
- * Note: currently we ignore DDAMode and always check for read+write.
+ * NOTE: currently we ignore DDAMode and always check for read+write.
  * This is done because the design of TestDDA checks if WE (the client) can read or
  * write to a directory, but the freneet node itself is not checked. But the node is 
  * checked when we test the opposite of what we want. So when we check for READ then

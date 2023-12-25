@@ -216,20 +216,20 @@ public class FileRequestsThread extends Thread {
             }
 
             try {
-                final LocalDate nowDate = new LocalDate(DateTimeZone.UTC);
+                final DateTime now = new DateTime(DateTimeZone.UTC);
                 for (int i=0; i < downloadBack; i++) {
                     boolean isForToday;
                     if( i == 0 ) {
-                        isForToday = true; // upload own keys today only
+                        isForToday = true; // upload own keys during the refresh of today only
                     } else {
                         isForToday = false;
                     }
 
-                    final LocalDate localDate = nowDate.minusDays(i);
-                    final String dateStr = DateFun.FORMAT_DATE.print(localDate);
-                    final long date = localDate.toDateMidnight(DateTimeZone.UTC).getMillis();
+                    final DateTime xDaysAgo = now.minusDays(i);
+                    final String dateStr = DateFun.FORMAT_DATE.print(xDaysAgo);
+                    final long date = xDaysAgo.withTimeAtStartOfDay().getMillis();
 
-                    final IndexSlot gis = IndexSlotsStorage.inst().getSlotForDate(
+                    final IndexSlot gis = IndexSlotsStorage.inst().getSlotForDateMidnightMillis(
                             IndexSlotsStorage.REQUESTS, date);
 
                     if( Logging.inst().doLogFilebaseMessages() ) {

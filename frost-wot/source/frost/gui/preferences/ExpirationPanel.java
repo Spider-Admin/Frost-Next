@@ -47,9 +47,9 @@ class ExpirationPanel extends JPanel {
     private final JCheckBox CbKeepFlaggedAndStarred = new JCheckBox();
     private final JCheckBox CbKeepUnread = new JCheckBox();
 
-    private final JCheckBox CbRemoveOfflineFilesWithKey = new JCheckBox();
-    private final JLabel LofflineFilesMaxDaysOld = new JLabel();
-    private final JTextField TfOfflineFilesMaxDaysOld = new JTextField(8);
+//#DIEFILESHARING    private final JCheckBox CbRemoveOfflineFilesWithKey = new JCheckBox();
+//#DIEFILESHARING    private final JLabel LofflineFilesMaxDaysOld = new JLabel();
+//#DIEFILESHARING    private final JTextField TfOfflineFilesMaxDaysOld = new JTextField(8);
 
     /**
      * @param settings the SettingsClass instance that will be used to get and store the settings of the panel
@@ -148,6 +148,7 @@ class ExpirationPanel extends JPanel {
         constraints.gridx = 0;
         add(CbKeepFlaggedAndStarred, constraints);
 
+        /*//#DIEFILESHARING: This entire block has been commented out
         constraints.gridy++;
 
         constraints.fill = GridBagConstraints.HORIZONTAL;
@@ -178,6 +179,7 @@ class ExpirationPanel extends JPanel {
         constraints.gridy++;
 
         add(CbRemoveOfflineFilesWithKey, constraints);
+        */
 
         // glue
         constraints.gridy++;
@@ -214,15 +216,11 @@ class ExpirationPanel extends JPanel {
         CbKeepFlaggedAndStarred.setSelected(settings.getBoolValue(SettingsClass.ARCHIVE_KEEP_FLAGGED_AND_STARRED));
         CbKeepUnread.setSelected(settings.getBoolValue(SettingsClass.ARCHIVE_KEEP_UNREAD));
 
-        CbRemoveOfflineFilesWithKey.setSelected(settings.getBoolValue(SettingsClass.DB_CLEANUP_REMOVEOFFLINEFILEWITHKEY));
-        TfOfflineFilesMaxDaysOld.setText(settings.getValue(SettingsClass.DB_CLEANUP_OFFLINEFILESMAXDAYSOLD));
+//#DIEFILESHARING        CbRemoveOfflineFilesWithKey.setSelected(settings.getBoolValue(SettingsClass.DB_CLEANUP_REMOVEOFFLINEFILEWITHKEY));
+//#DIEFILESHARING        TfOfflineFilesMaxDaysOld.setText(settings.getValue(SettingsClass.DB_CLEANUP_OFFLINEFILESMAXDAYSOLD));
 
         TfCleanupIntervalDays.setText(settings.getValue(SettingsClass.DB_CLEANUP_INTERVAL));
-        if( settings.getLongValue(SettingsClass.DB_CLEANUP_LASTRUN) == 0 ) {
-            CbCleanupNextStartup.setSelected(true);
-        } else {
-            CbCleanupNextStartup.setSelected(false);
-        }
+        CbCleanupNextStartup.setSelected(settings.getBoolValue(SettingsClass.DB_CLEANUP_FORCESTART));
     }
 
     /**
@@ -245,13 +243,11 @@ class ExpirationPanel extends JPanel {
         settings.setValue(SettingsClass.ARCHIVE_KEEP_FLAGGED_AND_STARRED, CbKeepFlaggedAndStarred.isSelected());
         settings.setValue(SettingsClass.ARCHIVE_KEEP_UNREAD, CbKeepUnread.isSelected());
 
-        settings.setValue(SettingsClass.DB_CLEANUP_REMOVEOFFLINEFILEWITHKEY, CbRemoveOfflineFilesWithKey.isSelected());
-        settings.setValue(SettingsClass.DB_CLEANUP_OFFLINEFILESMAXDAYSOLD, TfOfflineFilesMaxDaysOld.getText());
+//#DIEFILESHARING        settings.setValue(SettingsClass.DB_CLEANUP_REMOVEOFFLINEFILEWITHKEY, CbRemoveOfflineFilesWithKey.isSelected());
+//#DIEFILESHARING        settings.setValue(SettingsClass.DB_CLEANUP_OFFLINEFILESMAXDAYSOLD, TfOfflineFilesMaxDaysOld.getText());
 
         settings.setValue(SettingsClass.DB_CLEANUP_INTERVAL, TfCleanupIntervalDays.getText());
-        if( CbCleanupNextStartup.isSelected() ) {
-            settings.setValue(SettingsClass.DB_CLEANUP_LASTRUN, 0L);
-        }
+        settings.setValue(SettingsClass.DB_CLEANUP_FORCESTART, CbCleanupNextStartup.isSelected());
     }
 
     public void ok() {
@@ -263,13 +259,13 @@ class ExpirationPanel extends JPanel {
         RbArchiveExpiredMessages.setText(language.getString("Options.expiration.archiveExpiredMessages"));
         RbDeleteExpiredMessages.setText(language.getString("Options.expiration.deleteExpiredMessages"));
 
-        LmessageExpireDays.setText(language.getString("Options.expiration.numberOfDaysBeforeMessageExpires") + " (90)");
+        LmessageExpireDays.setText(language.getString("Options.expiration.numberOfDaysBeforeMessageExpires") + " (365)");
 
         CbKeepFlaggedAndStarred.setText(language.getString("Options.expiration.keepFlaggedAndStarredMessages"));
         CbKeepUnread.setText(language.getString("Options.expiration.keepUnreadMessages"));
 
-        CbRemoveOfflineFilesWithKey.setText(language.getString("Options.expiration.removeOfflineFilesWithKey"));
-        LofflineFilesMaxDaysOld.setText(language.getString("Options.expiration.offlineFilesMaxDaysOld")+" (30)");
+//#DIEFILESHARING        CbRemoveOfflineFilesWithKey.setText(language.getString("Options.expiration.removeOfflineFilesWithKey"));
+//#DIEFILESHARING        LofflineFilesMaxDaysOld.setText(language.getString("Options.expiration.offlineFilesMaxDaysOld")+" (30)");
 
         LcleanupIntervalDays.setText(language.getString("Options.expiration.cleanupIntervalDays") +
                 " (5 "+language.getString("Options.common.days")+")");

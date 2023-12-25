@@ -1,54 +1,80 @@
-  -------------------------
----  HOWTO - Build Frost  ---
-  -------------------------
+  ------------------------------
+---  HOWTO - Build Frost-Next  ---
+  ------------------------------
 
-Prereqs:
----------
+Requirements:
+--------------
 
-Apache ANT must be installed. Get it from http://ant.apache.org
+Apache ANT must be installed. Get it from http://ant.apache.org.
 
+You also need *both* the Java 6 *and* Java 8 JDKs. You cannot compile
+Frost-Next with any other Java versions, or you risk producing incompatible
+code which doesn't run on the user's systems!
 
-Build the source retrieved from SVN:
--------------------------------------
-
-If you got the Frost source code from the SVN repository, go to the
-Frost source directory and run the command 'ant'. This starts the Frost
-build. After the build finished, Frost is ready to run in the directory
-build/dist.
+Version 6 is used for the backwards-compatible launcher (which tells users
+to update Java if needed), and version 8 is used for the main program.
 
 
-Build the source retrieved from a Frost source.zip file:
----------------------------------------------------------
+Preparing build.xml:
+---------------------
 
-If you got the Frost source code from the frost-source.zip file, you need
-to copy the contents of the 'lib/' directory from the binary Frost distribution zip
-file into the 'frost-wot/lib/' directory. Then go to the 'frost-wot' directory
-and run the command 'ant'. This starts the Frost build. After the build
-finished, Frost is ready to run in the directory build/dist.
+If you are compiling on Linux, and you've installed the Java 6 and 8 JDKs,
+then everything will be alright as long as they're in these default
+paths (other paths are very unlikely, since these are standardized):
+  1.6: /usr/lib/jvm/java-6-oracle/bin/javac
+  1.8: /usr/lib/jvm/java-8-oracle/bin/javac
 
-Note: ant uses the environment variable JAVA_HOME to find the JDK.
+People on Windows would need to edit build.xml to point the "javac.exe.1.6"
+and "javac.exe.1.8" values to their own two *different* javac.exe versions.
+Pointing them to the same version can lead to subtle bugs, so DON'T do that.
+
+Mac users are on their own. Either way, anyone can create a small Linux
+virtual machine with the free VirtualBox software and compile this if
+they really want to do the compilation properly. If you want to try to be
+a masochist and do it on Windows or Mac, then you've probably got the
+skills and intelligence to understand Linux instead.
 
 
-Using ebuilds on gentoo linux:
--------------------------------
+Warning about multiple JVMs on one machine:
+--------------------------------------------
 
-Tommy[D] provided the following information about how to use ebuilds on gentoo linux:
+If you install multiple JVMs on linux, then you'll potentially cause
+the default Java executables to become the outdated ones. The Frost-Next
+build script is intelligent enough not to have any problems with that,
+but *you'll* certainly want to run all Java apps on your system using the
+latest, safest version possible. So, to change the default versions used
+by the system, you'll want to execute the following one-liner:
 
-I created some ebuilds for freenet and frost, they are in the sunrise overlay.
-So if someone wants to install freenet or frost in the future or wants to update frost,
-he can use this ebuilds. For updates of freenet I still recommend freenet itself as it is
-faster (update over sunrise overlay can have a delay of some days, depending on my time
-and the time of the devs reviewing sunrise).
+for APP in "java" "javac" "javadoc" "javafxpackager" "javah" "javap" "javapackager" "java_vm" "javaws"; do sudo update-alternatives --config "$APP"; done
 
-Short way to use them:
+You'll see a list of installed versions of each found component, and
+will be asked to select which one you want. Just choose the newest
+one for all of the choices. This is just about what your system will
+use by default, and has *nothing* to do with Frost-Next, but I thought
+I'd mention it just to help you stay safe.
 
-- emerge -av layman (if not already installed)
-- layman -a sunrise (if not already added)
-- emerge -av freenet / emerge -av frost
 
-If you want to install freenet and frost, "emerge -av frost" should do the job as freenet
-is a dependency of frost. Both ebuilds atm only have ~86 KEYWORD, an ebuild called freenet-bin
-has binarys for ~86 and ~amd64.
-If someone is interested in other KEYWORDS, wants to comment on those ebuilds or otherwise
-wants to talk to me, i am active in frost and in #freenet, #freenet-de, #frost and #gentoo-sunrise
-(server irc.freenode.net) as Tommy[D].
+
+Building the source code:
+--------------------------
+
+When your build environment is configured, simply go into the directory
+containing "build.xml", and run one of these three commands:
+
+- "ant" (or "ant main"): Builds all class files and creates "build/dist",
+  where Frost is ready to run. This is useful during development, since
+  you don't have to wait for the release-zip files to be created.
+  It only deletes the .jar file during recompilation, so you can safely
+  rely on the ability to have persistent test-databases in that folder.
+
+- "ant clean": You usually don't have to run this command, since ANT
+  detects when source files have changed and re-compiles them. But if you've
+  performed major changes to some class that *other* already-compiled files
+  rely on, then you'll need to recompile them too. That's where "clean"
+  comes in. It erases all compiled class files so that the next compilation
+  starts completely clean again.
+
+- "ant release": When it's time to release the product, this creates
+  the final "build/release" zip files for distribution.
+
+

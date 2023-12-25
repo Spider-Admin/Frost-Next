@@ -109,7 +109,7 @@ public class SearchMessagesThread extends Thread implements MessageCallback {
                         dr.startDate,
                         dr.endDate,
                         retrieveDisplayedMessages,
-                        ((searchConfig.content==null||searchConfig.content.length()==0)?false:true), // withContent
+                        ((searchConfig.contentString==null||searchConfig.contentString.length()==0)?false:true), // withContent
                         false, // withAttachment
                         false, // showDeleted
                         this);
@@ -167,18 +167,16 @@ public class SearchMessagesThread extends Thread implements MessageCallback {
             return;
         }
 
-        if( !matchText(mo.getFromName(), searchConfig.sender, searchConfig.senderMakeLowercase) ) {
+        // test the user-provided search fields (sender/subject/content), if valid patterns exist
+        // if no pattern exists for a field, that check is simply skipped
+        if( searchConfig.senderPattern != null && !matchText(mo.getFromName(), searchConfig.senderPattern) ) {
             return;
         }
-
-        if( !matchText(mo.getSubject(), searchConfig.subject, searchConfig.subjectMakeLowercase )) {
+        if( searchConfig.subjectPattern != null && !matchText(mo.getSubject(), searchConfig.subjectPattern)) {
             return;
         }
-
-        if( !searchConfig.content.isEmpty()) {
-            if( !matchText(mo.getContent(), searchConfig.content, searchConfig.contentMakeLowercase) ) {
-                return;
-            }
+        if( searchConfig.contentPattern != null && !matchText(mo.getContent(), searchConfig.contentPattern) ) {
+            return;
         }
 
         // match, add to result table
@@ -186,43 +184,37 @@ public class SearchMessagesThread extends Thread implements MessageCallback {
     }
 
     /**
-     * @return  true if text was accepted, false if not
+     * Perform a regular expression search against the given text.
+     * @return  true if there was a match in the text (or if there was no pattern provided), false if there was a pattern and it didn't match
      */
-    private boolean matchText(final String origText, final String regex, final boolean makeLowercase)
+    private boolean matchText(final String text, final Pattern regexPattern)
     {
-		String text;
-		if(makeLowercase)
-			text = origText.toLowerCase();
-		else
-			text = origText;
-			
-		Pattern pattern = Pattern.compile(regex);
-		Matcher matcher = pattern.matcher(text);
-  
-		if (matcher.find())
-			return true; // ok!
-		else
-			return false;
+        if( regexPattern == null ) {
+            return true; // if there's no pattern, we'll just return "yes, the text matches"
+        }
+
+        Matcher m = regexPattern.matcher(text);
+        return ( m.find() ? true : false ); // find() just looks for the 1st match in the string, which means that the check is super-fast.
     }
 
     private boolean matchesTrustStates(final FrostMessageObject msg, final TrustStates ts) {
 
-        if( msg.isMessageStatusGOOD() && ts.trust_good == false ) {
+        if( msg.isMessageStatusFRIEND() && ts.trust_FRIEND == false ) {
             return false;
         }
-        if( msg.isMessageStatusOBSERVE() && ts.trust_observe == false ) {
+        if( msg.isMessageStatusGOOD() && ts.trust_GOOD == false ) {
             return false;
         }
-        if( msg.isMessageStatusCHECK() && ts.trust_check == false ) {
+        if( msg.isMessageStatusNEUTRAL() && ts.trust_NEUTRAL == false ) {
             return false;
         }
-        if( msg.isMessageStatusBAD() && ts.trust_bad == false ) {
+        if( msg.isMessageStatusBAD() && ts.trust_BAD == false ) {
             return false;
         }
-        if( msg.isMessageStatusOLD() && ts.trust_none == false ) {
+        if( msg.isMessageStatusNONE() && ts.trust_NONE == false ) {
             return false;
         }
-        if( msg.isMessageStatusTAMPERED() && ts.trust_tampered == false ) {
+        if( msg.isMessageStatusTAMPERED() && ts.trust_TAMPERED == false ) {
             return false;
         }
 
@@ -232,43 +224,48 @@ public class SearchMessagesThread extends Thread implements MessageCallback {
     private void updateTrustStatesForBoard(final Board b, final TrustStates ts) {
         if( searchConfig.searchTruststates == SearchMessagesConfig.TRUST_ALL ) {
             // use all trust states
-            ts.trust_good = true;
-            ts.trust_observe = true;
-            ts.trust_check = true;
-            ts.trust_bad = true;
-            ts.trust_none = true;
-            ts.trust_tampered = true;
+            ts.trust_FRIEND = true;
+            ts.trust_GOOD = true;
+            ts.trust_NEUTRAL = true;
+            ts.trust_BAD = true;
+            ts.trust_NONE = true;
+            ts.trust_TAMPERED = true;
         } else if( searchConfig.searchTruststates == SearchMessagesConfig.TRUST_CHOSED ) {
             // use specified trust states
-            ts.trust_good = searchConfig.trust_good;
-            ts.trust_observe = searchConfig.trust_observe;
-            ts.trust_check = searchConfig.trust_check;
-            ts.trust_bad = searchConfig.trust_bad;
-            ts.trust_none = searchConfig.trust_none;
-            ts.trust_tampered = searchConfig.trust_tampered;
+            ts.trust_FRIEND = searchConfig.trust_FRIEND;
+            ts.trust_GOOD = searchConfig.trust_GOOD;
+            ts.trust_NEUTRAL = searchConfig.trust_NEUTRAL;
+            ts.trust_BAD = searchConfig.trust_BAD;
+            ts.trust_NONE = searchConfig.trust_NONE;
+            ts.trust_TAMPERED = searchConfig.trust_TAMPERED;
         } else if( searchConfig.searchTruststates == SearchMessagesConfig.TRUST_DISPLAYED ) {
             // use trust states configured for board
-            ts.trust_good = true;
-            ts.trust_observe = !b.getHideObserve();
-            ts.trust_check = !b.getHideCheck();
-            ts.trust_bad = !b.getHideBad();
-            ts.trust_none = !b.getShowSignedOnly();
-            ts.trust_tampered = !b.getShowSignedOnly();
+            ts.trust_FRIEND = true;
+            ts.trust_GOOD = !b.getHideGOOD();
+            ts.trust_NEUTRAL = !b.getHideNEUTRAL();
+            ts.trust_BAD = !b.getHideBAD();
+            ts.trust_NONE = !b.getHideUnsigned();
+            ts.trust_TAMPERED = !b.getHideUnsigned();
         }
     }
 
     private void updateDateRangeForBoard(final Board b, final DateRange dr) {
-        final LocalDate nowLocalDate = new LocalDate(DateTimeZone.UTC);
-        final long todayMillis = nowLocalDate.plusDays(1).toDateMidnight(DateTimeZone.UTC).getMillis();
+        // now = current UTC time; used for "visible posts (date_displayed)", "X days backwards", and "all posts until today".
+        final DateTime now = new DateTime(DateTimeZone.UTC);
+        final long todayMillis = now.plusDays(1).withTimeAtStartOfDay().getMillis();
         if( searchConfig.searchDates == SearchMessagesConfig.DATE_DISPLAYED ) {
-            dr.startDate = nowLocalDate.minusDays(b.getMaxMessageDisplay()).toDateMidnight(DateTimeZone.UTC).getMillis();
+            dr.startDate = now.minusDays(b.getMaxMessageDisplay()).withTimeAtStartOfDay().getMillis();
             dr.endDate = todayMillis;
         } else if( searchConfig.searchDates == SearchMessagesConfig.DATE_DAYS_BACKWARD ) {
-            dr.startDate = nowLocalDate.minusDays(searchConfig.daysBackward).toDateMidnight(DateTimeZone.UTC).getMillis();
+            dr.startDate = now.minusDays(searchConfig.daysBackward).withTimeAtStartOfDay().getMillis();
             dr.endDate = todayMillis;
         } else if( searchConfig.searchDates == SearchMessagesConfig.DATE_BETWEEN_DATES ) {
-            dr.startDate = new LocalDate(searchConfig.startDate).toDateMidnight(DateTimeZone.UTC).getMillis();
-            dr.endDate = new LocalDate(searchConfig.endDate).plusDays(1).toDateMidnight(DateTimeZone.UTC).getMillis();
+            // NOTE: we do NOT specify that these DateTime()s are in the UTC timezone; that way the input is treated as the local timezone.
+            // that's important, since the user chooses a local start/end date for the search here, and we want those local dates interpreted
+            // as the local timezone (at midnight/start of day). the getMillis() in turn returns the UTC milliseconds since the UNIX epoch.
+            // this means that the user will only see posts between the selected local dates, properly taking their timezone into account.
+            dr.startDate = new DateTime(searchConfig.startDate).withTimeAtStartOfDay().getMillis();
+            dr.endDate = new DateTime(searchConfig.endDate).plusDays(1).withTimeAtStartOfDay().getMillis();
         } else {
             // all dates
             dr.startDate = 0;
@@ -290,11 +287,11 @@ public class SearchMessagesThread extends Thread implements MessageCallback {
 
     private class TrustStates {
         // current trust status to search into
-        public boolean trust_good = false;
-        public boolean trust_observe = false;
-        public boolean trust_check = false;
-        public boolean trust_bad = false;
-        public boolean trust_none = false;
-        public boolean trust_tampered = false;
+        public boolean trust_FRIEND = false;
+        public boolean trust_GOOD = false;
+        public boolean trust_NEUTRAL = false;
+        public boolean trust_BAD = false;
+        public boolean trust_NONE = false;
+        public boolean trust_TAMPERED = false;
     }
 }

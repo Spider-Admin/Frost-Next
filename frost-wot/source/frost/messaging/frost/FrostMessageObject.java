@@ -24,14 +24,13 @@ import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.StringTokenizer;
+import java.util.Vector;
 
 import javax.swing.tree.MutableTreeNode;
 import javax.swing.tree.TreePath;
 
-import org.joda.time.DateMidnight;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
-import org.joda.time.TimeOfDay;
 
 import frost.MainFrame;
 import frost.gui.model.TableMember;
@@ -195,7 +194,6 @@ public class FrostMessageObject extends AbstractMessageObject implements TableMe
         if( getChildCount() == 0 ) {
             return result;
         }
-        breadthFirstEnumeration();
         final Enumeration<FrostMessageObject> frostMessageObjectEnumeration = breadthFirstEnumeration();
         while(frostMessageObjectEnumeration.hasMoreElements()) {
             final FrostMessageObject frostMessageObject = frostMessageObjectEnumeration.nextElement();
@@ -330,9 +328,12 @@ public class FrostMessageObject extends AbstractMessageObject implements TableMe
     
     
     /*
+     * NOTE: NO tables use the message object itself as table member, so this special "compare
+     * column" comparator never gets called. it's yet another relics of Frost's poor original code.
      * @see frost.gui.model.TableMember#compareTo(frost.gui.model.TableMember, int)
      */
     public int compareTo(final FrostMessageObject another, final int tableColumnIndex) {
+        System.out.println("LOL");
         String c1 = (String) getValueAt(tableColumnIndex);
         String c2 = (String) another.getValueAt(tableColumnIndex);
         if (tableColumnIndex == 4) {
@@ -340,7 +341,7 @@ public class FrostMessageObject extends AbstractMessageObject implements TableMe
         } else {
             // If we are sorting by anything but date...
             if (tableColumnIndex == 2) {
-                //If we are sorting by subject...
+                //If we are sorting by subject... then ignore the "Re: " prefix
                 if (c1.indexOf("Re: ") == 0) {
                     c1 = c1.substring(4);
                 }
@@ -376,12 +377,10 @@ public class FrostMessageObject extends AbstractMessageObject implements TableMe
     public String getDateAndTimeString() {
         if( dateAndTimeString == null ) {
             // Build a String of format yyyy.mm.dd hh:mm:ssGMT
-            final DateTime dateTime = new DateTime(getDateAndTime(), DateTimeZone.UTC);
-            final DateMidnight date = dateTime.toDateMidnight();
-            final TimeOfDay time = dateTime.toTimeOfDay();
+            final DateTime dateTime = new DateTime(getDateAndTime(), DateTimeZone.UTC); // UTC
 
-            final String dateStr = DateFun.FORMAT_DATE_EXT.print(date);
-            final String timeStr = DateFun.FORMAT_TIME_EXT.print(time);
+            final String dateStr = DateFun.FORMAT_DATE_EXT.print(dateTime); // "2008.12.24"; at UTC
+            final String timeStr = DateFun.FORMAT_TIME_EXT.print(dateTime); // "16:51:28GMT"; at UTC
 
             final StringBuilder sb = new StringBuilder(29);
             sb.append(dateStr).append(" ").append(timeStr);
@@ -547,18 +546,30 @@ public class FrostMessageObject extends AbstractMessageObject implements TableMe
 
     @Override
     public void add(final MutableTreeNode n) {
+        // this is a helper function which always adds the nodes silently (without notifying the
+        // table), thus behaving like the normal add() we're overriding
         add(n, true);
     }
 
     /**
-     * Overwritten add to add new nodes sorted to a parent node
+     * Special add() which adds the new nodes properly sorted within their parent node.
+     * NOTE: The node to add is a hierarchy of one or more children to add to the current parent object.
+     * In the case of messages with dummy parents, there's a hierarchy like "dummy -> dummy -> real
+     * message". Otherwise it directly refers to the real message.
+     * @param {MutableTreeNode} nn - a message tree hierarchy with 1 or more messages you want to
+     * add; the first node is the parent, and it can have one or more levels of children (such as
+     * in the case of having constructed a tree of dummy messages)
+     * @param {boolean} silent - if this is true, we assume that you are building a structure of
+     * multiple nested nodes *before* adding them to the table all in one go, so we don't send any
+     * table events; this must *always* be false when you actually add the message to the visible table!
      */
-    public void add(final MutableTreeNode mutableTreeNode, final boolean silent) {
-        // add sorted
-        final FrostMessageObject frostMessageObject = (FrostMessageObject)mutableTreeNode;
+    public void add(final MutableTreeNode nn, final boolean silent) {
+        // add the message tree at a properly sorted location, by analyzing the *first* (parent) node of the message tree we want to add
+        final FrostMessageObject frostMessageObject = (FrostMessageObject)nn;
         int[] ixs;
 
         if( getChildren() == null ) {
+            // adding a message tree to a node (root/msg/dummy) which had no other children means we just append it to the end (pos 0)
             super.add(frostMessageObject);
             ixs = new int[] { 0 };
         } else {
@@ -601,24 +612,56 @@ public class FrostMessageObject extends AbstractMessageObject implements TableMe
                 ixs = new int[] { insertPoint };
             }
         }
+        // if silent is false, it means that the caller is actually adding the new nodetree to a
+        // location within the real table, so we should now expand the tree path to the inserted
+        // node, notify the table of the insertion, and expand any further extra children
         if( !silent ) {
+            // first check if the path to the *parent* of the inserted nodetree is expanded (visible)
             if( MainFrame.getInstance().getMessageTreeTable().getTree().isExpanded(new TreePath(this.getPath())) ) {
-                // if node is already expanded, notify new inserted row to the models
+                // the parent is expanded, so we must now notify the table that the nodetree has
+                // been inserted, and at what offset (within the parent) it was inserted
                 MainFrame.getInstance().getMessageTreeModel().nodesWereInserted(this, ixs);
+                // now expand the inserted node and all of its children, if it has children
+                // (because all expansion/collapsing is handled by the JTree, and all new nodes
+                // default to collapsed)
                 if( frostMessageObject.getChildCount() > 0 ) {
-                    // added node has childs, expand them all
+                    // the parent of the added node was already expanded ("JTree.isExpanded()"),
+                    // but the added node has children so make sure we expand the new node and its children too
+                    // NOTE: this tells the table to draw any children that become visible as a
+                    // result of the expansion, and triggers the "treeExpanded" event for them
                     MainFrame.getInstance().getMessageTreeTable().expandNode(frostMessageObject);
                 }
             } else {
-                // if node is not expanded, expand it, this will notify the model of the new child as well as of the old childs
+                // the path to the parent itself wasn't expanded, so now expand the entire path
+                // to our parent *and* all of its children (including us and our children)
+                // NOTE: this most commonly fires when we're being added as the first child to a
+                // node that didn't have any children, since that means our parent was "collapsed"
                 MainFrame.getInstance().getMessageTreeTable().expandNode(this);
             }
         }
     }
-    
+
     @SuppressWarnings("unchecked")
-	protected List<FrostMessageObject> getChildren() {
-    	return (List<FrostMessageObject>) children;
+    protected List<FrostMessageObject> getChildren() {
+        return (List<FrostMessageObject>) children;
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public Enumeration<FrostMessageObject> depthFirstEnumeration() {
+        return super.depthFirstEnumeration();
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public Enumeration<FrostMessageObject> breadthFirstEnumeration() {
+        return super.breadthFirstEnumeration();
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public Enumeration<FrostMessageObject> children() {
+        return super.children();
     }
 
     @Override

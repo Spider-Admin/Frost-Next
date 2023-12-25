@@ -25,6 +25,8 @@ import java.io.*;
 import java.util.*;
 import java.util.List;
 import java.util.logging.*;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.InterruptedException;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -39,6 +41,7 @@ import frost.messaging.frost.*;
 import frost.messaging.frost.gui.*;
 import frost.messaging.frost.threads.*;
 import frost.storage.*;
+import frost.util.Mixed;
 import frost.util.gui.*;
 import frost.util.gui.search.*;
 import frost.util.gui.translation.*;
@@ -46,8 +49,9 @@ import frost.util.gui.translation.*;
 @SuppressWarnings("serial")
 public class TofTree extends JDragTree implements AutoSavable, ExitSavable, PropertyChangeListener {
 
-    private static final String FROST_ANNOUNCE_NAME = "frost-announce";
-    private static final String FREENET_07_FROST_ANNOUNCE_PUBKEY = "SSK@l4YxTKAc-sCho~6w-unV6pl-uxIbfuGnGRzo3BJH0ck,4N48yl8E4rh9UPPV26Ev1ZGrRRgeGOTgw1Voka6lk4g,AQACAAE";
+    // NO LONGER AUTO-ADDING THE DEAD "FROST-ANNOUNCE" BOARD
+    //private static final String FROST_ANNOUNCE_NAME = "frost-announce";
+    //private static final String FREENET_07_FROST_ANNOUNCE_PUBKEY = "SSK@l4YxTKAc-sCho~6w-unV6pl-uxIbfuGnGRzo3BJH0ck,4N48yl8E4rh9UPPV26Ev1ZGrRRgeGOTgw1Voka6lk4g,AQACAAE";
 
     private boolean showBoardDescriptionToolTips;
     private boolean showBoardUpdatedCount;
@@ -169,9 +173,10 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
             pasteNodeItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/edit-paste.png", 16, 16));
             refreshItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/view-refresh.png", 16, 16));
             resumeItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/view-refresh.png", 16, 16));
-            stopItem.setIcon(MiscToolkit.getScaledImage("/data/flagged.gif", 16, 16));
+            stopItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/process-stop.png", 16, 16));
             removeNodeItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/user-trash.png", 16, 16));
             sortFolderItem.setIcon(MiscToolkit.getScaledImage("/data/sort.gif", 16, 16));
+            markAllReadItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/mail-goto-unread.png", 16, 16));
             renameFolderItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/edit-select-all.png", 16, 16));
             searchMessagesItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/edit-find.png", 16, 16));
             sendMessageItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/mail-message-new.png", 16, 16));
@@ -227,14 +232,13 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
             refreshNode(selectedTreeNode);
         }
 
-		private void stopSelected() {
-			if(selectedTreeNode == null || !selectedTreeNode.isBoard())
-			{
-				return;
-			}
-			
-			((Board)selectedTreeNode).setStopUpdating(true);
-		}
+        private void stopSelected() {
+            if( selectedTreeNode == null || !selectedTreeNode.isBoard() )
+                return;
+
+            Board board = ((Board)selectedTreeNode);
+            getRunningBoardUpdateThreads().stopAllDownloadThreadsForBoard(board);
+        }
 
 		/**
 		 * Resume the backload for the selected board
@@ -251,8 +255,20 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
 				return;
 			}
 
+			// refuse to start a resume if an "all days back" scan is already running.
+			// this is just a precaution against race conditions, since the actual
+			// "Resume Refresh" menu item isn't shown while an update is ongoing.
+			// an example race condition that could otherwise happen: the regular
+			// "all days back" timered-scan begins *while* the user has the right-click
+			// board menu open with "Resume Refresh" visible, and then they click Resume too.
+			if( getRunningBoardUpdateThreads().isThreadOfTypeRunning(board, BoardUpdateThread.MSG_DNLOAD_BACK) == true ) {
+				return;
+			}
+
+			// bypass the normal "is it time for an all days thread?" check and just forcibly
+			// start one that resumes from the previous "all days back" location.
 			boolean threadStarted = false;
-			getRunningBoardUpdateThreads().startMessageDownloadBack(board, settings, listener, true, true);
+			getRunningBoardUpdateThreads().startMessageDownloadBack(board, settings, listener, /*resume=*/true);
 			logger.info("Resuming update (MSG_BACKLOAD) of " + selectedTreeNode.getName());
 			threadStarted = true;
 			
@@ -423,8 +439,21 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
         }
 
         public void keyPressed(final KeyEvent e) {
-            final char key = e.getKeyChar();
-            pressedKey(key);
+            /* FIXME: Because our processKeyEvent() forwards and ignores all alphanumeric
+             * keys, this never triggers for anything but special keys (like shift and F5).
+             * But then again, I don't think people would WANT the ability to press X or V
+             * to cut and paste tree nodes. It's useless and would be confusing, since we're
+             * also handling message list shortcuts via the JTree.
+            if (!isEditing()) { // if JTree isn't being edited
+                final char key = e.getKeyChar();
+                if (key == 'x' || key == 'X') {
+                    cutNode(model.getSelectedNode());
+                }
+                if (key == 'v' || key == 'V') {
+                    pasteNode(model.getSelectedNode());
+                }
+            }
+            */
         }
 
         public void keyTyped(final KeyEvent e) {
@@ -487,8 +516,8 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
             // scan bui for this board, update board status for: dos today / dos for backload, but not all backload days / dos for all (today and all backload)
             // only respect days that would be updated
             final int maxDaysBack = board.getMaxMessageDownload();
-            final LocalDate localDate = new LocalDate(DateTimeZone.UTC).minusDays(maxDaysBack);
-            final long minDateTime = localDate.toDateMidnight(DateTimeZone.UTC).getMillis();
+            final DateTime xDaysAgo = new DateTime(DateTimeZone.UTC).minusDays(maxDaysBack);
+            final long minDateTime = xDaysAgo.withTimeAtStartOfDay().getMillis();
             final long todayDateTime = MainFrame.getInstance().getTodaysDateMillis();
             board.updateDosStatus(stopBoardUpdatesWhenDOSed, minDateTime, todayDateTime);
 
@@ -655,10 +684,10 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
             if (showBoardUpdateVisualization && board != null && board.isUpdating()) {
                 // set special updating colors
                 Color c;
-                c = (Color) settings.getObjectValue(SettingsClass.BOARD_UPDATE_VISUALIZATION_BGCOLOR_NOT_SELECTED);
+                c = settings.getColorValue(SettingsClass.COLORS_BOARD_UPDATE_VISUALIZATION_BACKGROUND_NOTSELECTED);
                 setBackgroundNonSelectionColor(c);
 
-                c = (Color) settings.getObjectValue(SettingsClass.BOARD_UPDATE_VISUALIZATION_BGCOLOR_SELECTED);
+                c = settings.getColorValue(SettingsClass.COLORS_BOARD_UPDATE_VISUALIZATION_BACKGROUND_SELECTED);
                 setBackgroundSelectionColor(c);
 
             } else {
@@ -748,12 +777,18 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
 
         showBoardDescriptionToolTips = Core.frostSettings.getBoolValue(SettingsClass.SHOW_BOARDDESC_TOOLTIPS);
         showBoardUpdatedCount = Core.frostSettings.getBoolValue(SettingsClass.SHOW_BOARD_UPDATED_COUNT);
-        showBoardUpdateVisualization = Core.frostSettings.getBoolValue(SettingsClass.SHOW_BOARD_UPDATE_VISUALIZATION);
+        showBoardUpdateVisualization = Core.frostSettings.getBoolValue(SettingsClass.BOARD_UPDATE_VISUALIZATION_ENABLED);
         showFlaggedStarredIndicators = Core.frostSettings.getBoolValue(SettingsClass.SHOW_BOARDTREE_FLAGGEDSTARRED_INDICATOR);
         stopBoardUpdatesWhenDOSed = Core.frostSettings.getBoolValue(SettingsClass.DOS_STOP_BOARD_UPDATES_WHEN_DOSED);
         maxInvalidMessagesPerDayThreshold = Core.frostSettings.getIntValue(SettingsClass.DOS_INVALID_SUBSEQUENT_MSGS_THRESHOLD);
 
         setRowHeight(18); // we use 16x16 icons, keep a gap
+    }
+
+    // used by the "Quicksend" instant message upload mode, for starting a today-update
+    // thread with the correct listener (so that the board-refresh state is visible in tree).
+    public Listener getListener() {
+        return listener;
     }
 
     private PopupMenuTofTree getPopupMenuTofTree() {
@@ -773,7 +808,7 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
 
         Core.frostSettings.addPropertyChangeListener(SettingsClass.SHOW_BOARDDESC_TOOLTIPS, this);
         Core.frostSettings.addPropertyChangeListener(SettingsClass.SHOW_BOARD_UPDATED_COUNT, this);
-        Core.frostSettings.addPropertyChangeListener(SettingsClass.SHOW_BOARD_UPDATE_VISUALIZATION, this);
+        Core.frostSettings.addPropertyChangeListener(SettingsClass.BOARD_UPDATE_VISUALIZATION_ENABLED, this);
         Core.frostSettings.addPropertyChangeListener(SettingsClass.SHOW_BOARDTREE_FLAGGEDSTARRED_INDICATOR, this);
 
         Core.frostSettings.addPropertyChangeListener(SettingsClass.BOARD_TREE_FONT_NAME, this);
@@ -854,49 +889,24 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
         configBoardMenuItem.setText(language.getString("BoardTree.popupmenu.configureSelectedBoard"));
     }
 
-    /**
-     * Get keyTyped for tofTree
-     */
-    public void pressedKey(final char key) {
-        if (!isEditing()) {
-            if (key == 'x' || key == 'X') {
-                cutNode(model.getSelectedNode());
-            }
-            if (key == 'v' || key == 'V') {
-                pasteNode(model.getSelectedNode());
-            }
-        }
-    }
-
     @Override
     protected void processKeyEvent(final KeyEvent e) {
-        // hack to prevent the standard JTree idiom (selects nodes starting with pressed key)
-        final MessagePanel msgPanel = MainFrame.getInstance().getMessagePanel();
-        Action action = null;
-        if( e.getID()==KeyEvent.KEY_TYPED && (e.getKeyChar() == 'n' || e.getKeyChar() == 'N') ) {
-            action = msgPanel.getActionMap().get("NEXT_MSG");
-        } else if( e.getID()==KeyEvent.KEY_TYPED && (e.getKeyChar() == 'b' || e.getKeyChar() == 'B') ) {
-            action = msgPanel.getActionMap().get("SET_BAD");
-        } else if( e.getID()==KeyEvent.KEY_TYPED && (e.getKeyChar() == 'c' || e.getKeyChar() == 'C') ) {
-            action = msgPanel.getActionMap().get("SET_CHECK");
-        } else if( e.getID()==KeyEvent.KEY_TYPED && (e.getKeyChar() == 'o' || e.getKeyChar() == 'O') ) {
-            action = msgPanel.getActionMap().get("SET_OBSERVE");
-        } else if( e.getID()==KeyEvent.KEY_TYPED && (e.getKeyChar() == 'g' || e.getKeyChar() == 'G') ) {
-            action = msgPanel.getActionMap().get("SET_GOOD");
-        } else if( e.getID()==KeyEvent.KEY_TYPED && (e.getKeyChar() == 'f' || e.getKeyChar() == 'F') ) {
-            action = msgPanel.getActionMap().get("TOGGLE_FLAGGED");
-        } else if( e.getID()==KeyEvent.KEY_TYPED && (e.getKeyChar() == 's' || e.getKeyChar() == 'S') ) {
-            action = msgPanel.getActionMap().get("TOGGLE_STARRED");
-        } else if( e.getID()==KeyEvent.KEY_TYPED && (e.getKeyChar() == 'j' || e.getKeyChar() == 'J') ) {
-            action = msgPanel.getActionMap().get("TOGGLE_JUNK");
-        } else if( Character.isLetter(e.getKeyChar()) || Character.isDigit(e.getKeyChar()) ) {
-            // ignore
+        // this is a trick to prevent the standard JTree key handler from running, which otherwise
+        // selects tree nodes starting with the pressed alphanumeric letter.
+        //
+        // we check the resulting char from pressing the keyboard key, and if it's alphanumeric
+        // we forward it to our parent News tab instead. but if it's any other key, we let the
+        // standard JTree handler run.
+        if( Character.isLetter(e.getKeyChar()) || Character.isDigit(e.getKeyChar()) ) {
+            // forward the alphanumeric key and don't handle it in this tree!
+            final MessagePanel msgPanel = MainFrame.getInstance().getMessagePanel();
+            msgPanel.forwardedAlphanumericKeyEventFromTree(e);
         } else {
+            // this is some non-alphanumeric key, so just forward it to the normal JTree handler.
+            // NOTE: this lets the tree handle leftarrow/rightarrow to expand and collapse nodes (if L&F
+            // has that), but the tree forwards keys like F5 to the "News" tab which in turn handles them!
+            // that in turn means that we properly forward all keys that we've bound on the News tab.
             super.processKeyEvent(e);
-        }
-
-        if (action != null) {
-            action.actionPerformed(null);
         }
     }
 
@@ -911,7 +921,7 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
         if( iniFile.exists() == false ) {
             logger.warning("boards.xml file not found, reading default file (will be saved to boards.xml on exit).");
             final String defaultBoardsFile = "boards.xml.default07";
-            boardIniFilename = settings.getValue(SettingsClass.DIR_CONFIG) + defaultBoardsFile;
+            boardIniFilename = Mixed.getFrostDirFile(settings.getValue(SettingsClass.DIR_CONFIG) + defaultBoardsFile, true);
         }
 
         final String unsentName = language.getString("UnsentMessages.folderName");
@@ -924,10 +934,10 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
             return loadWasOk;
         }
 
+        /* NO LONGER AUTO-ADDING THE DEAD "frost-announce" board.
         // check if the board 'frost-announce' is contained in the list, add it if not found
         final String expectedPubkey = FREENET_07_FROST_ANNOUNCE_PUBKEY;
 
-        final List<Board> existingBoards = model.getAllBoards();
         boolean boardFound = false;
         for( final Board board : existingBoards ) {
             if( board.getName().equals(FROST_ANNOUNCE_NAME) ) {
@@ -945,9 +955,11 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
             final Folder root = (Folder)model.getRoot();
             model.addNodeToTree(newBoard, root);
         }
+        */
 
         // check all boards for obsolete 0.7 encryption key and warn user
         final List<String> boardsWithObsoleteKeys = new ArrayList<String>();
+        final List<Board> existingBoards = model.getAllBoards();
         for( final Board board : existingBoards ) {
             if( board.getPublicKey() != null && board.getPublicKey().endsWith("AQABAAE") ) {
                 boardsWithObsoleteKeys.add( board.getName() );
@@ -961,9 +973,9 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
                         StartupMessage.MessageType.BoardsWithObsoleteKeysFound,
                         title,
                         text,
-                        JOptionPane.ERROR_MESSAGE,
+                        MiscToolkit.ERROR_MESSAGE,
                         true);
-                MainFrame.enqueueStartupMessage(sm);
+                Core.enqueueStartupMessage(sm);
                 logger.severe("Board with obsolete public key found: "+boardName);
             }
         }
@@ -1049,11 +1061,11 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
                 final String boardDescription = dialog.getBoardDescription();
 
                 if (model.getBoardByName(boardName) != null) {
-                    JOptionPane.showMessageDialog(
+                    MiscToolkit.showMessageDialog(
                         parent,
                         language.formatMessage("BoardTree.duplicateNewBoardNameError.body", boardName),
                         language.getString("BoardTree.duplicateNewBoardNameError.title"),
-                        JOptionPane.ERROR_MESSAGE);
+                        MiscToolkit.ERROR_MESSAGE);
                 } else {
                     final Board newBoard = new Board(boardName, boardDescription);
                     model.addNodeToTree(newBoard);
@@ -1076,13 +1088,13 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
         final Board existingBoard = model.getBoardByName(bname);
         if (existingBoard != null) {
             final int answer =
-                JOptionPane.showConfirmDialog(
+                MiscToolkit.showConfirmDialog(
                     getTopLevelAncestor(),
                     language.formatMessage("BoardTree.overWriteBoardConfirmation.body", bname),
                     language.getString("BoardTree.overWriteBoardConfirmation.title"),
-                    JOptionPane.YES_NO_OPTION,
-                    JOptionPane.WARNING_MESSAGE);
-            if (answer == JOptionPane.YES_OPTION) {
+                    MiscToolkit.YES_NO_OPTION,
+                    MiscToolkit.WARNING_MESSAGE);
+            if (answer == MiscToolkit.YES_OPTION) {
                 // overwrite keys and description of existing board
                 existingBoard.setPublicKey(bpubkey);
                 existingBoard.setPrivateKey(bprivkey);
@@ -1117,11 +1129,11 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
         String nodeName = null;
         do {
             final Object nodeNameOb =
-                JOptionPane.showInputDialog(
+                MiscToolkit.showInputDialog(
                     parent,
                     language.getString("BoardTree.newFolderDialog.body") + ":",
                     language.getString("BoardTree.newFolderDialog.title"),
-                    JOptionPane.QUESTION_MESSAGE,
+                    MiscToolkit.QUESTION_MESSAGE,
                     null,
                     null,
                     language.getString("BoardTree.newFolderDialog.defaultName"));
@@ -1152,22 +1164,22 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
     public boolean removeNode(final Component parent, final AbstractNode node) {
         int answer;
         if (node.isFolder()) {
-            answer = JOptionPane.showConfirmDialog(
+            answer = MiscToolkit.showConfirmDialog(
                     parent,
                     language.formatMessage("BoardTree.removeFolderConfirmation.body", node.getName()),
                     language.formatMessage("BoardTree.removeFolderConfirmation.title", node.getName()),
-                    JOptionPane.YES_NO_OPTION);
+                    MiscToolkit.YES_NO_OPTION);
         } else if(node.isBoard()) {
-            answer = JOptionPane.showConfirmDialog(
+            answer = MiscToolkit.showConfirmDialog(
                     parent,
                     language.formatMessage("BoardTree.removeBoardConfirmation.body", node.getName()),
                     language.formatMessage("BoardTree.removeBoardConfirmation.title", node.getName()),
-                    JOptionPane.YES_NO_OPTION);
+                    MiscToolkit.YES_NO_OPTION);
         } else {
             return false;
         }
 
-        if (answer == JOptionPane.NO_OPTION) {
+        if( answer != MiscToolkit.YES_OPTION ) {
             return false;
         }
 
@@ -1226,6 +1238,9 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
         newFrame.runDialog(); // all needed updates of boards are done by the dialog before it closes
     }
 
+    private static final int UPDATETYPE_TODAY = 0;
+    private static final int UPDATETYPE_ALLDAYS = 1;
+
     /**
      * Starts the board update threads, getRequest thread and update id thread.
      * Checks for each type of thread if its already running, and starts allowed
@@ -1244,8 +1259,38 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
 
         boolean threadStarted = false;
 
-        // download the messages of today
-        if (getRunningBoardUpdateThreads().isThreadOfTypeRunning(board, BoardUpdateThread.MSG_DNLOAD_TODAY) == false) {
+        // determine what type of update it's time for ("today" or "all days back" (only if it's
+        // been 12+ hours since last or if the user forces it on every update))
+        int updateType = UPDATETYPE_TODAY;
+        final long now = System.currentTimeMillis();
+        final long lastAllDaysUpdateTime = board.getLastBackloadUpdateFinishedMillis(); // can be -1 for "never done one"
+        final long nextAllDaysUpdateTime = lastAllDaysUpdateTime + (12L * 60L * 60L * 1000L);
+        if( Core.frostSettings.getBoolValue(SettingsClass.ALWAYS_DOWNLOAD_MESSAGES_BACKLOAD)
+                || lastAllDaysUpdateTime < 0 // never done an "all days back" scan yet
+                || now >= nextAllDaysUpdateTime )
+        {
+            updateType = UPDATETYPE_ALLDAYS;
+        }
+
+        // if it's time for an "all days back" scan, start one IF it's not already running one,
+        // otherwise set the type to "just today" instead.
+        if( updateType == UPDATETYPE_ALLDAYS
+                && getRunningBoardUpdateThreads().isThreadOfTypeRunning(board, BoardUpdateThread.MSG_DNLOAD_BACK) == false )
+        {
+            getRunningBoardUpdateThreads().startMessageDownloadBack(board, settings, listener, /*resume=*/false);
+            logger.info("Starting update (MSG_BACKLOAD) of " + board.getName());
+            threadStarted = true;
+        } else {
+            // since an "all days" scan is already running, let's switch to a "today" scan
+            // to allow people to force Frost to download "today" *while* waiting for their
+            // long, multi-day update to finish.
+            updateType = UPDATETYPE_TODAY;
+        }
+
+        // regular "today"-update, but only if one isn't already running
+        if( updateType == UPDATETYPE_TODAY
+                && getRunningBoardUpdateThreads().isThreadOfTypeRunning(board, BoardUpdateThread.MSG_DNLOAD_TODAY) == false )
+        {
             getRunningBoardUpdateThreads().startMessageDownloadToday(
                 board,
                 settings,
@@ -1254,29 +1299,8 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
             threadStarted = true;
         }
 
-        final long now = System.currentTimeMillis();
-
-        if (getRunningBoardUpdateThreads().isThreadOfTypeRunning(board, BoardUpdateThread.MSG_DNLOAD_BACK) == false) {
-
-            // get the older messages, if configured start backload only after 12 hours
-            final long before12hours = now - (12L * 60L * 60L * 1000L); // 12 hours
-            boolean downloadCompleteBackload;
-            if( Core.frostSettings.getBoolValue(SettingsClass.ALWAYS_DOWNLOAD_MESSAGES_BACKLOAD) == false
-                    && before12hours < board.getLastBackloadUpdateFinishedMillis() )
-            {
-                downloadCompleteBackload = false;
-            } else {
-                // we start a complete backload
-                downloadCompleteBackload = true;
-            }
-
-            getRunningBoardUpdateThreads().startMessageDownloadBack(board, settings, listener, downloadCompleteBackload);
-            logger.info("Starting update (MSG_BACKLOAD) of " + board.getName());
-            threadStarted = true;
-        }
-
         // if there was a new thread started, update the lastUpdateStartTimeMillis
-        if (threadStarted == true) {
+        if( threadStarted == true ) {
             board.setLastUpdateStartMillis(now);
             board.incTimesUpdatedCount();
         }
@@ -1306,8 +1330,8 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
         } else if( evt.getPropertyName().equals(SettingsClass.SHOW_BOARDTREE_FLAGGEDSTARRED_INDICATOR) ) {
             showFlaggedStarredIndicators = Core.frostSettings.getBoolValue(SettingsClass.SHOW_BOARDTREE_FLAGGEDSTARRED_INDICATOR);
             updateTree(); // redraw tree nodes
-        } else if( evt.getPropertyName().equals(SettingsClass.SHOW_BOARD_UPDATE_VISUALIZATION) ) {
-            showBoardUpdateVisualization = Core.frostSettings.getBoolValue(SettingsClass.SHOW_BOARD_UPDATE_VISUALIZATION);
+        } else if( evt.getPropertyName().equals(SettingsClass.BOARD_UPDATE_VISUALIZATION_ENABLED) ) {
+            showBoardUpdateVisualization = Core.frostSettings.getBoolValue(SettingsClass.BOARD_UPDATE_VISUALIZATION_ENABLED);
             updateTree(); // redraw tree nodes
         } else if( evt.getPropertyName().equals(SettingsClass.DOS_STOP_BOARD_UPDATES_WHEN_DOSED) ) {
             stopBoardUpdatesWhenDOSed = Core.frostSettings.getBoolValue(SettingsClass.DOS_STOP_BOARD_UPDATES_WHEN_DOSED);
@@ -1336,8 +1360,8 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
         final long todayDateTime = MainFrame.getInstance().getTodaysDateMillis();
         for( final Board board : model.getAllBoards() ) {
             final int maxDaysBack = board.getMaxMessageDownload();
-            final LocalDate localDate = new LocalDate(DateTimeZone.UTC).minusDays(maxDaysBack);
-            final long minDateTime = localDate.toDateMidnight(DateTimeZone.UTC).getMillis();
+            final DateTime xDaysAgo = new DateTime(DateTimeZone.UTC).minusDays(maxDaysBack);
+            final long minDateTime = xDaysAgo.withTimeAtStartOfDay().getMillis();
             board.updateDosStatus(stopBoardUpdatesWhenDOSed, minDateTime, todayDateTime);
         }
     }
@@ -1389,5 +1413,70 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
         }
         final Board selectedBoard = (Board)selectedNode;
         return selectedBoard;
+    }
+
+    /**
+     * Selects the given board object in the tree view, if the board exists in the tree. If the
+     * board is already selected, this does nothing.
+     * You must pass in a board object, since it's possible for multiple boards to have the same
+     * name, so we can't simply do a string comparison. Therefore it is important that your board
+     * object is the exact same instance of the board object used by the tree. If you're unable
+     * to get the exact same object, then you can use the "getBoardByName" function to retrieve
+     * the board object by name, but be aware that there may be name clashes if the user has
+     * added the same board multiple times with different private/public keys.
+     * Recommendation: If result < 0, treat it as failure; if result > 0, treat it as board messages
+     * having to load from disk (so you should wait for ~1-2 seconds before trying to do anything
+     * with the board contents); otherwise (result == 0) you can instantly use the board contents
+     * for something.
+     * @param Board theBoard - the board to select
+     * @return int - success: 0 if the board was already selected, 1 if the board exists and was
+     * selected by us; failure: -1 if the board does not exist, -2 if the board exists but couldn't
+     * be selected (should never be able to happen, though)
+     */
+    public int setSelectedBoard(final Board theBoard) {
+        if( theBoard == null ){ return -1; } // no board provided = board doesn't exist
+
+        // loops through all tree nodes regardless of depth, looking for the board
+        final Enumeration<AbstractNode> en = model.getRoot().depthFirstEnumeration();
+        while( en.hasMoreElements() ) {
+            final AbstractNode node = en.nextElement();
+            if( node != null && node.isBoard() ) {
+                final Board nodeAsBoard = (Board)node;
+                if( nodeAsBoard.equals(theBoard) ) {
+                    // get the path to the board and check if it's already selected
+                    final TreePath boardPath = new TreePath(node.getPath());
+                    final TreePath currentSelectedPath = getSelectionPath();
+                    if( currentSelectedPath.equals(boardPath) ) {
+                        return 0; // success, board exists and is already selected
+                    }
+
+                    // we found the board! but it wasn't selected, so we'll need to expand the whole
+                    // path (regardless of depth; making the board viewable) and then try to select it
+                    // NOTE: if the calling thread is not the AWT event queue, then we'll need to do
+                    // the actual board-selection in a new job on the AWT event queue, otherwise we'll
+                    // fuck up any ongoing AWT rendering of the tree and cause general mayhem.
+                    try {
+                        Mixed.invokeNowInDispatchThread(new Runnable() {
+                            public void run() {
+                                // NOTE: since this is all happening in the AWT thread, the GUI redraw after
+                                // the expansion will be handled *instantly*, so it's safe to instantly try
+                                // to select the board afterwards
+                                expandPath(boardPath);
+                                setSelectionPath(boardPath);
+                            }
+                        });
+                    } catch( Exception e ) {
+                        return -2; // if there was a problem, then simply return "could not select"
+                    }
+
+                    // check if the node is now selected, if so return 1 ("now selected"),
+                    // otherwise return -2 ("could not select")
+                    final TreePath newSelectedPath = getSelectionPath();
+                    return ( newSelectedPath.equals(boardPath) ? 1 : -2 );
+                }
+            }
+        }
+
+        return -1; // the board did not exist in our tree
     }
 }

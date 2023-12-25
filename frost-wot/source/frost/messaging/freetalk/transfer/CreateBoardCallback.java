@@ -27,6 +27,7 @@ import frost.fcp.fcp07.*;
 import frost.fcp.fcp07.freetalk.FcpFreetalkConnection.*;
 import frost.messaging.freetalk.*;
 import frost.messaging.freetalk.boards.*;
+import frost.util.gui.MiscToolkit;
 
 public class CreateBoardCallback implements FreetalkNodeMessageCallback {
 
@@ -60,11 +61,11 @@ public class CreateBoardCallback implements FreetalkNodeMessageCallback {
             final FreetalkBoard newBoard = new FreetalkBoard(storedBoardName);
             mainFrame.getFreetalkMessageTab().getBoardTree().addNewBoard(newBoard);
         } else {
-            JOptionPane.showMessageDialog(
+            MiscToolkit.showMessageDialog(
                     mainFrame,
                     "Error Description: "+errorDesc,
                     "Error creating new Freetalk board",
-                    JOptionPane.ERROR_MESSAGE);
+                    MiscToolkit.ERROR_MESSAGE);
         }
     }
 }

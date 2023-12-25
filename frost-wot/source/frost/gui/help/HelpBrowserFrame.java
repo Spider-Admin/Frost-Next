@@ -128,31 +128,18 @@ public class HelpBrowserFrame extends JFrame {
         final boolean lastMaximized = Core.frostSettings.getBoolValue("helpBrowser.lastFrameMaximized");
 
         if( lastHeight <= 0 || lastWidth <= 0 ) {
-            // first call
+            // first time the user opens the help dialog; use the default help window size
             setSize(780,550);
             setLocationRelativeTo(MainFrame.getInstance());
             return;
         }
 
-        final Dimension scrSize = Toolkit.getDefaultToolkit().getScreenSize();
-
-        if (lastWidth < 100) {
+	// resize to default dimensions if the user made the window too small last time
+        if (lastWidth < 200) {
             lastWidth = 780;
         }
-        if (lastHeight < 100) {
+        if (lastHeight < 200) {
             lastHeight = 550;
-        }
-
-        if ((lastPosX + lastWidth) > scrSize.width) {
-            setSize(780,550);
-            setLocationRelativeTo(MainFrame.getInstance());
-            return;
-        }
-
-        if ((lastPosY + lastHeight) > scrSize.height) {
-            setSize(780,550);
-            setLocationRelativeTo(MainFrame.getInstance());
-            return;
         }
 
         setBounds(lastPosX, lastPosY, lastWidth, lastHeight);

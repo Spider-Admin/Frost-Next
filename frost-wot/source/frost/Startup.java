@@ -21,6 +21,8 @@ package frost;
 import java.io.*;
 import java.util.logging.*;
 
+import frost.fileTransfer.download.FrostDownloadItem;
+
 /**
  * Does some things that have to be done when starting Frost.
  */
@@ -113,7 +115,7 @@ public class Startup {
     }
 
     private static void checkDirectories(final SettingsClass settings) {
-        final File downloadDirectory = new File(settings.getValue(SettingsClass.DIR_DOWNLOAD));
+        final File downloadDirectory = new File(FrostDownloadItem.getDefaultDownloadDir());
         if( !downloadDirectory.isDirectory() ) {
             logger.warning("Creating download directory");
             downloadDirectory.mkdirs();

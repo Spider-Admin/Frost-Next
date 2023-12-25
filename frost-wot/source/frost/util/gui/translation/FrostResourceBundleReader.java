@@ -36,39 +36,60 @@ public class FrostResourceBundleReader {
 
     /**
      * Loads the properties from a jarResource. Provide resource as '/i18n/langres.properties'.
-     * This class is guaranteed to never return null.
+     * This function is guaranteed to never return null.
      */
     public static Map<String,String> loadBundle(final String jarResource) {
-        final InputStream input = MainFrame.class.getResourceAsStream(jarResource);
-        if( input == null ) {
-            // file not found in jar
+        Map<String,String> result = null;
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final InputStream input = MainFrame.class.getResourceAsStream(jarResource);
+        ) {
+            if( input != null ) { // getRes.. returns null if the resource is missing
+                result = loadBundle(input, jarResource);
+            }
+        } catch( final Exception e ) {}
+        if( result == null ) {
             logger.severe("Resource not found in jar file: "+jarResource);
-            return new HashMap<String,String>();
+            result = new HashMap<String,String>();
         }
-        return loadBundle(input, jarResource);
+        return result;
     }
 
     /**
      * Loads the properties from a file.
-     * This class is guaranteed to never return null.
+     * This function is guaranteed to never return null.
      */
     public static Map<String,String> loadBundle(final File fileResource) {
-        InputStream input;
-        try {
-            input = new FileInputStream(fileResource);
-        } catch (final FileNotFoundException e) {
-            logger.log(Level.SEVERE, "Could not open properties file: "+fileResource, e);
-            return new HashMap<String,String>();
+        Map<String,String> result = null;
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final InputStream input = new FileInputStream(fileResource);
+        ) {
+            result = loadBundle(input, fileResource.getPath());
+        } catch( final Exception e ) {}
+        if( result == null ) {
+            logger.severe("Could not open properties file: "+fileResource);
+            result = new HashMap<String,String>();
         }
-        return loadBundle(input, fileResource.getPath());
+        return result;
     }
 
+    /**
+     * The function that actually does the loading. Note that it swallows all exceptions.
+     * This function is guaranteed to never return null.
+     *
+     * NOTE: The caller (you) are responsible for closing the inStream afterwards, either
+     * manually via .close() or by wrapping it with an autocloseable try-statement.
+     */
     private static Map<String,String> loadBundle(final InputStream inStream, final String resourceName) {
 
         final Map<String,String> bundle = new HashMap<String,String>();
 
-        try {
-            final BufferedReader rdr = new BufferedReader(new InputStreamReader(inStream, "UTF-8"));
+        try (
+            // NOTE: Java 7+ try-with-resources (autocloseable)
+            final InputStreamReader inputStreamReader = new InputStreamReader(inStream, "UTF-8");
+            final BufferedReader rdr = new BufferedReader(inputStreamReader);
+        ) {
             String wholeLine = null;
             while(true) {
                 String line = rdr.readLine();
@@ -118,7 +139,6 @@ public class FrostResourceBundleReader {
             }
         } catch(final Throwable t) {
             logger.log(Level.SEVERE, "Error reading resource: "+resourceName, t);
-            return bundle;
         }
         return bundle;
     }

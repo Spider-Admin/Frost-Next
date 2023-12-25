@@ -18,9 +18,16 @@
 */
 package frost.util.model;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Iterator;
+
 import frost.util.gui.*;
 
-@SuppressWarnings("serial")
+// NOTE: This is one of the three types of sortable tables in Frost:
+// - SortedTable
+// - SortedModelTable: mostly used for uploads/downloads tables and sent/outbox message lists
+// - The board-message lists (they're a treetable and use their own implementation)
 public class SortedModelTable<T extends ModelItem<T>> extends ModelTable<T> {
 	
 	/**
@@ -45,19 +52,24 @@ public class SortedModelTable<T extends ModelItem<T>> extends ModelTable<T> {
 		
 		getTable().setTableHeader(new SortedTableHeader(this));
 	}
-	/**
-	 * @param columnNumber
-	 */
-	void columnClicked(int columnNumber) {
-		if (columnNumber != currentSortedColumnNumber) {
-			currentSortedColumnNumber = columnNumber;
-			ascending = true;
-		} else {
-			ascending = !ascending;
-		}
-        
+
+    // you can override this to be able to configure the default sort-order of clicked columns,
+    // by checking the column number and returning true for ascending or false for descending.
+    // this is used when the user clicks a different column to sort by something else. the user
+    // expects logical default sorting behaviors, such as sorting dates descending.
+    public boolean getColumnDefaultAscendingState(final int columnNumber) {
+        return true;
+    }
+
+    // triggered when the user clicks a column header, and is the model-indexed column number.
+    void columnClicked(int columnNumber) {
+        // if the user clicks the same column then toggle ascending/descending,
+        // if the user clicks another column then use that column's default order.
+        ascending = ( columnNumber == currentSortedColumnNumber ? !ascending : getColumnDefaultAscendingState(columnNumber) );
+        currentSortedColumnNumber = columnNumber;
+
         resortTable();
-	}
+    }
     
     public void setSortedColumn(final int col, final boolean asc) {
         currentSortedColumnNumber = col;
@@ -66,18 +78,28 @@ public class SortedModelTable<T extends ModelItem<T>> extends ModelTable<T> {
     }
     
     public void resortTable() {
+        // step 1: save the list of model items the user has selected (we don't care about what table
+        // rows they're in, since it's impossible to know where they will end up after sorting)
+        // NOTE: this may be null if there's no selection
+        final List<T> selectedItems = getSelectedItems();
+
         FrostSwingWorker worker = new FrostSwingWorker(table) {
 
             @Override
-            protected void doNonUILogic() throws RuntimeException {
+            protected void doNonUILogic() throws RuntimeException { // step 2
+                // now re-sort the model data (this sorting method means the view's row-index and model's index always corresponds 1:1)
                 int index = convertColumnIndexToFormat(currentSortedColumnNumber);
                 model.sort(index, ascending);
             }
 
             @Override
-            protected void doUIUpdateLogic() throws RuntimeException {
+            protected void doUIUpdateLogic() throws RuntimeException { // step 3
+                // repaint the table so that it shows the re-sorted row order
                 table.revalidate();
                 table.repaint();
+
+                // apply the same selection again, taking all updated row offsets into account
+                model.selectTheseModelItems(selectedItems);
             }
 
         };

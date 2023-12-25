@@ -111,12 +111,14 @@ public class SearchTable extends SortedModelTable<FrostSearchItem> {
             showDetails();
             return;
         }
-        addItemsToDownloadTable( getSelectedItems() );
+        final List<FrostSearchItem> selectedItems = getSelectedItems();
+        if( selectedItems == null ) { return; }
+        addItemsToDownloadTable( selectedItems );
     }
 
     private void showDetails() {
         final List<FrostSearchItem> selectedItems = getSelectedItems();
-        if (selectedItems.size() != 1) {
+        if( selectedItems == null || selectedItems.size() != 1 ) {
             return;
         }
         new FileListFileDetailsDialog(MainFrame.getInstance(), true).startDialog(selectedItems.get(0).getFrostFileListFileObject());
@@ -244,10 +246,14 @@ public class SearchTable extends SortedModelTable<FrostSearchItem> {
                 downloadAllKeys();
             }
             if (e.getSource() == copyKeysAndNamesItem) {
-                CopyToClipboard.copyKeysAndFilenames(getSelectedItems().toArray());
+                final List<FrostSearchItem> selectedItems = getSelectedItems();
+                if( selectedItems == null ) { return; }
+                CopyToClipboard.copyKeysAndFilenames(selectedItems.toArray());
             }
             if (e.getSource() == copyExtendedInfoItem) {
-                CopyToClipboard.copyExtendedInfo(getSelectedItems().toArray());
+                final List<FrostSearchItem> selectedItems = getSelectedItems();
+                if( selectedItems == null ) { return; }
+                CopyToClipboard.copyExtendedInfo(selectedItems.toArray());
             }
             if (e.getSource() == hideSelectedKeysItem) {
                 hideSelectedFiles();
@@ -262,12 +268,14 @@ public class SearchTable extends SortedModelTable<FrostSearchItem> {
         }
 
         private void downloadSelectedKeys() {
-            addItemsToDownloadTable( getSelectedItems() );
+            final List<FrostSearchItem> selectedItems = getSelectedItems();
+            if( selectedItems == null ) { return; }
+            addItemsToDownloadTable( selectedItems );
         }
 
         private void hideSelectedFiles() {
             final List<FrostSearchItem> selectedItems = getSelectedItems();
-            if (selectedItems == null || selectedItems.size() == 0) {
+            if( selectedItems == null || selectedItems.size() == 0 ) {
                 return;
             }
 
@@ -304,13 +312,10 @@ public class SearchTable extends SortedModelTable<FrostSearchItem> {
 
             final List<FrostSearchItem> selectedItems = getSelectedItems();
 
-            if (selectedItems.size() > 0) {
+            if( selectedItems != null && selectedItems.size() > 0 ) {
+                // if at least 1 item is selected
                 add(copyToClipboardMenu);
                 addSeparator();
-            }
-
-            if (selectedItems.size() != 0) {
-                // If at least 1 item is selected
                 add(downloadSelectedKeysItem);
                 addSeparator();
             }
@@ -318,7 +323,7 @@ public class SearchTable extends SortedModelTable<FrostSearchItem> {
             addSeparator();
             add(hideSelectedKeysItem);
 
-            if (selectedItems.size() == 1) {
+            if( selectedItems != null && selectedItems.size() == 1 ) {
                 addSeparator();
                 add(detailsItem);
             }

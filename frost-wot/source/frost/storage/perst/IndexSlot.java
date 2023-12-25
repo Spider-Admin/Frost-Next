@@ -45,6 +45,9 @@ public class IndexSlot extends Persistent {
     public int getIndexName() {
         return indexName;
     }
+    /**
+     * Returns the midnight milliseconds timestamp for the day that this IndexSlot is for.
+     */
     public long getMsgDate() {
         return msgDate;
     }

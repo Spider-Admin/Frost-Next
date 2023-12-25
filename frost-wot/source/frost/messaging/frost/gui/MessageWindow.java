@@ -29,6 +29,9 @@ import frost.messaging.frost.*;
 import frost.util.gui.*;
 import frost.util.gui.translation.*;
 
+/**
+ * This is the window used when double-clicking messages and search results to view the message.
+ */
 @SuppressWarnings("serial")
 public class MessageWindow extends JFrame {
 
@@ -47,6 +50,8 @@ public class MessageWindow extends JFrame {
     private final boolean showReplyButton;
 
     private static final ImageIcon frameIcon = MiscToolkit.loadImageIcon("/data/messagebright.gif");
+
+    private final int systemKeyModifier = Toolkit.getDefaultToolkit().getMenuShortcutKeyMask(); // win/linux: ctrl, mac: cmd
 
     public MessageWindow(final Window parentWindow, final FrostMessageObject message, final Dimension size) {
         this(parentWindow, message, size, null, true);
@@ -129,7 +134,11 @@ public class MessageWindow extends JFrame {
             close();
         }
         public void maybeDoSomething(final KeyEvent e){
-            if( e.getKeyChar() == KeyEvent.VK_ESCAPE ) {
+            // NOTE: getKeyChar() is the translated result (like shift+a = "A"), whereas getKeyCode()
+            // is the actual physical key (such as "a"). we must read ctrl+w using getKeyCode() since
+            // the ctrl modifier changes the getKeyChar() meaning.
+            if( e.getKeyChar() == KeyEvent.VK_ESCAPE // escape
+             || e.getKeyCode() == KeyEvent.VK_W && (e.getModifiers() & systemKeyModifier) != 0 ) { // ctrl+w (win/linux) or cmd+w (mac)
                 close();
             }
         }
@@ -308,6 +317,7 @@ public class MessageWindow extends JFrame {
                 TFsubject.setText(" "+innerMessage.getSubject());
                 TFsubject.setBorder(javax.swing.BorderFactory.createEmptyBorder(2,2,2,2));
                 TFsubject.setEditable(false);
+                TFsubject.setOpaque(false); // removes ugly background in some L&Fs
             }
             return TFsubject;
         }
@@ -318,6 +328,7 @@ public class MessageWindow extends JFrame {
                 TFfrom.setText(" "+innerMessage.getFromName());
                 TFfrom.setBorder(javax.swing.BorderFactory.createEmptyBorder(2,2,2,2));
                 TFfrom.setEditable(false);
+                TFfrom.setOpaque(false);
             }
             return TFfrom;
         }
@@ -328,6 +339,7 @@ public class MessageWindow extends JFrame {
                 TFto.setText(" "+innerMessage.getRecipientName());
                 TFto.setBorder(javax.swing.BorderFactory.createEmptyBorder(2,2,2,2));
                 TFto.setEditable(false);
+                TFto.setOpaque(false);
             }
             return TFto;
         }
@@ -338,6 +350,7 @@ public class MessageWindow extends JFrame {
                 TFdate.setText(" "+innerMessage.getDateAndTimeString());
                 TFdate.setBorder(javax.swing.BorderFactory.createEmptyBorder(2,2,2,2));
                 TFdate.setEditable(false);
+                TFdate.setOpaque(false);
             }
             return TFdate;
         }
@@ -348,6 +361,7 @@ public class MessageWindow extends JFrame {
                 TFboard.setText(" "+innerMessage.getBoard().getName());
                 TFboard.setBorder(javax.swing.BorderFactory.createEmptyBorder(2,2,2,2));
                 TFboard.setEditable(false);
+                TFboard.setOpaque(false);
             }
             return TFboard;
         }

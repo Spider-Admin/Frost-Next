@@ -156,7 +156,7 @@ public class SharedFileXmlFile implements XMLizable {
 
     public Element getXMLElement(final Document doc) {
 
-        // we do not add keys who are not signed by people we marked as GOOD!
+        // we do not add keys who are not signed by people we marked as FRIEND!
         // but we add unsigned keys for now; this will probably change soon
 
         final Element fileelement = doc.createElement("File");

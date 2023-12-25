@@ -20,6 +20,8 @@ package frost.messaging.frost.boards;
 
 import java.util.*;
 
+import frost.util.VectorComparator;
+
 /**
  * Represents a folder in the board tree.
  */
@@ -35,8 +37,11 @@ public class Folder extends AbstractNode {
         nameLowerCase = name.toLowerCase();
     }
 
+    @SuppressWarnings("unchecked")
     public void sortChildren() {
-        Collections.sort(children);
+        // NOTE: the underlying model unchangeably uses a plain untyped Vector<Object>, but vectors
+        // implement the "List" interface, so we simply force a cast and sort using our own comparator
+        Collections.sort((List<AbstractNode>)children, new VectorComparator<AbstractNode>(false));
     }
 
     @Override

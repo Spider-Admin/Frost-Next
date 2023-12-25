@@ -44,7 +44,7 @@ public class SharedFilesOwnerDialog extends JDialog {
     private JButton Bok = null;
 
     private JLabel LaskForIdentity = null;
-    private JComboBox CBidentities = null;
+    private JComboBox<String> CBidentities = null;
 
     private JLabel LaskIfToReplace = null;
     private JRadioButton RBignoreExistingFile = null;
@@ -224,9 +224,9 @@ public class SharedFilesOwnerDialog extends JDialog {
      *
      * @return javax.swing.JComboBox
      */
-    private JComboBox getCBidentities() {
+    private JComboBox<String> getCBidentities() {
         if( CBidentities == null ) {
-            CBidentities = new JComboBox();
+            CBidentities = new JComboBox<String>();
             for( final LocalIdentity localIdentity : Core.getIdentities().getLocalIdentities() ) {
                 final LocalIdentity id = localIdentity;
                 CBidentities.addItem(id.getUniqueName());

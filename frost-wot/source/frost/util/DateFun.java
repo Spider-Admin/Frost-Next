@@ -232,6 +232,16 @@ public class DateFun {
     }
 
     /**
+     * Returns date and time with leading zeroes
+     * @return format "yyyy.mm.dd hh:mm:ssGMT"
+     */
+    public static String getExtendedDateAndTimeFromMillis(final long millis) {
+        return FORMAT_DATE_EXT.print(millis) // "2008.12.24"; at UTC
+            + " "
+            + FORMAT_TIME_EXT.print(millis); // "16:51:28GMT"; at UTC
+    }
+
+    /**
      * Returns date -n days.
      * @return Date as String yyyy.m.d in GMT without leading zeros
      */

@@ -27,7 +27,8 @@ import javax.swing.table.*;
 
 import frost.util.gui.*;
 
-@SuppressWarnings("serial")
+// NOTE: the message list is a custom sortable table, and doesn't use any of the other types of sortable
+// table implementations in Frost. that's why we have to implement the custom sorting behavior here.
 public class MessageTreeTableHeader extends JTableHeader {
 
     private final MessageTreeTable messageTreeTable;
@@ -68,11 +69,16 @@ public class MessageTreeTableHeader extends JTableHeader {
                 //This translation is done so the real column number is used when the user moves columns around.
                 final int modelIndex = lColumnModel.getColumn(columnNumber).getModelIndex();
 
+                // if the user clicks the same column then toggle ascending/descending,
+                // if the user clicks another column then use that column's default order.
                 if( MessageTreeTableSortStateBean.getSortedColumn() == modelIndex ) {
                     // toggle ascending
                     MessageTreeTableSortStateBean.setAscending( !MessageTreeTableSortStateBean.isAscending() );
                 } else {
+                    // switch to sorting by a different column and use its default sort order
                     MessageTreeTableSortStateBean.setSortedColumn(modelIndex);
+                    boolean sortAscending = MessageTreeTableSortStateBean.columnDefaultAscendingStates[modelIndex];
+                    MessageTreeTableSortStateBean.setAscending( sortAscending );
                 }
 
                 messageTreeTable.resortTable();

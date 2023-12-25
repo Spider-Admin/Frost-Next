@@ -30,15 +30,17 @@ public class FcpSocket {
 
     private static final Logger logger = Logger.getLogger(FcpSocket.class.getName());
 
-    // This is the timeout set in Socket.setSoTimeout().
-    private final static int TIMEOUT = 90 * 60 * 1000;
+    // These are the timeouts set in Socket.setSoTimeout(), for non-infinite connections.
+    private final static int TIMEOUT_READ_DEFAULT = 3 * 60 * 1000; // 3 minutes
+    private final static int TIMEOUT_READ_NONPERSISTENT = 90 * 60 * 1000; // 90 minutes
 
     private final NodeAddress nodeAddress;
+    private final boolean infiniteTimeout;
 
     private Socket fcpSock;
     private BufferedInputStream fcpIn;
     private PrintStream fcpOut;
-    private final BufferedOutputStream fcpRawOut;
+    private BufferedOutputStream fcpRawOut;
 
     private final Set<String> checkedDirectories = Collections.synchronizedSet(new HashSet<String>());
     
@@ -78,9 +80,12 @@ public class FcpSocket {
      */
     public FcpSocket(final NodeAddress na, final boolean infiniteTimeout) throws UnknownHostException, IOException {
         nodeAddress = na;
+        this.infiniteTimeout = infiniteTimeout;
         fcpSock = new Socket(nodeAddress.getHost(), nodeAddress.getPort());
-        if (!infiniteTimeout) {
-            fcpSock.setSoTimeout(TIMEOUT);
+        if( !this.infiniteTimeout ) {
+            setDefaultTimeout();
+        } else {
+            fcpSock.setSoTimeout(0); // 0 = infinite read()-wait
         }
         fcpSock.setKeepAlive(true);
 
@@ -89,6 +94,66 @@ public class FcpSocket {
         fcpOut = new PrintStream(fcpSock.getOutputStream(), false, "UTF-8");
 
         doHandshake();
+    }
+
+    /**
+     * If the socket is valid, returns the current timeout value.
+     * 
+     * @return  -1 if socket invalid, otherwise 0 (infinite) or 1+ (millis).
+     */
+    public int getCurrentTimeout() {
+        if( fcpSock != null ) {
+            try {
+                return fcpSock.getSoTimeout();
+            } catch( final Throwable t ) {}
+        }
+        return -1;
+    }
+
+    /**
+     * Used internally, but can also be used externally to override the timeout
+     * for certain situations. For example, you could use this to only give the
+     * node a single minute to reply to the request for data.
+     */
+    public boolean setCustomTimeout(final int timeoutMillis) {
+        if( !infiniteTimeout && fcpSock != null ) {
+            try {
+                fcpSock.setSoTimeout(timeoutMillis);
+                return true;
+            } catch( final Throwable t ) {}
+        }
+        return false;
+    }
+
+    /**
+     * Sets the 90 minute timeout. Use this for FcpConnection.java (the non-persistent
+     * transfer mode), where the transfers may have long periods of zero activity
+     * in the block counts, and where we need to ensure the socket stays alive
+     * for as long as possible.
+     */
+    public boolean setNonPersistentTimeout() {
+        return setCustomTimeout(TIMEOUT_READ_NONPERSISTENT);
+    }
+
+    /**
+     * Sets the default 3 minute timeout. This should be used while waiting for
+     * node-replies to queries, but certain cases may need longer/shorter timeouts.
+     *
+     * NOTE: Some instances of FcpSocket use an infinite timeout instead, in
+     * which case this function has no effect. In fact, MOST of Frost uses
+     * infinite timeouts (its persistent queue-watching thread, its persistent
+     * message uploader/downloader in single-threaded message transfer mode, etc),
+     * but the most important things use timeouts: The AllData retrieval after
+     * a persistent transfer is complete; and the whole transfer during
+     * a non-persistent transfer, and the multi-threaded message retrieval mode.
+     * Those are the areas where we need reasonable timeouts, to avoid hanging
+     * forever waiting for a response.
+     * However, you may want to setCustomTimeout() instead, to give the node
+     * even less time to respond to the initial message, so that your downloads
+     * don't stall for very long if the node is frozen.
+     */
+    public boolean setDefaultTimeout() {
+        return setCustomTimeout(TIMEOUT_READ_DEFAULT);
     }
 
     /**
@@ -142,6 +207,13 @@ public class FcpSocket {
             } catch (final Throwable e) {
             }
             fcpOut = null;
+        }
+        if( fcpRawOut != null ) {
+            try {
+                fcpRawOut.close();
+            } catch (final Throwable e) {
+            }
+            fcpRawOut = null;
         }
         if( fcpSock != null ) {
             try {

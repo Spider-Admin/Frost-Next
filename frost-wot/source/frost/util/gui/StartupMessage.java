@@ -18,6 +18,7 @@
 */
 package frost.util.gui;
 
+import java.awt.Component;
 import java.util.*;
 
 import javax.swing.*;
@@ -60,7 +61,7 @@ public class StartupMessage {
     /**
      * Override this method if you want to do special things.
      */
-    public void display(final JFrame parent) {
+    public void display(final Component parent) {
 
         if( isMessageTypeIgnored(getMessageType()) ) {
             return;
@@ -72,22 +73,23 @@ public class StartupMessage {
             final String okStr = language.getString("Common.ok");
             final String ignoreStr = language.getString("Common.ignoreMessagesOfThisType");
             final Object[] options = { okStr, ignoreStr };
-            final int answer = JOptionPane.showOptionDialog(
+            final int answer = MiscToolkit.showOptionDialog(
                     parent,
                     getText(),
                     getTitle(),
-                    JOptionPane.DEFAULT_OPTION,
+                    MiscToolkit.DEFAULT_OPTION,
                     getDialogType(),
                     null,
                     options,
-                    options[0]);
+                    options[0],
+                    true); // always on top just like the parent (splashscreen)
 
-            if( answer == 1 ) {
+            if( answer == 1 ) { // 1 == user clicked option 1; "ignoreStr"
                 StartupMessage.setMessageTypeIgnored(getMessageType());
-            }
+            } // else: user clicked "okStr" or closed the dialog
         } else {
             // user cannot choose to not show any more msgs of this type
-            JOptionPane.showMessageDialog(parent, getText(), getTitle(), getDialogType());
+            MiscToolkit.showMessageDialog(parent, getText(), getTitle(), getDialogType(), null, true); // always on top
         }
     }
 

@@ -44,11 +44,11 @@ import frost.*;
 @SuppressWarnings("serial")
 public class BoardUpdateInformationFrame extends javax.swing.JFrame implements BoardUpdateThreadListener, TreeSelectionListener {
 
-    private JComboBox cbBoards;
+    private JComboBox<Board> cbBoards;
     private JLabel lBoards;
     private JTextArea taContent;
     private JLabel lDates;
-    private JComboBox cbDates;
+    private JComboBox<BoardUpdateInformation> cbDates;
 
     private static boolean isShowing = false; // flag, is true if frame is shown
     private final TofTree tofTree;
@@ -67,7 +67,7 @@ public class BoardUpdateInformationFrame extends javax.swing.JFrame implements B
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         enableEvents(AWTEvent.WINDOW_EVENT_MASK);
         initGUI();
-        setTitle("Board update informations");
+        setTitle("Board update information");
         setLocationRelativeTo(parentFrame);
     }
 
@@ -78,8 +78,8 @@ public class BoardUpdateInformationFrame extends javax.swing.JFrame implements B
             final GridBagLayout boardUpdateInfoPanelLayout = new GridBagLayout();
             final JPanel boardUpdateInfoPanel = new JPanel(boardUpdateInfoPanelLayout);
             {
-                final ComboBoxModel cbBoardsModel = new DefaultComboBoxModel();
-                cbBoards = new JComboBox();
+                final ComboBoxModel<Board> cbBoardsModel = new DefaultComboBoxModel<Board>();
+                cbBoards = new JComboBox<Board>();
                 boardUpdateInfoPanel.add(cbBoards, new GridBagConstraints(1, 0, 1, 1, 0.4, 0.0, GridBagConstraints.CENTER, GridBagConstraints.HORIZONTAL, new Insets(5, 5, 5, 0), 0, 0));
                 cbBoards.setModel(cbBoardsModel);
                 cbBoards.addActionListener(new ActionListener() {
@@ -89,8 +89,8 @@ public class BoardUpdateInformationFrame extends javax.swing.JFrame implements B
                 });
             }
             {
-                final ComboBoxModel cbDatesModel = new DefaultComboBoxModel();
-                cbDates = new JComboBox();
+                final ComboBoxModel<BoardUpdateInformation> cbDatesModel = new DefaultComboBoxModel<BoardUpdateInformation>();
+                cbDates = new JComboBox<BoardUpdateInformation>();
                 boardUpdateInfoPanel.add(cbDates, new GridBagConstraints(3, 0, 1, 1, 0.4, 0.0, GridBagConstraints.CENTER, GridBagConstraints.HORIZONTAL, new Insets(5, 5, 5, 5), 0, 0));
                 cbDates.setModel(cbDatesModel);
                 cbDates.addActionListener(new ActionListener() {
@@ -175,7 +175,7 @@ public class BoardUpdateInformationFrame extends javax.swing.JFrame implements B
     }
 
     private void clearTaContent() {
-        taContent.setText("No informations available");
+        taContent.setText("No information available");
     }
 
     private void cbBoardsActionPerformed(final ActionEvent evt) {
@@ -221,7 +221,7 @@ public class BoardUpdateInformationFrame extends javax.swing.JFrame implements B
                 items.add(b);
             }
         }
-        final ComboBoxModel cbBoardsModel = new DefaultComboBoxModel(items);
+        final ComboBoxModel<Board> cbBoardsModel = new DefaultComboBoxModel<Board>(items);
         cbBoards.setModel(cbBoardsModel);
 
         if( cbBoards.getItemCount() > 0 ) {

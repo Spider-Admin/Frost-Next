@@ -19,6 +19,8 @@
 package frost.gui;
 
 import java.awt.*;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 
 import javax.swing.*;
 import javax.swing.table.*;
@@ -27,16 +29,20 @@ import frost.*;
 import frost.fileTransfer.common.*;
 import frost.gui.model.*;
 import frost.messaging.frost.*;
+import frost.util.gui.TrustStateColors;
 import frost.util.gui.*;
 
 @SuppressWarnings("serial")
-public class SearchMessagesResultTable extends SortedTable<FrostSearchResultMessageObject> {
+public class SearchMessagesResultTable
+    extends SortedTable<FrostSearchResultMessageObject>
+    implements PropertyChangeListener
+{
 
     private final CellRenderer cellRenderer = new CellRenderer();
     private final BooleanCellRenderer booleanCellRenderer = new BooleanCellRenderer();
 
-    private final ImageIcon flaggedIcon = MiscToolkit.loadImageIcon("/data/flagged.gif");
-    private final ImageIcon starredIcon = MiscToolkit.loadImageIcon("/data/starred.gif");
+    private final ImageIcon flaggedIcon = MiscToolkit.loadImageIcon("/data/flag.png");
+    private final ImageIcon starredIcon = MiscToolkit.loadImageIcon("/data/star.png");
 
     private final ImageIcon messageDummyIcon = MiscToolkit.loadImageIcon("/data/messagedummyicon.gif");
     private final ImageIcon messageNewIcon = MiscToolkit.loadImageIcon("/data/messagenewicon.gif");
@@ -46,11 +52,17 @@ public class SearchMessagesResultTable extends SortedTable<FrostSearchResultMess
 
     private final boolean showColoredLines;
 
+    private Color fMsgNormalColor;
+    private Color fMsgPrivColor;
+    private Color fMsgWithAttachmentsColor;
+    private Color fMsgUnsignedColor;
+
     public SearchMessagesResultTable(final SearchMessagesTableModel m) {
         super(m);
 
-        setDefaultRenderer(String.class, cellRenderer);
-        setDefaultRenderer(Boolean.class, booleanCellRenderer);
+        updateMessageColors();
+
+        setCustomRenderers();
 
         // default for messages: sort by date descending
         sortedColumnIndex = 5;
@@ -60,6 +72,29 @@ public class SearchMessagesResultTable extends SortedTable<FrostSearchResultMess
         initLayout();
 
         showColoredLines = Core.frostSettings.getBoolValue(SettingsClass.SHOW_COLORED_ROWS);
+        MainFrame.getInstance().getMessageColorManager().addPropertyChangeListener(this);
+    }
+
+    private void updateMessageColors()
+    {
+        fMsgNormalColor = MainFrame.getInstance().getMessageColorManager().getNormalColor();
+        fMsgPrivColor = MainFrame.getInstance().getMessageColorManager().getPrivColor();
+        fMsgWithAttachmentsColor = MainFrame.getInstance().getMessageColorManager().getWithAttachmentsColor();
+        fMsgUnsignedColor = MainFrame.getInstance().getMessageColorManager().getUnsignedColor();
+    }
+
+    private void setCustomRenderers() {
+        if( booleanCellRenderer == null ) { return; } // avoid null renderers during initial startup
+        setDefaultRenderer(String.class, cellRenderer);
+        setDefaultRenderer(Boolean.class, booleanCellRenderer);
+    }
+
+    @Override
+    public void updateUI() {
+        super.updateUI();
+
+        // re-apply the custom cell renderers (since most L&Fs replace them with default ones)
+        setCustomRenderers();
     }
 
     private void initLayout() {
@@ -77,6 +112,16 @@ public class SearchMessagesResultTable extends SortedTable<FrostSearchResultMess
         // set icon table header renderer for icon columns
         tcm.getColumn(0).setHeaderRenderer(new IconTableHeaderRenderer(flaggedIcon));
         tcm.getColumn(1).setHeaderRenderer(new IconTableHeaderRenderer(starredIcon));
+    }
+
+    // override the default sort order when clicking different columns
+    @Override
+    public boolean getColumnDefaultAscendingState(final int col) {
+        if( col == 7 ) {
+            // sort date column descending by default
+            return false;
+        }
+        return true; // all other columns: ascending
     }
 
     /**
@@ -157,10 +202,10 @@ public class SearchMessagesResultTable extends SortedTable<FrostSearchResultMess
         private Font boldFont = null;
         private Font normalFont = null;
         private boolean isDeleted = false;
-        private final Color col_good    = new Color(0x00, 0x80, 0x00);
-        private final Color col_check   = new Color(0xFF, 0xCC, 0x00);
-        private final Color col_observe = new Color(0x00, 0xD0, 0x00);
-        private final Color col_bad     = new Color(0xFF, 0x00, 0x00);
+        private final Color col_BAD       = TrustStateColors.BAD;
+        private final Color col_NEUTRAL   = TrustStateColors.NEUTRAL;
+        private final Color col_GOOD      = TrustStateColors.GOOD;
+        private final Color col_FRIEND    = TrustStateColors.FRIEND;
 
         public CellRenderer() {
             final Font baseFont = SearchMessagesResultTable.this.getFont();
@@ -203,24 +248,17 @@ public class SearchMessagesResultTable extends SortedTable<FrostSearchResultMess
                 setBackground(newBackground);
             }
 
-            // do nice things for FROM and SIG column and BOARD column
+            // do nice things for FROM, SUBJECT, SIG and BOARD columns
             if( column == 3 ) {
                 // FROM
                 // first set font, bold for new msg or normal
+                // NOTE: we don't make the actual "subject" column bold too, since most people will have
+                // a majority of unread messages in their search results, so it's cleaner to just make
+                // the "from" column bold instead
                 if (msg.getMessageObject().isNew()) {
                     setFont(boldFont);
                 } else {
                     setFont(normalFont);
-                }
-                // now set color
-                if (!isSelected) {
-                    if( msg.getMessageObject().getRecipientName() != null && msg.getMessageObject().getRecipientName().length() > 0) {
-                        setForeground(Color.RED);
-                    } else if (msg.getMessageObject().containsAttachments()) {
-                        setForeground(Color.BLUE);
-                    } else {
-                        setForeground(Color.BLACK);
-                    }
                 }
                 setToolTipText(msg.getMessageObject().getFromName());
 
@@ -235,6 +273,7 @@ public class SearchMessagesResultTable extends SortedTable<FrostSearchResultMess
 //                    }
 //                }
             } else if( column == 5 ) {
+                // SUBJECT
                 ImageIcon icon;
                 if( msg.getMessageObject().isDummy() ) {
                     icon = messageDummyIcon;
@@ -255,22 +294,22 @@ public class SearchMessagesResultTable extends SortedTable<FrostSearchResultMess
                 setToolTipText(msg.getMessageObject().getSubject());
             } else if( column == 6 ) {
                 // SIG
-                // state == good/bad/check/observe -> bold and coloured
-                if( msg.getMessageObject().isMessageStatusGOOD() ) {
+                // state == BAD/NEUTRAL/GOOD/FRIEND -> bold and colored
+                if( msg.getMessageObject().isMessageStatusNEUTRAL() ) {
                     setFont(boldFont);
-                    setForeground(col_good);
-                } else if( msg.getMessageObject().isMessageStatusCHECK() ) {
+                    setForeground(col_NEUTRAL);
+                } else if( msg.getMessageObject().isMessageStatusGOOD() ) {
                     setFont(boldFont);
-                    setForeground(col_check);
-                } else if( msg.getMessageObject().isMessageStatusOBSERVE() ) {
+                    setForeground(col_GOOD);
+                } else if( msg.getMessageObject().isMessageStatusFRIEND() ) {
                     setFont(boldFont);
-                    setForeground(col_observe);
+                    setForeground(col_FRIEND);
                 } else if( msg.getMessageObject().isMessageStatusBAD() ) {
                     setFont(boldFont);
-                    setForeground(col_bad);
+                    setForeground(col_BAD);
                 } else if( msg.getMessageObject().isMessageStatusTAMPERED() ) {
                     setFont(boldFont);
-                    setForeground(col_bad);
+                    setForeground(col_BAD);
                 } else {
                     setFont(normalFont);
                     if (!isSelected) {
@@ -283,6 +322,23 @@ public class SearchMessagesResultTable extends SortedTable<FrostSearchResultMess
                     setForeground(Color.BLACK);
                 }
             }
+
+            // now set color of the "from" and "subject" columns based on message type
+            if( column == 3 || column == 5 ) {
+                if( !isSelected ) {
+                    // color priority: private message > has attachments > unsigned/anonymous
+                    if( msg.getMessageObject().getRecipientName() != null && msg.getMessageObject().getRecipientName().length() > 0 ) {
+                        setForeground(fMsgPrivColor);
+                    } else if( msg.getMessageObject().containsAttachments() ) {
+                        setForeground(fMsgWithAttachmentsColor);
+                    } else if( !msg.getMessageObject().isSignatureStatusVERIFIED() ) {
+                        setForeground(fMsgUnsignedColor);
+                    } else {
+                        setForeground(fMsgNormalColor);
+                    }
+                }
+            }
+
 
             setDeleted(msg.getMessageObject().isDeleted());
 
@@ -376,5 +432,21 @@ public class SearchMessagesResultTable extends SortedTable<FrostSearchResultMess
             cellRenderer.setFont(font);
         }
         setRowHeight(font.getSize() + 5);
+    }
+
+    @Override
+    public void propertyChange(final PropertyChangeEvent evt) {
+        if( evt.getPropertyName().equals("MessageColorsChanged") ) {
+            updateMessageColors();
+            SwingUtilities.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    // executed on swing since we can't guarantee that the event came from EDT
+                    // NOTE: this clears the user's selection but maintains the scroll position
+                    final SearchMessagesTableModel model = (SearchMessagesTableModel) getModel();
+                    model.fireTableDataChanged(); // update all visible rows
+                }
+            });
+        }
     }
 }

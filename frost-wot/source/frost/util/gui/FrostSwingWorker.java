@@ -151,7 +151,7 @@ public abstract class FrostSwingWorker {
 		} finally {
 			// Allow original component to get the focus
 			if (getAComponent() != null) {
-				getAComponent().requestFocus();
+				getAComponent().requestFocusInWindow();
 			}
 		}
 	}

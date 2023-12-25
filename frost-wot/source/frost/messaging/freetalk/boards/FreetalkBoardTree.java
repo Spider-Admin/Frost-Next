@@ -148,6 +148,7 @@ public class FreetalkBoardTree extends JDragTree implements AutoSavable, ExitSav
 //            refreshItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/view-refresh.png", 16, 16));
 //            removeNodeItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/user-trash.png", 16, 16));
 //            sortFolderItem.setIcon(MiscToolkit.getScaledImage("/data/sort.gif", 16, 16));
+//            markAllReadItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/mail-goto-unread.png", 16, 16));
 //            renameFolderItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/edit-select-all.png", 16, 16));
 //            searchMessagesItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/edit-find.png", 16, 16));
 //            sendMessageItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/mail-message-new.png", 16, 16));
@@ -334,8 +335,21 @@ public class FreetalkBoardTree extends JDragTree implements AutoSavable, ExitSav
         }
 
         public void keyPressed(final KeyEvent e) {
-            final char key = e.getKeyChar();
-            pressedKey(key);
+            /* FIXME: Because our processKeyEvent() forwards and ignores all alphanumeric
+             * keys, this never triggers for anything but special keys (like shift and F5).
+             * But then again, I don't think people would WANT the ability to press X or V
+             * to cut and paste tree nodes. It's useless and would be confusing, since we're
+             * also handling message list shortcuts via the JTree.
+            if (!isEditing()) { // if JTree isn't being edited
+                final char key = e.getKeyChar();
+                if (key == 'x' || key == 'X') {
+                    cutNode(model.getSelectedNode());
+                }
+                if (key == 'v' || key == 'V') {
+                    pasteNode(model.getSelectedNode());
+                }
+            }
+            */
         }
 
         public void keyTyped(final KeyEvent e) {
@@ -636,49 +650,24 @@ public class FreetalkBoardTree extends JDragTree implements AutoSavable, ExitSav
         configBoardMenuItem.setText(language.getString("BoardTree.popupmenu.configureSelectedBoard"));
     }
 
-    /**
-     * Get keyTyped for tofTree
-     */
-    public void pressedKey(final char key) {
-        if (!isEditing()) {
-            if (key == 'x' || key == 'X') {
-                cutNode(model.getSelectedNode());
-            }
-            if (key == 'v' || key == 'V') {
-                pasteNode(model.getSelectedNode());
-            }
-        }
-    }
-
     @Override
     protected void processKeyEvent(final KeyEvent e) {
-        // hack to prevent the standard JTree idiom (selects nodes starting with pressed key)
-        final MessagePanel msgPanel = MainFrame.getInstance().getMessagePanel();
-        Action action = null;
-        if( e.getID()==KeyEvent.KEY_TYPED && (e.getKeyChar() == 'n' || e.getKeyChar() == 'N') ) {
-            action = msgPanel.getActionMap().get("NEXT_MSG");
-        } else if( e.getID()==KeyEvent.KEY_TYPED && (e.getKeyChar() == 'b' || e.getKeyChar() == 'B') ) {
-            action = msgPanel.getActionMap().get("SET_BAD");
-        } else if( e.getID()==KeyEvent.KEY_TYPED && (e.getKeyChar() == 'c' || e.getKeyChar() == 'C') ) {
-            action = msgPanel.getActionMap().get("SET_CHECK");
-        } else if( e.getID()==KeyEvent.KEY_TYPED && (e.getKeyChar() == 'o' || e.getKeyChar() == 'O') ) {
-            action = msgPanel.getActionMap().get("SET_OBSERVE");
-        } else if( e.getID()==KeyEvent.KEY_TYPED && (e.getKeyChar() == 'g' || e.getKeyChar() == 'G') ) {
-            action = msgPanel.getActionMap().get("SET_GOOD");
-        } else if( e.getID()==KeyEvent.KEY_TYPED && (e.getKeyChar() == 'f' || e.getKeyChar() == 'F') ) {
-            action = msgPanel.getActionMap().get("TOGGLE_FLAGGED");
-        } else if( e.getID()==KeyEvent.KEY_TYPED && (e.getKeyChar() == 's' || e.getKeyChar() == 'S') ) {
-            action = msgPanel.getActionMap().get("TOGGLE_STARRED");
-        } else if( e.getID()==KeyEvent.KEY_TYPED && (e.getKeyChar() == 'j' || e.getKeyChar() == 'J') ) {
-            action = msgPanel.getActionMap().get("TOGGLE_JUNK");
-        } else if( Character.isLetter(e.getKeyChar()) || Character.isDigit(e.getKeyChar()) ) {
-            // ignore
+        // this is a trick to prevent the standard JTree key handler from running, which otherwise
+        // selects tree nodes starting with the pressed alphanumeric letter.
+        //
+        // we check the resulting char from pressing the keyboard key, and if it's alphanumeric
+        // we forward it to our parent News tab instead. but if it's any other key, we let the
+        // standard JTree handler run.
+        if( Character.isLetter(e.getKeyChar()) || Character.isDigit(e.getKeyChar()) ) {
+            // forward the alphanumeric key and don't handle it in this tree!
+            final MessagePanel msgPanel = MainFrame.getInstance().getMessagePanel();
+            msgPanel.forwardedAlphanumericKeyEventFromTree(e);
         } else {
+            // this is some non-alphanumeric key, so just forward it to the normal JTree handler.
+            // NOTE: this lets the tree handle leftarrow/rightarrow to expand and collapse nodes (if L&F
+            // has that), but the tree forwards keys like F5 to the "News" tab which in turn handles them!
+            // that in turn means that we properly forward ALL keys that we've bound on the News tab.
             super.processKeyEvent(e);
-        }
-
-        if (action != null) {
-            action.actionPerformed(null);
         }
     }
 
@@ -694,7 +683,7 @@ public class FreetalkBoardTree extends JDragTree implements AutoSavable, ExitSav
 //        if( iniFile.exists() == false ) {
 //            logger.warning("boards.xml file not found, reading default file (will be saved to boards.xml on exit).");
 //            final String defaultBoardsFile = "boards.xml.default07";
-//            boardIniFilename = settings.getValue(SettingsClass.DIR_CONFIG) + defaultBoardsFile;
+//            boardIniFilename = Mixed.getFrostDirFile(settings.getValue(SettingsClass.DIR_CONFIG) + defaultBoardsFile, true);
 //        }
 //
 //        final String unsentName = language.getString("UnsentMessages.folderName");
@@ -744,9 +733,9 @@ public class FreetalkBoardTree extends JDragTree implements AutoSavable, ExitSav
 //                        StartupMessage.MessageType.BoardsWithObsoleteKeysFound,
 //                        title,
 //                        text,
-//                        JOptionPane.ERROR_MESSAGE,
+//                        MiscToolkit.ERROR_MESSAGE,
 //                        true);
-//                MainFrame.enqueueStartupMessage(sm);
+//                Core.enqueueStartupMessage(sm);
 //                logger.severe("Board with obsolete public key found: "+boardName);
 //            }
 //        }
@@ -832,11 +821,11 @@ public class FreetalkBoardTree extends JDragTree implements AutoSavable, ExitSav
 //                final String boardDescription = dialog.getBoardDescription();
 //
 //                if (model.getBoardByName(boardName) != null) {
-//                    JOptionPane.showMessageDialog(
+//                    MiscToolkit.showMessageDialog(
 //                        parent,
 //                        language.formatMessage("BoardTree.duplicateNewBoardNameError.body", boardName),
 //                        language.getString("BoardTree.duplicateNewBoardNameError.title"),
-//                        JOptionPane.ERROR_MESSAGE);
+//                        MiscToolkit.ERROR_MESSAGE);
 //                } else {
 //                    final Board newBoard = new Board(boardName, boardDescription);
 //                    model.addNodeToTree(newBoard);
@@ -869,11 +858,11 @@ public class FreetalkBoardTree extends JDragTree implements AutoSavable, ExitSav
         String nodeName = null;
         do {
             final Object nodeNameOb =
-                JOptionPane.showInputDialog(
+                MiscToolkit.showInputDialog(
                     parent,
                     language.getString("BoardTree.newFolderDialog.body") + ":",
                     language.getString("BoardTree.newFolderDialog.title"),
-                    JOptionPane.QUESTION_MESSAGE,
+                    MiscToolkit.QUESTION_MESSAGE,
                     null,
                     null,
                     language.getString("BoardTree.newFolderDialog.defaultName"));
@@ -904,22 +893,22 @@ public class FreetalkBoardTree extends JDragTree implements AutoSavable, ExitSav
     public boolean removeNode(final Component parent, final AbstractFreetalkNode node) {
         int answer;
         if (node.isFolder()) {
-            answer = JOptionPane.showConfirmDialog(
+            answer = MiscToolkit.showConfirmDialog(
                     parent,
                     language.formatMessage("BoardTree.removeFolderConfirmation.body", node.getName()),
                     language.formatMessage("BoardTree.removeFolderConfirmation.title", node.getName()),
-                    JOptionPane.YES_NO_OPTION);
+                    MiscToolkit.YES_NO_OPTION);
         } else if(node.isBoard()) {
-            answer = JOptionPane.showConfirmDialog(
+            answer = MiscToolkit.showConfirmDialog(
                     parent,
                     language.formatMessage("BoardTree.removeBoardConfirmation.body", node.getName()),
                     language.formatMessage("BoardTree.removeBoardConfirmation.title", node.getName()),
-                    JOptionPane.YES_NO_OPTION);
+                    MiscToolkit.YES_NO_OPTION);
         } else {
             return false;
         }
 
-        if (answer == JOptionPane.NO_OPTION) {
+        if( answer != MiscToolkit.YES_OPTION ) {
             return false;
         }
 

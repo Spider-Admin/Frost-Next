@@ -179,14 +179,14 @@ public class StatisticsDialog extends JDialog {
             jContentPane.add(LarcMsgCount, gridBagConstraints3);
             jContentPane.add(LidCountLabel, gridBagConstraints11);
             jContentPane.add(LidCount, gridBagConstraints21);
-            jContentPane.add(LfileCountLabel, gridBagConstraints31);
-            jContentPane.add(LfileCount, gridBagConstraints4);
+//#DIEFILESHARING            jContentPane.add(LfileCountLabel, gridBagConstraints31);
+//#DIEFILESHARING            jContentPane.add(LfileCount, gridBagConstraints4);
             jContentPane.add(getBclose(), gridBagConstraints5);
             jContentPane.add(glueLabel, gridBagConstraints6);
 //            jContentPane.add(LfileSizeLabel, gridBagConstraints7);
 //            jContentPane.add(LfileSize, gridBagConstraints8);
-            jContentPane.add(LsharerCountLabel, gridBagConstraints9);
-            jContentPane.add(LsharerCount, gridBagConstraints10);
+//#DIEFILESHARING            jContentPane.add(LsharerCountLabel, gridBagConstraints9);
+//#DIEFILESHARING            jContentPane.add(LsharerCount, gridBagConstraints10);
         }
         return jContentPane;
     }

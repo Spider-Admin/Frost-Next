@@ -59,10 +59,13 @@ public class DownloadThread extends Thread {
             // otherwise, proceed as usual
             logger.info("FILEDN: Download of '" + filename + "' started.");
 
-            // Download file
+            // Download file (blocking operation until the job is complete)
             FcpResultGet result = null;
-
             try {
+                // NOTE: this is the file-writer used by all non-persistent downloads in Frost
+                // whenever the persistent queue is disabled. the getFile() implementation is in
+                // FcpHandler.java -> FcpHandler07.java -> FcpRequest.java.
+                // if persistence is enabled, Frost uses PersistenceManager.java for downloads instead
                 result = FcpHandler.inst().getFile(
                             FcpHandler.TYPE_FILE,
                             key,

@@ -45,8 +45,8 @@ public interface Smileys {
 		{	":O" , ":o" , ":-O", ":-o"	},		// Shock (11)
 		{	"X-("			},					// Anger (12)
 		{	":>" , ":->"	},					// Smug (13)
-		{	"B)" , "B-)"	},					// Cool (14)
-		{	":s" , ":S" , ":-s" , ":-S "	},		// Worried (15)
+		{	"B-)"	},							// Cool (14)
+		{	":s" , ":S" , ":-s" , ":-S"	},		// Worried (15)
 
 		{	">:)"	},							// Devilish (16)
 		{	":(("	},							// Crying (17)

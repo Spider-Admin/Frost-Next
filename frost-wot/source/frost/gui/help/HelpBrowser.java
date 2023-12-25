@@ -273,7 +273,7 @@ public class HelpBrowser extends JPanel {
             lastSearchPosEnd = 0; // reset pos
             lastSearchText = null;
 
-            editorPane.requestFocus();
+            editorPane.requestFocusInWindow();
 
         } catch (final IOException e1) {
             logger.log(Level.INFO, "HELP: Missing file: '" + url + "'");

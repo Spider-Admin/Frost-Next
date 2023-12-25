@@ -85,11 +85,11 @@ public class MessageUploader {
 
         final MessageUploaderWorkArea wa = new MessageUploaderWorkArea();
 
-        wa.message = message;
+        wa.message = message; // NOTE: determines the date-string
         wa.unsentMessageFile = message.getFile();
         wa.parentFrame = parentFrame;
         wa.callback = callback;
-        wa.indexSlot = indexSlot;
+        wa.indexSlot = indexSlot; // NOTE: determines the slot indexes we'll try; MUST be the slotindex for the date we've got on the message
         wa.encryptForRecipient = encryptForRecipient;
         wa.senderId = senderId; // maybe null for anonymous
         wa.logBoardName = logBoardName;

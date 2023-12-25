@@ -81,6 +81,7 @@ public class KnownBoardsXmlDAO {
      * the used freenet version.
      */
     private static boolean isBoardKeyValidForFreenetVersion(final Board b) {
+        // NOTE: these keys always have "SSK@" prefix, which is why the validator can test them
         String key;
         key = b.getPublicKey();
         if( key != null && key.length() > 0 ) {
