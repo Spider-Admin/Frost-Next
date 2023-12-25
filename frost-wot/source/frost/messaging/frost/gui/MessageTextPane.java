@@ -262,7 +262,7 @@ public class MessageTextPane extends JPanel {
 
         if( searchMessagesConfig != null &&
             searchMessagesConfig.content != null &&
-            searchMessagesConfig.content.size() > 0 )
+            searchMessagesConfig.content.length() > 0 )
         {
             // highlight words in content that the user searched for
             if( textHighlighter == null ) {
@@ -404,12 +404,14 @@ public class MessageTextPane extends JPanel {
                 if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
                     // user clicked on 'clickedKey', List 'allKeys' contains all keys
                     final List<String> allKeys = ((MessageDecoder)messageTextArea.getDecoder()).getHyperlinkedKeys();
+                    final List<String> currentMessageKeys = ((MessageDecoder)messageTextArea.getDecoder()).getHyperlinkedKeys(selectedMessage.getIdLinePos());
                     final String clickedKey = e.getDescription();
                     // show menu to download this/all keys and copy this/all to clipboard
                     showHyperLinkPopupMenu(
                             e,
                             clickedKey,
                             allKeys,
+                            currentMessageKeys,
                             e.getMouseEvent().getX(),
                             e.getMouseEvent().getY());
                 }
@@ -629,13 +631,14 @@ public class MessageTextPane extends JPanel {
         popupMenuAttachmentTable.show(e.getComponent(), e.getX(), e.getY());
     }
 
-    private void showHyperLinkPopupMenu(final HyperlinkEvent e, final String clickedKey, final List<String> allKeys, final int x, final int y) {
+    private void showHyperLinkPopupMenu(final HyperlinkEvent e, final String clickedKey, final List<String> allKeys, final List<String> currentMessageKeys, final int x, final int y) {
         if (popupMenuHyperLink == null) {
             popupMenuHyperLink = new PopupMenuHyperLink();
             language.addLanguageListener(popupMenuHyperLink);
         }
         popupMenuHyperLink.setClickedKey(clickedKey);
         popupMenuHyperLink.setAllKeys(allKeys);
+        popupMenuHyperLink.setCurrentMessageKeys(currentMessageKeys);
 
         popupMenuHyperLink.show(messageTextArea, x, y);
     }
@@ -927,7 +930,7 @@ public class MessageTextPane extends JPanel {
     extends JSkinnablePopupMenu
     implements ActionListener, LanguageListener {
 
-        private final JMenuItem cancelItem = new JMenuItem();
+//        private final JMenuItem cancelItem = new JMenuItem();
 
         private final JMenuItem copyKeyOnlyToClipboard = new JMenuItem();
 
@@ -935,6 +938,7 @@ public class MessageTextPane extends JPanel {
 
         private final JMenuItem copyFileLinkToClipboard = new JMenuItem();
         private final JMenuItem copyAllFileLinksToClipboard = new JMenuItem();
+        private final JMenuItem copyAllFileLinksOfMessageToClipboard = new JMenuItem();
 
         private final JMenuItem downloadFile = new JMenuItem();
         private final JMenuItem downloadAllFiles = new JMenuItem();
@@ -945,6 +949,7 @@ public class MessageTextPane extends JPanel {
 
         private String clickedKey = null;
         private List<String> allKeys = null;
+        private List<String> currentMessageKeys = null;
 
         public PopupMenuHyperLink() throws HeadlessException {
             super();
@@ -957,16 +962,21 @@ public class MessageTextPane extends JPanel {
         public void setAllKeys(final List<String> listAllKeys) {
             allKeys = listAllKeys;
         }
+        public void setCurrentMessageKeys(final List<String> listCurrentMessageKeys) {
+            currentMessageKeys = listCurrentMessageKeys;
+        }
 
         public void actionPerformed(final ActionEvent e) {
             if( e.getSource() == copyKeyOnlyToClipboard ) {
-                copyToClipboard(false);
+                copyToClipboard(Collections.singletonList(clickedKey));
             } else if( e.getSource() == copyFreesiteLinkToClipboard ) {
-                copyToClipboard(false);
+                copyToClipboard(Collections.singletonList(clickedKey));
             } else if( e.getSource() == copyFileLinkToClipboard ) {
-                copyToClipboard(false);
+                copyToClipboard(Collections.singletonList(clickedKey));
             } else if( e.getSource() == copyAllFileLinksToClipboard ) {
-                copyToClipboard(true);
+                copyToClipboard(allKeys);
+            } else if( e.getSource() == copyAllFileLinksOfMessageToClipboard ) {
+                copyToClipboard(currentMessageKeys);
             } else if( e.getSource() == downloadFile ) {
                 downloadItems(false);
             } else if( e.getSource() == downloadAllFiles ) {
@@ -987,6 +997,7 @@ public class MessageTextPane extends JPanel {
             copyFreesiteLinkToClipboard.addActionListener(this);
             copyFileLinkToClipboard.addActionListener(this);
             copyAllFileLinksToClipboard.addActionListener(this);
+            copyAllFileLinksOfMessageToClipboard.addActionListener(this);
             downloadFile.addActionListener(this);
             downloadAllFiles.addActionListener(this);
             downloadAllFilesOfMessage.addActionListener(this);
@@ -1000,13 +1011,14 @@ public class MessageTextPane extends JPanel {
             copyFreesiteLinkToClipboard.setText(language.getString("MessagePane.hyperlink.popupmenu.copyFreesiteLinkToClipboard"));
             copyFileLinkToClipboard.setText(language.getString("MessagePane.hyperlink.popupmenu.copyFileKeyToClipboard"));
             copyAllFileLinksToClipboard.setText(language.getString("MessagePane.hyperlink.popupmenu.copyAllFileKeysToClipboard"));
+            copyAllFileLinksOfMessageToClipboard.setText(language.getString("MessagePane.hyperlink.popupmenu.copyAllFileKeysOfMessageToClipboard"));
             downloadFile.setText(language.getString("MessagePane.hyperlink.popupmenu.downloadFileKey"));
             downloadAllFiles.setText(language.getString("MessagePane.hyperlink.popupmenu.downloadAllFileKeys"));
             downloadAllFilesOfMessage.setText(language.getString("MessagePane.hyperlink.popupmenu.downloadAllFileKeysOfMessage"));
             openFileInBrowser.setText(language.getString("MessagePane.hyperlink.popupmenu.openFileInBrowser"));
             openAllFilesInBrowser.setText(language.getString("MessagePane.hyperlink.popupmenu.openAllFlesInBrowser"));
 
-            cancelItem.setText(language.getString("Common.cancel"));
+//            cancelItem.setText(language.getString("Common.cancel"));
         }
 
         @Override
@@ -1036,12 +1048,17 @@ public class MessageTextPane extends JPanel {
             } else {
                 // file key
                 add(copyFileLinkToClipboard);
+                if( currentMessageKeys.size() > 0 ) {
+                    add(copyAllFileLinksOfMessageToClipboard);
+                }
                 if( allKeys.size() > 1 ) {
                     add(copyAllFileLinksToClipboard);
                 }
                 addSeparator();
                 add(downloadFile);
-                add(downloadAllFilesOfMessage);
+                if( currentMessageKeys.size() > 0 ) {
+                    add(downloadAllFilesOfMessage);
+                }
                 if( allKeys.size() > 1 ) {
                     add(downloadAllFiles);
                 }
@@ -1055,8 +1072,8 @@ public class MessageTextPane extends JPanel {
 	            }
 			}
 
-            addSeparator();
-            add(cancelItem);
+//            addSeparator();
+//            add(cancelItem);
 
             super.show(invoker, x, y);
         }
@@ -1124,12 +1141,11 @@ public class MessageTextPane extends JPanel {
         }
 
         /**
-         * This method copies the CHK keys and file names of the selected or all items to the clipboard.
+         * This method copies the keys and file names of the items to the clipboard.
          */
-        private void copyToClipboard(final boolean getAll) {
+        private void copyToClipboard(final List<String> items) {
 
-            final List<String> items = getItems(getAll);
-            if( items == null ) {
+            if( items == null || items.isEmpty() ) {
                 return;
             }
 

@@ -65,6 +65,7 @@ public class Frost {
      * If none was specified, the System Look and Feel is set.
      */
     private void initializeLookAndFeel() {
+        UIManager.put("TextArea.font", new javax.swing.plaf.FontUIResource("Monospaced", java.awt.Font.PLAIN, 12));
         LookAndFeel laf = null;
         try {
             // use cmd line setting

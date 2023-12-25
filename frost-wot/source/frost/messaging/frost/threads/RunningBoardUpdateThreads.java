@@ -18,6 +18,9 @@
 */
 package frost.messaging.frost.threads;
 
+import org.joda.time.*;
+
+import java.util.logging.*;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
@@ -35,6 +38,8 @@ import frost.messaging.frost.boards.BoardUpdateThreadListener;
  * Listeners for thread started and thread finished are provided.
  */
 public class RunningBoardUpdateThreads implements BoardUpdateThreadListener {
+	
+	private static final Logger logger = Logger.getLogger(MessageThread.class.getName());
 
     // listeners are notified of each finished thread
     Hashtable<String,Vector<BoardUpdateThreadListener>> threadListenersForBoard = null; // contains all listeners registered for 1 board
@@ -63,7 +68,8 @@ public class RunningBoardUpdateThreads implements BoardUpdateThreadListener {
         final MessageThread tofd = new MessageThread(
                 true,
                 board,
-                board.getMaxMessageDownload());
+                board.getMaxMessageDownload(),
+                0);
 
         // register listener and this class as listener
         tofd.addBoardUpdateThreadListener(this);
@@ -88,17 +94,57 @@ public class RunningBoardUpdateThreads implements BoardUpdateThreadListener {
         final BoardUpdateThreadListener listener,
         final boolean downloadCompleteBackload)
     {
-        int daysBackward;
+		return startMessageDownloadBack(board, config, listener, downloadCompleteBackload, false);
+    }
+
+    public boolean startMessageDownloadBack(
+        final Board board,
+        final SettingsClass config,
+        final BoardUpdateThreadListener listener,
+        final boolean downloadCompleteBackload,
+        final boolean resume)
+    {
+		int daysBackward;
+        int startDay = 1; // SF_EDIT
+        LocalDate resumeFrom = null;
+        
         if( downloadCompleteBackload ) {
             daysBackward = board.getMaxMessageDownload();
+            startDay = board.getStartDaysBack(); //SF
         } else {
             daysBackward = 1;
         }
 
+		if(resume)
+		{
+			resumeFrom = board.getLastDayBoardUpdatedObj();
+			logger.info(board.getName() + ": Resume From: " + resumeFrom);
+			LocalDate today = new LocalDate(DateTimeZone.UTC);
+			logger.info(board.getName() + ": today: " + today);
+			Period period = new Period(resumeFrom, today);
+			logger.info(board.getName() + ": Got Period...");
+
+			int days = period.getDays();
+			int weeks = period.getWeeks();
+			int months = period.getMonths();
+			int years = period.getYears();
+			
+			// Should we add a day or two here or just resume where we left off?
+			// Also who would wait years between frost runs?
+			int differenceDays = (days) + (weeks * 7) + (months * 30) + (years * 365);
+			logger.info(board.getName()+ ". RESUME: differenceDays=" + differenceDays);
+			
+			startDay = board.getLastDayChecked() - differenceDays;
+			logger.info(board.getName() + ". lastDayChecked: " + board.getLastDayChecked());
+			logger.info(board.getName() + ". startday : " + startDay);
+
+	    }
+        
         final MessageThread backload = new MessageThread(
                 false,
                 board,
-                daysBackward);
+                daysBackward,
+                startDay);
 
         // register listener and this class as listener
         backload.addBoardUpdateThreadListener(this);
@@ -112,7 +158,7 @@ public class RunningBoardUpdateThreads implements BoardUpdateThreadListener {
         backload.start();
 
         return true;
-    }
+	}
 
     /**
      * Gets an Vector from a Hashtable with given key. If key is not contained

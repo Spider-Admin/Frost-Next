@@ -57,6 +57,10 @@ public class SettingsClass implements ExitSavable {
 
     private static final Logger logger = Logger.getLogger(SettingsClass.class.getName());
 
+	public static final String DOWNLOAD_ENABLED_DEFAULT = "downloads.autoenable"; //SF_EDIT
+	public static final String SNOWFLAKE_HACK_WRITE_LAST_DAY = "snowflakehack.writeLastDay";
+	public static final String DOWNLOAD_TODAY_DAYS_BACK = "message.DN_LOAD_TODAY.maxDaysBack";
+
     public static final String DOS_STOP_BOARD_UPDATES_WHEN_DOSED = "dos.stopBoardUpdatesWhenDosed";
     public static final String DOS_INVALID_SUBSEQUENT_MSGS_THRESHOLD = "dos.invalidSubsequentMessagesThreshold";
 
@@ -193,6 +197,7 @@ public class SettingsClass implements ExitSavable {
     public static final String MAX_MESSAGE_DISPLAY = "maxMessageDisplay";
     public static final String MAX_MESSAGE_DOWNLOAD = "maxMessageDownload";
     public static final String MESSAGE_UPLOAD_DISABLED = "messageUploadDisabled";
+    public static final String MAX_MESSAGE_FAILURE = "maxMesssageFailure";
 
     public static final String SEARCH_MAX_RESULTS = "maxSearchResults";
     public static final String SEARCH_HIDE_BAD = "hideBadFiles";
@@ -873,6 +878,8 @@ public class SettingsClass implements ExitSavable {
         defaults = new Hashtable<String,Object>();
         final File fn = File.listRoots()[0];
 
+		defaults.put(DOWNLOAD_ENABLED_DEFAULT, "true"); //SF_EDIT
+
         defaults.put(MIGRATE_VERSION, "0");
 
         defaults.put(FREETALK_SHOW_TAB, "false");
@@ -955,8 +962,9 @@ public class SettingsClass implements ExitSavable {
         defaults.put(DOWNLOAD_MAX_RETRIES, "25");
         defaults.put(DOWNLOAD_WAITTIME, "5");
 
-        defaults.put(MAX_MESSAGE_DISPLAY, "15");
-        defaults.put(MAX_MESSAGE_DOWNLOAD, "5");
+        defaults.put(MAX_MESSAGE_DISPLAY, "90");
+        defaults.put(MAX_MESSAGE_DOWNLOAD, "30");
+        defaults.put(MAX_MESSAGE_FAILURE, "2"); //SF_EDIT
         defaults.put(ALWAYS_DOWNLOAD_MESSAGES_BACKLOAD, "false");
 
         defaults.put(MIN_DAYS_BEFORE_FILE_RESHARE, "5"); // reshare all 5 days
@@ -1084,6 +1092,9 @@ public class SettingsClass implements ExitSavable {
 
         defaults.put(PERST_COMPACT_STORAGES, "false");
         defaults.put(PERST_EXPORT_STORAGES,  "false");
+
+		defaults.put(SNOWFLAKE_HACK_WRITE_LAST_DAY, "false");
+		defaults.put(DOWNLOAD_TODAY_DAYS_BACK,"1");
 
         settingsHash.putAll(defaults);
     }

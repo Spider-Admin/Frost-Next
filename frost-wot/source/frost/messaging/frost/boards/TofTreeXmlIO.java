@@ -26,6 +26,7 @@ import javax.swing.*;
 import javax.swing.tree.*;
 
 import org.w3c.dom.*;
+import org.joda.time.*;
 
 import frost.util.*;
 
@@ -178,6 +179,52 @@ public class TofTreeXmlIO {
                     }
                 }
 
+                // maybe restore lastDayBoardUpdated SF_EDIT
+                // logger.info(fbobj.getName() + ": Trying to restore lastDayBoardUpdated");
+                ltmp = XMLTools.getChildElementsByTagName(child, "lastDayBoardUpdated");
+                if (ltmp.size() > 0) {
+					//logger.info(fbobj.getName() + ": Size > 0 true");
+                    final Text txtname = (Text) ((Node) ltmp.get(0)).getFirstChild();
+                    //logger.info(fbobj.getName() + ": txtname = " + txtname );
+                    if (txtname != null) {
+                        String day = null;
+                        try {
+                            day = txtname.getData();
+                            //logger.info(fbobj.getName() + ": getData: " + day);
+                        } catch (final Exception e) {
+                            //logger.info(fbobj.getName() +": CAUGHT EXCEPTION");
+                        }
+
+                        if (day.length() > 0) {
+							//logger.info(fbobj.getName() + ": Restoring lastDayBoardUpdated: " + day);
+                            fbobj.setLastDayBoardUpdated(day);
+                        }
+                    } else {
+						//logger.info(fbobj.getName() + ": Got lastDayBoardUpdated null..");
+					}
+                }
+
+                // maybe restore lastDayChecked SF_EDIT
+                //logger.info(fbobj.getName() + ": Trying to restore lastDayChecked");
+                ltmp = XMLTools.getChildElementsByTagName(child, "lastDayChecked");
+                if (ltmp.size() > 0) {
+                    final Text txtname = (Text) ((Node) ltmp.get(0)).getFirstChild();
+                    if (txtname != null) {
+                        int lastDayChecked = -1;
+                        try {
+                            lastDayChecked = Integer.parseInt(txtname.getData());
+                            //logger.info(fbobj.getName() + ": getData: " + lastDayChecked);
+                        } catch (final Exception e) {
+                            ;
+                        }
+
+                        if (lastDayChecked > 0) {
+							//logger.info(fbobj.getName() +": Setting lastDayChecked: lastDayChecked");
+                            fbobj.setLastDayChecked(lastDayChecked);
+                        }
+                    }
+                }
+
                 treeFolder.add(fbobj);
             } else {
                 final boolean isExpanded = isExpanded(child);
@@ -210,6 +257,15 @@ public class TofTreeXmlIO {
 
         String val = element.getAttribute("autoUpdate");
         board.setAutoUpdateEnabled( Boolean.valueOf(val).booleanValue() );
+
+		//SF_EDIT
+		val = element.getAttribute("startDaysBack");
+        if( val.length() == 0 ) {
+            board.setStartDaysBack( null );
+        } else {
+            board.setStartDaysBack( new Integer(val) );
+        }
+		//END_EDIT
 
         val = element.getAttribute("maxMessageDisplay");
         if( val.length() == 0 ) {
@@ -451,10 +507,30 @@ public class TofTreeXmlIO {
              element.appendChild( cdata );
              rootBoardElement.appendChild( element );
          }
+         //SF_EDIT
+         if( board.getLastDayBoardUpdatedObj() != null ) {
+             element = doc.createElement("lastDayBoardUpdated");
+             cdata = doc.createCDATASection(board.getLastDayBoardUpdated());
+             element.appendChild( cdata );
+             rootBoardElement.appendChild( element );
+          }
+          
+         if( board.getLastDayCheckedObj() != null ) {
+             element = doc.createElement("lastDayChecked");
+             cdata = doc.createCDATASection(Integer.toString(board.getLastDayChecked()));
+             element.appendChild( cdata );
+             rootBoardElement.appendChild( element );
+          }
+          //END_EDIT
         // <config />
         if( board.isConfigured() ) {
             element = doc.createElement("config");
 
+			//SF_EDIT
+            if( board.getStartDaysBackObj() != null ) {
+                element.setAttribute("startDaysBack", "" + board.getStartDaysBack());
+            }
+			//END_EDIT
             element.setAttribute("autoUpdate", "" + board.getAutoUpdateEnabled());
             if( board.getMaxMessageDisplayObj() != null ) {
                 element.setAttribute("maxMessageDisplay", "" + board.getMaxMessageDisplay());

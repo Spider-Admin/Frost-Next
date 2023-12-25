@@ -75,6 +75,8 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
         private final JMenuItem descriptionItem = new JMenuItem();
         private final JMenuItem pasteNodeItem = new JMenuItem();
         private final JMenuItem refreshItem = new JMenuItem();
+        private final JMenuItem resumeItem = new JMenuItem();
+        private final JMenuItem stopItem = new JMenuItem();
         private final JMenuItem removeNodeItem = new JMenuItem();
         private final JMenuItem renameFolderItem = new JMenuItem();
         private final JMenuItem searchMessagesItem = new JMenuItem();
@@ -124,7 +126,11 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
                         searchMessagesSelected();
                     } else if( source == sendMessageItem ) {
                         sendMessageSelected();
-                    }
+					} else if( source == resumeItem ) {
+						resumeSelected();
+					} else if( source == stopItem ) {
+						stopSelected();
+					}
                 }
 
                 @Override
@@ -162,6 +168,8 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
             cutNodeItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/edit-cut.png", 16, 16));
             pasteNodeItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/edit-paste.png", 16, 16));
             refreshItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/view-refresh.png", 16, 16));
+            resumeItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/view-refresh.png", 16, 16));
+            stopItem.setIcon(MiscToolkit.getScaledImage("/data/flagged.gif", 16, 16));
             removeNodeItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/user-trash.png", 16, 16));
             sortFolderItem.setIcon(MiscToolkit.getScaledImage("/data/sort.gif", 16, 16));
             renameFolderItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/edit-select-all.png", 16, 16));
@@ -172,6 +180,8 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
 
             // add listeners
             refreshItem.addActionListener(this);
+            resumeItem.addActionListener(this);
+            stopItem.addActionListener(this);
             addBoardItem.addActionListener(this);
             addFolderItem.addActionListener(this);
             removeNodeItem.addActionListener(this);
@@ -200,6 +210,8 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
         }
 
         private void refreshLanguage() {
+			resumeItem.setText(language.getString("BoardTree.popupmenu.resumeRefresh"));
+			stopItem.setText(language.getString("BoardTree.popupmenu.stopRefresh"));
             addBoardItem.setText(language.getString("BoardTree.popupmenu.addNewBoard"));
             addFolderItem.setText(language.getString("BoardTree.popupmenu.addNewFolder"));
             configureBoardItem.setText(language.getString("BoardTree.popupmenu.configureSelectedBoard"));
@@ -214,6 +226,54 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
         private void refreshSelected() {
             refreshNode(selectedTreeNode);
         }
+
+		private void stopSelected() {
+			if(selectedTreeNode == null || !selectedTreeNode.isBoard())
+			{
+				return;
+			}
+			
+			((Board)selectedTreeNode).setStopUpdating(true);
+		}
+
+		/**
+		 * Resume the backload for the selected board
+		 */
+        private void resumeSelected() {
+			if (selectedTreeNode == null || !selectedTreeNode.isBoard()) {
+				return;
+			}
+
+			Board board = ((Board)selectedTreeNode);
+
+			// TODO: the gui buttons for boardupdate should be disabled instead
+			if (!Core.isFreenetOnline()) {
+				return;
+			}
+
+			boolean threadStarted = false;
+			getRunningBoardUpdateThreads().startMessageDownloadBack(board, settings, listener, true, true);
+			logger.info("Resuming update (MSG_BACKLOAD) of " + selectedTreeNode.getName());
+			threadStarted = true;
+			
+			
+			// Also download the messages of today
+			if (getRunningBoardUpdateThreads().isThreadOfTypeRunning(board, BoardUpdateThread.MSG_DNLOAD_TODAY) == false) {
+				getRunningBoardUpdateThreads().startMessageDownloadToday(
+					board,
+					settings,
+					listener);
+				logger.info("Starting update (MSG_TODAY) of " + board.getName());
+				threadStarted = true;
+			}
+			
+			// if there was a new thread started, update the lastUpdateStartTimeMillis
+			if (threadStarted == true) {
+				long now = System.currentTimeMillis();
+				board.setLastUpdateStartMillis(now);
+				board.incTimesUpdatedCount();
+			}
+		}
 
         private void sendMessageSelected() {
             if( selectedTreeNode == null || !selectedTreeNode.isBoard() ) {
@@ -285,9 +345,21 @@ public class TofTree extends JDragTree implements AutoSavable, ExitSavable, Prop
                 add(descriptionItem);
                 addSeparator();
                 add(refreshItem);
+                
+                if(selectedTreeNode.isBoard() && ((Board)selectedTreeNode).isUpdating())
+                {
+					add(stopItem);
+				}
+                
+                if(selectedTreeNode.isBoard() && ((Board)selectedTreeNode).isResumeable())
+                {
+					add(resumeItem);
+				}
+                
                 if (selectedTreeNode.isFolder() == false && !((Board)selectedTreeNode).isReadAccessBoard() ) {
                     add(sendMessageItem);
                 }
+                
                 add(searchMessagesItem);
                 addSeparator();
                 add(markAllReadItem);

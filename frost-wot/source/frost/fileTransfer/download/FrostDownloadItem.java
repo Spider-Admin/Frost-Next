@@ -44,7 +44,7 @@ public class FrostDownloadItem extends ModelItem<FrostDownloadItem> implements C
 	private String associatedMessageId = null;
 	private String associatedBoardName = null;
 
-    private Boolean enabled = Boolean.TRUE;
+    private Boolean enabled = Core.frostSettings.getBoolValue(SettingsClass.DOWNLOAD_ENABLED_DEFAULT); // SF_EDIT
     private int state = STATE_WAITING;
     private long downloadAddedTime = 0;
     private long downloadStartedTime = 0;

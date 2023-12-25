@@ -27,6 +27,8 @@ import frost.storage.perst.messages.*;
 import frost.util.*;
 import frost.util.gui.*;
 import frost.util.gui.translation.*;
+import org.joda.time.*;
+import java.util.logging.*;
 
 /**
  * Represents a board in the board tree.
@@ -34,10 +36,16 @@ import frost.util.gui.translation.*;
 @SuppressWarnings("serial")
 public class Board extends AbstractNode {
 
+    private static final Logger logger = Logger.getLogger(Board.class.getName());
+
     private static Language language = Language.getInstance();
 
     private PerstFrostBoardObject perstFrostBoardObject = null;
 
+    private Integer startDaysBack = null; //SF_EDIT Day to start downloading backlog at
+    private Integer lastDayChecked = null; // SF_EDIT 
+    private boolean stopUpdating = false;
+    
     private boolean autoUpdateEnabled = true; // must apply, no default
     private String boardDescription = null;
     private final String boardFileName;
@@ -72,6 +80,8 @@ public class Board extends AbstractNode {
 
     private boolean hasFlaggedMessages = false;
     private boolean hasStarredMessages = false;
+
+	private LocalDate lastDayBoardUpdated = null;
 
     // Long is the dateMillis used in MessageThread, a unique String per day
     private final Hashtable<Long,BoardUpdateInformation> boardUpdateInformations = new Hashtable<Long,BoardUpdateInformation>();
@@ -331,6 +341,73 @@ public class Board extends AbstractNode {
         return boardIcon;
     }
 
+    // SF_EDIT
+    
+    public Boolean getStopUpdating()
+    {
+		return stopUpdating;
+	}
+    
+    //Number of days backwards to start downloading from
+    public int getStartDaysBack()
+    {
+      if (!isConfigured() || startDaysBack == null)
+		return 0;
+      else
+		return startDaysBack;
+    }
+
+    public Integer getStartDaysBackObj()
+    {
+		return startDaysBack;
+    }
+    
+    //Number of days back we are currently at
+    public int getLastDayChecked()
+    {
+		//logger.log(Level.INFO, getName() + ": getLastDayChecked: " + lastDayChecked);
+		if(lastDayChecked != null)
+			return lastDayChecked;
+		else return 0;
+	}
+	
+	public Integer getLastDayCheckedObj()
+	{
+		return lastDayChecked;
+	}
+	
+	// The most recent day that the board was updating
+	public String getLastDayBoardUpdated()
+	{
+		logger.info(getName() + ": getLastDayBoardUpdated: " + lastDayBoardUpdated);
+		if (lastDayBoardUpdated != null)
+			return lastDayBoardUpdated.toString();
+		else
+			return "never";
+	}
+	
+	public LocalDate getLastDayBoardUpdatedObj()
+	{
+		logger.info(getName() + ": getLastDayBoardUpdatedObj: " + lastDayBoardUpdated);
+		return lastDayBoardUpdated;
+	}
+	
+	/**
+	 * Backload updating can be resumed
+	 */
+	public boolean isResumeable()
+	{
+		boolean resumable = false;
+		
+		if ( (lastDayBoardUpdated != null) && (!isUpdating()) )
+			if( (lastDayChecked != null) && (lastDayChecked < getMaxMessageDownload()) )
+				resumable = true;
+				
+		return ( resumable );
+	}
+	
+    // END EDIT
+    
     //////////////////////////////////////////////
     // From BoardStats
 
@@ -467,6 +544,42 @@ public class Board extends AbstractNode {
         isUpdating = val;
     }
 
+	//SF_EDIT
+	
+	public void setStopUpdating(boolean stop)
+	{
+		stopUpdating = stop;
+	}
+	
+    //Number of days backwards to start downloading from
+    public void setStartDaysBack(final Integer val)
+    {
+		startDaysBack = val;
+    }
+    
+    //Number of days back we are currently at
+    public void setLastDayChecked(final Integer val)
+    {
+		lastDayChecked = val;
+		logger.log(Level.INFO, getName() + ": setLastDayChecked: " + val);
+	}
+    
+    // The most recent day that the board was updating
+    public void setLastDayBoardUpdated(String day)
+    {
+		logger.log(Level.INFO, getName() + ": setLastDayBoardUpdated: " + day);
+		if (day.equals("never"))
+			lastDayBoardUpdated = null;
+		else
+			lastDayBoardUpdated = LocalDate.parse(day);
+	}
+	
+	public void setLastDayBoardUpdated(LocalDate day)
+	{
+		lastDayBoardUpdated = day;
+		logger.log(Level.INFO, getName() + ": setLastDayBoardUpdated: " + day);
+	}
+    
     /**
      * Returns true if board is allowed to be updated.
      * If a board is already updating only not running threads will be started.
@@ -522,6 +635,7 @@ public class Board extends AbstractNode {
         this.perstFrostBoardObject = perstFrostBoardObject;
     }
 
+    
     /////// BoardUpdateInformation methods //////
 
     public BoardUpdateInformation getBoardUpdateInformationForDay(final long dateMillis) {

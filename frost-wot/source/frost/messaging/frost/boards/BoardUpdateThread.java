@@ -27,7 +27,9 @@ public interface BoardUpdateThread
     public final static int MSG_DNLOAD_BACK   = 2;
 
     int getThreadType();
-
+    
+    int getDaysBack(); //SF_EDIT
+    
     // FrostBoard getTargetBoard()
     public Board getTargetBoard();
 

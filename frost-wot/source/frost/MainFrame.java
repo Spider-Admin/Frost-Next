@@ -79,6 +79,7 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
     //File Menu
     private final JMenu fileMenu = new JMenu();
     private final JMenuItem fileExitMenuItem = new JMenuItem();
+    private final JMenuItem fileReloadSettings = new JMenuItem();
     private final JMenuItem fileStatisticsMenuItem = new JMenuItem();
 
     private final JMenuItem helpAboutMenuItem = new JMenuItem();
@@ -263,6 +264,7 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
 
             fileExitMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/system-log-out.png", 16, 16));
             fileStatisticsMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/x-office-spreadsheet.png", 16, 16));
+            fileReloadSettings.setIcon(MiscToolkit.getScaledImage("/data/toolbar/arrow_switch.png", 16, 16));
             lookAndFeelMenu.setIcon(MiscToolkit.getScaledImage("/data/toolbar/preferences-desktop-theme.png", 16, 16));
             optionsManageIdentitiesMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/group.png", 16, 16));
             //optionsManageTrackedDownloadsMenuItem.setIcon(MiscToolkit.getScaledImage("/data/toolbar/filelist.png", 16, 16));
@@ -280,6 +282,11 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
             fileStatisticsMenuItem.addActionListener(new ActionListener() {
                 public void actionPerformed(final ActionEvent e) {
                     fileStatisticsMenuItem_actionPerformed(e);
+                }
+            });
+            fileReloadSettings.addActionListener(new ActionListener() {
+                public void actionPerformed(final ActionEvent e) {
+                    fileReloadSettings_actionPerformed();
                 }
             });
             optionsPreferencesMenuItem.addActionListener(new ActionListener() {
@@ -337,6 +344,7 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
 
             // File Menu
             fileMenu.add(fileStatisticsMenuItem);
+            fileMenu.add(fileReloadSettings);
             fileMenu.addSeparator();
             fileMenu.add(fileExitMenuItem);
             // News Menu
@@ -469,6 +477,13 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
         if (frostSettings.getBoolValue(SettingsClass.FREETALK_SHOW_TAB)) {
             getFreetalkMessageTab().saveLayout();
         }
+    }
+
+    /**
+     * File | Reload Settings action performed
+     */
+    public void fileReloadSettings_actionPerformed() {
+		frostSettings.readSettingsFile();
     }
 
     /**
@@ -773,7 +788,10 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
         /////////////////////////////////////////////////
         //   Update status bar and file count in panels
         /////////////////////////////////////////////////
-        getStatusBar().setStatusBarInformations(fileInfo, msgInfo, getFrostMessageTab().getTofTreeModel().getSelectedNode().getName());
+        //SF_EDIT
+        AbstractNode selectedNode = getFrostMessageTab().getTofTreeModel().getSelectedNode();
+        getStatusBar().setStatusBarInformations(fileInfo, msgInfo, selectedNode);
+		//END_EDIT
 
         Core.getInstance().getFileTransferManager().updateWaitingCountInPanels(fileInfo);
     }
@@ -804,6 +822,7 @@ public class MainFrame extends JFrame implements SettingsUpdater, LanguageListen
         fileMenu.setText(language.getString("MainFrame.menu.file"));
         fileExitMenuItem.setText(language.getString("Common.exit"));
         fileStatisticsMenuItem.setText(language.getString("MainFrame.menu.file.statistics"));
+        fileReloadSettings.setText(language.getString("MainFrame.menu.file.reload"));
         tofMenu.setText(language.getString("MainFrame.menu.news"));
         tofAutomaticUpdateMenuItem.setText(language.getString("MainFrame.menu.news.automaticBoardUpdate"));
         optionsMenu.setText(language.getString("MainFrame.menu.options"));

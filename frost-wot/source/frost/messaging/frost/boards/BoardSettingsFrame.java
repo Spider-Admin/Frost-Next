@@ -62,6 +62,13 @@ public class BoardSettingsFrame extends JDialog {
 
     private final Listener listener = new Listener();
 
+    //SF_EDIT    
+    private final JTextField startDayToDownload_value = new JTextField(6);
+    private final JLabel startDayToDownloadLabel = new JLabel();
+    private final JRadioButton startDayToDownload_default = new JRadioButton();
+    private final JRadioButton startDayToDownload_set = new JRadioButton();
+    //END_EDIT
+    
     private final JCheckBox autoUpdateEnabled = new JCheckBox();
     private final JButton cancelButton = new JButton();
     private boolean exitState;
@@ -142,7 +149,7 @@ public class BoardSettingsFrame extends JDialog {
         enableEvents(AWTEvent.WINDOW_EVENT_MASK);
         initialize();
         //pack();
-        setSize(430,615);
+        setSize(430,648);
         setLocationRelativeTo(parentFrame);
     }
 
@@ -196,6 +203,9 @@ public class BoardSettingsFrame extends JDialog {
         settingsPanel.setBorder(new CompoundBorder(new EtchedBorder(), new EmptyBorder(5,5,5,5)));
         settingsPanel.setLayout(new GridBagLayout());
 
+        final ButtonGroup bg9 = new ButtonGroup();
+        bg9.add(startDayToDownload_default);
+        bg9.add(startDayToDownload_set);
         final ButtonGroup bg2 = new ButtonGroup();
         bg2.add(maxMessageDisplay_default);
         bg2.add(maxMessageDisplay_set);
@@ -242,6 +252,24 @@ public class BoardSettingsFrame extends JDialog {
         settingsPanel.add(autoUpdateEnabled, constraints);
         constraints.gridy++;
 
+        //SF_EDIT
+        constraints.gridwidth = 3;
+        constraints.gridx = 0;
+        constraints.insets = new Insets(3, 25, 0, 5);
+        settingsPanel.add(startDayToDownloadLabel, constraints);
+        constraints.insets = new Insets(0, 35, 0, 5);
+        constraints.gridwidth = 1;
+        constraints.gridy++;
+        constraints.gridx = 0;
+        settingsPanel.add(startDayToDownload_default, constraints);
+        constraints.insets = new Insets(0, 0, 0, 5);
+        constraints.gridx = 1;
+        settingsPanel.add(startDayToDownload_set, constraints);
+        constraints.gridx = 2;
+        settingsPanel.add(startDayToDownload_value, constraints);
+        constraints.gridy++;
+        //END_EDIT
+        
         constraints.gridwidth = 3;
         constraints.gridx = 0;
         constraints.insets = new Insets(3, 25, 0, 5);
@@ -385,6 +413,7 @@ public class BoardSettingsFrame extends JDialog {
         refreshLanguage();
 
         // Adds all of the components
+        new TextComponentClipboardMenu(startDayToDownload_value, language); //SF_EDIT
         new TextComponentClipboardMenu(maxMessageDisplay_value, language);
         new TextComponentClipboardMenu(maxMessageDownload_value, language);
         new TextComponentClipboardMenu(privateKeyTextField, language);
@@ -535,6 +564,13 @@ public class BoardSettingsFrame extends JDialog {
 
             overrideSettingsCheckBox.setSelected(board.isConfigured());
 
+            if (!board.isConfigured() || board.getStartDaysBackObj() == null) {
+                startDayToDownload_default.setSelected(true);
+            } else {
+                startDayToDownload_set.setSelected(true);
+                startDayToDownload_value.setText("" + board.getStartDaysBack());
+            }
+            
             if (!board.isConfigured() || board.getMaxMessageDisplayObj() == null) {
                 maxMessageDisplay_default.setSelected(true);
             } else {
@@ -703,6 +739,17 @@ public class BoardSettingsFrame extends JDialog {
 
             board.setAutoUpdateEnabled(autoUpdateEnabled.isSelected());
 
+            if( startDayToDownload_default.isSelected() || startDayToDownload_set.isSelected() ) {
+                if (startDayToDownload_default.isSelected() == false) {
+					int check = new Integer(startDayToDownload_value.getText());
+					if (check >= board.getMaxMessageDownload())
+						check = board.getMaxMessageDownload() -1;
+                    board.setStartDaysBack(check);
+                } else {
+                    board.setStartDaysBack(null);
+                }
+            }
+            
             if( maxMessageDisplay_default.isSelected() || maxMessageDisplay_set.isSelected() ) {
                 if (maxMessageDisplay_default.isSelected() == false) {
                     board.setMaxMessageDays(new Integer(maxMessageDisplay_value.getText()));
@@ -793,6 +840,13 @@ public class BoardSettingsFrame extends JDialog {
         if (overrideSettingsCheckBox.isSelected()) {
             board.setConfigured(true);
             board.setAutoUpdateEnabled(autoUpdateEnabled.isSelected());
+            
+            if (startDayToDownload_default.isSelected() == false) {
+                board.setStartDaysBack(new Integer(startDayToDownload_value.getText()));
+            } else {
+                board.setStartDaysBack(null);
+            }
+            
             if (maxMessageDisplay_default.isSelected() == false) {
                 board.setMaxMessageDays(new Integer(maxMessageDisplay_value.getText()));
             } else {
@@ -908,6 +962,12 @@ public class BoardSettingsFrame extends JDialog {
         final String useDefault = language.getString("BoardSettings.label.useDefault");
         final String yes = language.getString("BoardSettings.label.yes");
         final String no  = language.getString("BoardSettings.label.no");
+        
+        startDayToDownload_default.setText(useDefault); //SF_EDIT
+        startDayToDownload_set.setText(language.getString("BoardSettings.label.setTo") + ":");
+        startDayToDownload_default.setText(useDefault);
+        startDayToDownload_set.setText(language.getString("BoardSettings.label.setTo") + ":");
+        
         maxMessageDisplay_default.setText(useDefault);
         maxMessageDisplay_set.setText(language.getString("BoardSettings.label.setTo") + ":");
         maxMessageDownload_default.setText(useDefault);
@@ -941,7 +1001,9 @@ public class BoardSettingsFrame extends JDialog {
         hideObserveMessagesLabel.setText(language.getString("BoardSettings.label.hideObserveMessages"));
         hideMessageCountLabel.setText(language.getString("BoardSettings.label.hideMessageCountDisplay"));
         storeSentMessagesLabel.setText(language.getString("BoardSettings.label.storeSentMessages"));
-
+        
+        startDayToDownloadLabel.setText(language.getString("BoardSettings.label.startDay") + " :");
+        
         descriptionLabel.setText(language.getString("BoardSettings.label.description"));
     }
 

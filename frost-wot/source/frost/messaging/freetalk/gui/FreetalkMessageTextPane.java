@@ -201,7 +201,7 @@ public class FreetalkMessageTextPane extends JPanel {
 
         if( searchMessagesConfig != null &&
             searchMessagesConfig.content != null &&
-            searchMessagesConfig.content.size() > 0 )
+            searchMessagesConfig.content.length() > 0 )
         {
             // highlight words in content that the user searched for
             if( textHighlighter == null ) {

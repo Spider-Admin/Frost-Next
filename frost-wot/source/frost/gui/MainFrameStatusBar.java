@@ -18,6 +18,8 @@
 */
 package frost.gui;
 
+import java.lang.Integer;
+
 import java.awt.*;
 import java.awt.event.*;
 
@@ -25,6 +27,8 @@ import javax.swing.*;
 import javax.swing.border.*;
 
 import frost.*;
+import frost.MainFrame;
+import frost.messaging.frost.boards.*;
 import frost.fileTransfer.*;
 import frost.messaging.frost.threads.*;
 import frost.util.gui.*;
@@ -37,6 +41,8 @@ import frost.util.gui.translation.*;
 public class MainFrameStatusBar extends JPanel {
 
     private final Language language;
+
+	private BoardsManager boardManager = new BoardsManager(Core.frostSettings);
 
     private JLabel statusLabelTofup = null;
     private JLabel statusLabelTofdn = null;
@@ -209,7 +215,7 @@ public class MainFrameStatusBar extends JPanel {
         add(p5, gridBagConstraints6);
     }
 
-    public void setStatusBarInformations(final FileTransferInformation finfo, final RunningMessageThreadsInformation info, final String selectedNode) {
+    public void setStatusBarInformations(final FileTransferInformation finfo, final RunningMessageThreadsInformation info, final AbstractNode selectedNode) {
 
         this.statusBarInformations = info;
 
@@ -270,14 +276,36 @@ public class MainFrameStatusBar extends JPanel {
                 .toString();
             statusLabelTofdn.setText(newText);
         }
+        
+		//SF_EDIT
+		Board selectedBoard = null;
+		boolean isUpdating = false;
+		int day = -1;
+		String name = selectedNode.getName();
+		if(selectedNode.isBoard())
+		{
+			MainFrame mainFrame = MainFrame.getInstance();
+			selectedBoard = mainFrame.getFrostMessageTab().getTofTreeModel().getBoardByName(name);
+			if (selectedBoard.isUpdating())
+			{
+				isUpdating = true;
+				day = selectedBoard.getLastDayChecked();
+			}
+		}
 
-        newText = new StringBuilder()
-            .append(" ")
+        sb = new StringBuilder();
+            sb.append(" ")
             .append(language.getString("MainFrame.statusBar.selectedBoard")).append(": ")
-            .append(selectedNode)
-            .append(" ")
-            .toString();
-        statusLabelBoard.setText(newText);
+            .append(name);
+            
+			 if(isUpdating) {
+				sb.append(", " + language.getString("MainFrame.statusBar.updateDay") + " ");
+                sb.append(Integer.toString(day));
+              }
+
+        statusLabelBoard.setText(sb.toString());
+        //END_EDIT
+        
     }
 
     public void showNewMessageIcon(final boolean show) {

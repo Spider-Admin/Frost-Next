@@ -1208,27 +1208,36 @@ public class MessagePanel extends JPanel implements PropertyChangeListener {
         }
 
         if( origMessage.getRecipientName() != null ) {
-            // this message was for me, reply encrypted
+            // this message was encrypted, reply encrypted
 
-            if( origMessage.getFromIdentity() == null ) {
-                final String title = language.getString("MessagePane.unknownRecipientError.title");
-                final String txt = language.formatMessage("MessagePane.unknownRecipientError.text", origMessage.getFromName());
+            Identity senderId = origMessage.getFromIdentity();
+            if( senderId == null ) {
+                final String title = language.getString("MessagePane.missingSenderIdentityError.title");
+                final String txt = language.formatMessage("MessagePane.missingSenderIdentityError.text", origMessage.getFromName());
                 JOptionPane.showMessageDialog(parent, txt, title, JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            LocalIdentity senderId = null;
-            if( origMessage.getFromIdentity() instanceof LocalIdentity ) {
-                // we want to reply to our own message
-                senderId = (LocalIdentity)origMessage.getFromIdentity();
-            } else {
-                // we want to reply, find our identity that was the recipient of this message
-                senderId = identities.getLocalIdentity(origMessage.getRecipientName());
-                if( senderId == null ) {
-                    final String title = language.getString("MessagePane.missingLocalIdentityError.title");
-                    final String txt = language.formatMessage("MessagePane.missingLocalIdentityError.text", origMessage.getRecipientName());
+
+            Identity recipientId = identities.getIdentity(origMessage.getRecipientName());
+            if( recipientId == null ) {
+                final String title = language.getString("MessagePane.missingRecipientIdentityError.title");
+                final String txt = language.formatMessage("MessagePane.missingRecipientIdentityError.text", origMessage.getRecipientName());
+                JOptionPane.showMessageDialog(parent, txt, title, JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            if( !(recipientId instanceof LocalIdentity) ) {
+                if ( !(senderId instanceof LocalIdentity) ) {
+                    final String title = language.getString("MessagePane.bothIdentitiesAreNotLocalError.title");
+                    final String txt = language.getString("MessagePane.bothIdentitiesAreNotLocalError.text");
                     JOptionPane.showMessageDialog(parent, txt, title, JOptionPane.ERROR_MESSAGE);
                     return;
                 }
+
+                // we want to reply to our own message, swap identities
+                Identity swapId = senderId;
+                senderId = recipientId;
+                recipientId = swapId;
             }
 
             final MessageFrame newMessageFrame = new MessageFrame(settings, parent);
@@ -1237,8 +1246,8 @@ public class MessagePanel extends JPanel implements PropertyChangeListener {
                     subject,
                     inReplyTo,
                     origMessage.getCompleteContent(),
-                    origMessage.getFromIdentity(),
                     senderId,
+                    (LocalIdentity)recipientId,
                     origMessage);
         } else {
             final MessageFrame newMessageFrame = new MessageFrame(settings, parent);

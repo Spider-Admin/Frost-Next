@@ -41,7 +41,7 @@ public class MessageDecoder extends Decoder implements Smileys, MessageTypes {
 	private boolean smileys = true;
 	private boolean freenetKeys = true;
 
-    private final List<String> hyperlinkedKeys = new LinkedList<String>();
+    private final TreeMap<Integer, String> hyperlinkedKeys = new TreeMap<Integer, String>();
     private final TreeSet<MessageElement> elements = new TreeSet<MessageElement>();
 
     public MessageDecoder() {
@@ -162,6 +162,10 @@ public class MessageDecoder extends Decoder implements Smileys, MessageTypes {
                             length -= pos;
                         }
 
+                        // exclude trailing white spaces from a link
+                        while (Character.isWhitespace(testMessage.charAt(pos + length - 1)))
+                            --length;
+
                         final String aFileLink = testMessage.substring(pos, pos+length);
                         if( FreenetKeys.isValidKey(aFileLink) ) {
                             // we add all file links (last char of link must not be a '/' or similar) to list of links;
@@ -171,7 +175,7 @@ public class MessageDecoder extends Decoder implements Smileys, MessageTypes {
                             if( Character.isLetterOrDigit(testMessage.charAt(pos+length-1)) ) {
                                 // file link must contain at least one '/'
                                 if( aFileLink.indexOf("/") > 0 ) {
-                                    hyperlinkedKeys.add(aFileLink);
+                                    hyperlinkedKeys.put(pos + offset, aFileLink);
                                 }
                             }
                         }
@@ -232,7 +236,11 @@ public class MessageDecoder extends Decoder implements Smileys, MessageTypes {
         return SmileyCache.getCachedSmiley(i);
 	}
 
+    public List<String> getHyperlinkedKeys(int fromPos) {
+        return new LinkedList<String>(hyperlinkedKeys.tailMap(fromPos).values());
+    }
+
     public List<String> getHyperlinkedKeys() {
-        return hyperlinkedKeys;
+        return new LinkedList<String>(hyperlinkedKeys.values());
     }
 }

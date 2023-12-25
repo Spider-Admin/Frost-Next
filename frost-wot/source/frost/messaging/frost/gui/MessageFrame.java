@@ -42,6 +42,7 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.awt.Color;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
@@ -102,6 +103,8 @@ import frost.messaging.frost.FrostMessageObject;
 import frost.messaging.frost.FrostUnsentMessageObject;
 import frost.messaging.frost.UnsentMessagesManager;
 import frost.messaging.frost.boards.Board;
+import frost.messaging.frost.boards.TofTree;
+import frost.messaging.frost.boards.BoardUpdateThread;
 import frost.storage.perst.messages.MessageStorage;
 import frost.util.DateFun;
 import frost.util.FileAccess;
@@ -174,6 +177,7 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
     private JComboBox ownIdentitiesComboBox = null;
 
     private static int openInstanceCount = 0;
+    
 
     public MessageFrame(final SettingsClass newSettings, final Window tparentWindow) {
         super();
@@ -446,6 +450,7 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
             buddies.removeAllItems();
             buddies.addItem(recipient);
             buddies.setSelectedItem(recipient);
+            messageTextArea.setForeground(Color.BLUE);
             // dont allow to disable signing/encryption
             encrypt.setEnabled(false);
             buddies.setEnabled(false);
@@ -1094,6 +1099,28 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
             }
         }
 
+		// Download todays messages if message uploading isn't disabled. 
+		if (Core.isFreenetOnline() && !frostSettings.getBoolValue(SettingsClass.MESSAGE_UPLOAD_DISABLED)) {
+			TofTree tree = MainFrame.getInstance().getFrostMessageTab().getTofTree();
+			boolean threadStarted = false;
+
+			// download the messages of today
+			if (tree.getRunningBoardUpdateThreads().isThreadOfTypeRunning(board, BoardUpdateThread.MSG_DNLOAD_TODAY) == false) {
+				tree.getRunningBoardUpdateThreads().startMessageDownloadToday(
+					board,
+					frostSettings,
+					tree.getRunningBoardUpdateThreads());
+				logger.info("Starting update (MSG_TODAY) of " + board.getName());
+				threadStarted = true;
+			}
+			// if there was a new thread started, update the lastUpdateStartTimeMillis
+			if (threadStarted == true) {
+				long now = System.currentTimeMillis();
+				board.setLastUpdateStartMillis(now);
+				board.incTimesUpdatedCount();
+			}
+		}
+
         setVisible(false);
         dispose();
     }
@@ -1161,8 +1188,10 @@ public class MessageFrame extends JFrame implements AltEditCallbackInterface {
     private void encrypt_actionPerformed(final ActionEvent e) {
         if( encrypt.isSelected() ) {
             buddies.setEnabled(true);
+            messageTextArea.setForeground(Color.BLUE);
         } else {
             buddies.setEnabled(false);
+            messageTextArea.setForeground(Color.BLACK);
         }
     }
 

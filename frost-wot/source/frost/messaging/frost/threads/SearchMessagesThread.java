@@ -20,6 +20,8 @@ package frost.messaging.frost.threads;
 
 import java.util.*;
 import java.util.logging.*;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 import org.joda.time.*;
 
@@ -107,7 +109,7 @@ public class SearchMessagesThread extends Thread implements MessageCallback {
                         dr.startDate,
                         dr.endDate,
                         retrieveDisplayedMessages,
-                        ((searchConfig.content==null||searchConfig.content.size()==0)?false:true), // withContent
+                        ((searchConfig.content==null||searchConfig.content.length()==0)?false:true), // withContent
                         false, // withAttachment
                         false, // showDeleted
                         this);
@@ -165,16 +167,16 @@ public class SearchMessagesThread extends Thread implements MessageCallback {
             return;
         }
 
-        if( !matchText(mo.getFromName(), searchConfig.senderMakeLowercase, searchConfig.sender, searchConfig.notSender) ) {
+        if( !matchText(mo.getFromName(), searchConfig.sender, searchConfig.senderMakeLowercase) ) {
             return;
         }
 
-        if( !matchText(mo.getSubject(), searchConfig.subjectMakeLowercase, searchConfig.subject, searchConfig.notSubject) ) {
+        if( !matchText(mo.getSubject(), searchConfig.subject, searchConfig.subjectMakeLowercase )) {
             return;
         }
 
-        if( !searchConfig.content.isEmpty() || !searchConfig.notContent.isEmpty() ) {
-            if( !matchText(mo.getContent(), searchConfig.contentMakeLowercase, searchConfig.content, searchConfig.notContent) ) {
+        if( !searchConfig.content.isEmpty()) {
+            if( !matchText(mo.getContent(), searchConfig.content, searchConfig.contentMakeLowercase) ) {
                 return;
             }
         }
@@ -186,35 +188,21 @@ public class SearchMessagesThread extends Thread implements MessageCallback {
     /**
      * @return  true if text was accepted, false if not
      */
-    private boolean matchText(
-            final String origText,
-            final boolean makeLowerCase,
-            final List<String> strings,
-            final List<String> notStrings)
+    private boolean matchText(final String origText, final String regex, final boolean makeLowercase)
     {
-
-        if( !notStrings.isEmpty() || !strings.isEmpty() ) {
-            String text;
-            if( makeLowerCase ) {
-                text = origText.toLowerCase();
-            } else {
-                text = origText;
-            }
-
-            // check NOT strings
-            if( !notStrings.isEmpty() ) {
-                if( TextSearchFun.containsAnyString(text, notStrings) ) {
-                    return false;
-                }
-            }
-            // check strings
-            if( !strings.isEmpty() ) {
-                if( !TextSearchFun.containsEachString(text, strings) ) {
-                    return false;
-                }
-            }
-        }
-        return true; // ok!
+		String text;
+		if(makeLowercase)
+			text = origText.toLowerCase();
+		else
+			text = origText;
+			
+		Pattern pattern = Pattern.compile(regex);
+		Matcher matcher = pattern.matcher(text);
+  
+		if (matcher.find())
+			return true; // ok!
+		else
+			return false;
     }
 
     private boolean matchesTrustStates(final FrostMessageObject msg, final TrustStates ts) {

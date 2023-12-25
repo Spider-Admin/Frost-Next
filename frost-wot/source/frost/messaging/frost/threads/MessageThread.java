@@ -21,10 +21,12 @@ package frost.messaging.frost.threads;
 
 import java.io.*;
 import java.util.logging.*;
+import java.lang.Number;
 
 import org.joda.time.*;
 
 import frost.*;
+import frost.SettingsClass;
 import frost.identities.*;
 import frost.messaging.frost.*;
 import frost.messaging.frost.boards.*;
@@ -40,14 +42,26 @@ public class MessageThread extends BoardUpdateThreadObject implements BoardUpdat
     private final Board board;
     private final int maxMessageDownload;
     private final boolean downloadToday;
-
+    private final int startDay; // SF_EDIT
+    private int daysBack; // SF_EDIT
+	private final SettingsClass config;
+	
     private static final Logger logger = Logger.getLogger(MessageThread.class.getName());
 
-    public MessageThread(final boolean downloadToday, final Board boa, final int maxmsgdays) {
+    public MessageThread(final boolean downloadToday, final Board boa, final int maxmsgdays, final int startDay) {
         super(boa);
         this.downloadToday = downloadToday;
         this.board = boa;
         this.maxMessageDownload = maxmsgdays;
+		this.daysBack = 0;
+		this.startDay = startDay;
+		config = new SettingsClass();
+    }
+
+	//SF_EDIT
+    public int getDaysBack()
+    {
+		return startDay + daysBack;
     }
 
     public int getThreadType() {
@@ -85,23 +99,70 @@ public class MessageThread extends BoardUpdateThreadObject implements BoardUpdat
             final int boardId = board.getPerstFrostBoardObject().getBoardId();
             // start a thread if allowed,
             if (this.downloadToday) {
-                final long dateMillis = localDate.toDateMidnight(DateTimeZone.UTC).getMillis();
-                // get IndexSlot for today
-                final IndexSlot gis = IndexSlotsStorage.inst().getSlotForDate(boardId, dateMillis);
-                // download only current date
-                final BoardUpdateInformation todayBui = downloadDate(localDate, gis, dateMillis);
+				int maxMessageToday = config.getIntValue(SettingsClass.DOWNLOAD_TODAY_DAYS_BACK);
+				if (maxMessageToday > 5)
+					maxMessageToday = 5;
+				
+				while(!isInterrupted() && daysBack < maxMessageToday) {
+					daysBack++;
+					logger.info(board.getName() + ": TOF Download: downloading day: " + daysBack);
+					
+					// get IndexSlot for today
+					final long dateMillis = localDate.toDateMidnight(DateTimeZone.UTC).getMillis();
+                    final IndexSlot gis = IndexSlotsStorage.inst().getSlotForDate(boardId, dateMillis);
+					final BoardUpdateInformation todayBui = downloadDate(localDate, gis, dateMillis);
 
-                // after update, check if there are messages for upload and upload them
-                // ... but only when we didn't stop because of too much invalid messages
-                if( todayBui.isBoardUpdateAllowed() ) {
-                    uploadMessages(gis); // doesn't get a message when message upload is disabled
-                }
+					// after update, check if there are messages for upload and upload them
+					// ... but only when we didn't stop because of too much invalid messages
+					if( todayBui.isBoardUpdateAllowed() && daysBack == 1) {
+						logger.info(board.getName() + ": TOF Download: uploading messages.");
+						uploadMessages(gis); // doesn't get a message when message upload is disabled
+					}
+					localDate = localDate.minusDays(1);
+				}
             } else {
+				localDate = localDate.minusDays(startDay);
                 // download up to maxMessages days to the past
-                int daysBack = 0;
                 while (!isInterrupted() && daysBack < maxMessageDownload) {
+					if(board.getStopUpdating())
+					{
+						board.setStopUpdating(false);
+						break;
+						
+					}
+					
+					board.setLastDayChecked(daysBack + startDay);
+					board.setLastDayBoardUpdated(new LocalDate(DateTimeZone.UTC));
+					
+					//Write a file for each updating board with value of daysback
+					if(config.getBoolValue(SettingsClass.SNOWFLAKE_HACK_WRITE_LAST_DAY) )
+					{
+						File outDir = new File("./localdata/boardupdates/");
+						if (!outDir.exists()) {
+							boolean result = outDir.mkdir();
+						}
+						
+						String boardName = board.getName();
+						Integer.toString(daysBack);
+						String filename= "./localdata/boardupdates/" + boardName + ".txt";
+						FileWriter fw = new FileWriter(filename,false);
+						try
+						{ 
+							fw.write(daysBack + "\n");
+							fw.close();
+						}
+						catch(IOException ioe)
+						{
+							System.err.println("IOException: " + ioe.getMessage());
+						}
+						finally
+						{
+							fw.close();
+						}
+					 }
+					 
                     daysBack++;
-                    localDate = localDate.minusDays(1);
+                    localDate = localDate.minusDays(startDay + daysBack);
                     final long dateMillis = localDate.toDateMidnight(DateTimeZone.UTC).getMillis();
                     final IndexSlot gis = IndexSlotsStorage.inst().getSlotForDate(boardId, dateMillis);
                     downloadDate(localDate, gis, dateMillis);
@@ -160,7 +221,10 @@ public class MessageThread extends BoardUpdateThreadObject implements BoardUpdat
 
         int index = -1;
         int failures = 0;
-        final int maxFailures = 2; // skip a maximum of 2 empty slots at the end of known indices
+        int configMaxFailures = config.getIntValue(SettingsClass.MAX_MESSAGE_FAILURE);
+        if(configMaxFailures > 5)
+			configMaxFailures = 5;
+        final int maxFailures = configMaxFailures; // skip a maximum of 2 empty slots at the end of known indices
 
         while (failures < maxFailures) {
 

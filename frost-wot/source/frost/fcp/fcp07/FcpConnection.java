@@ -337,6 +337,8 @@ public class FcpConnection {
         msg.add("Identifier=put-" + FcpSocket.getNextFcpId() );
         msg.add("Verbosity=-1"); // receive SimpleProgress
         msg.add("MaxRetries=3");
+        msg.add("ExtraInsertsSingleBlock=5");
+        msg.add("ExtraInsertsSplitfileHeaderBlock=5");
         if ((ulItem != null) && !ulItem.getCompress()) {
         	msg.add("DontCompress=true");
         }
@@ -371,6 +373,7 @@ public class FcpConnection {
             	}
             } else if( type == FcpHandler.TYPE_MESSAGE ) {
                 prio = FreenetPriority.getPriority(Core.frostSettings.getIntValue(SettingsClass.FCP2_DEFAULT_PRIO_MESSAGE_UPLOAD));
+                msg.add("EarlyEncode=true");
             } else {
             	if( ulItem != null) {
             		prio = ulItem.getPriority();

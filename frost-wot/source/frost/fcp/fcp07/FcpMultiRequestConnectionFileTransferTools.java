@@ -179,6 +179,8 @@ public class FcpMultiRequestConnectionFileTransferTools {
         lst.add("Identifier=" + id);
         lst.add("Verbosity=-1");
         lst.add("MaxRetries=-1");
+        lst.add("ExtraInsertsSingleBlock=5");
+        lst.add("ExtraInsertsSplitfileHeaderBlock=5");
         if( ! compress ) {
          	lst.add("DontCompress=true");
         }
@@ -364,6 +366,9 @@ public class FcpMultiRequestConnectionFileTransferTools {
         msg.add("Identifier=" + id );
         msg.add("Verbosity=0");
         msg.add("MaxRetries=1");
+        msg.add("ExtraInsertsSingleBlock=5");
+        msg.add("ExtraInsertsSplitfileHeaderBlock=5");
+        msg.add("EarlyEncode=true");
         //msg.add("DontCompress=true");
         msg.add("PriorityClass=" + prio.getNumber());
         msg.add("Persistence=connection");

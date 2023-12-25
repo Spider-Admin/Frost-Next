@@ -219,8 +219,8 @@ Build log  : ${logfilename}</echo>
     <delete quiet="true" file="${release.dir}/${distZipNamePrefix}${revision}-source.zip"/>
     <zip destfile="${release.dir}/${distZipNamePrefix}${revision}-source.zip" filesonly="true">
     	<zipfileset dir="."
-    				prefix = "frost-wot"
-    				excludes=".* **/CVS/* ${lib.dir}/**/*.jar"
+    				prefix = "frost"
+    				excludes=".* **/CVS/*"
     				includes="${src.dir}/**/* ${bin.dir}/**/* ${res.dir}/**/*
     						  ${lib.dir}/**/* ${specs.dir}/**/* ${helpsrc.dir}/**/*
                               build.xml HOWTO-BUILD.txt"/>
